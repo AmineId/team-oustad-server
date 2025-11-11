@@ -1,0 +1,74 @@
+version: '3.9'
+
+services:
+  # ===== BASE DE DONNÉES DEV =====
+  postgres-dev:
+    image: postgres:16
+    container_name: teamfitness-db-dev
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: admin
+      POSTGRES_DB: fitness
+    ports:
+      - '5432:5432'
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U admin -d fitness"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    volumes:
+      - pgdata-dev:/var/lib/postgresql/data
+    networks:
+      - teamfitness-network
+
+  # ===== BASE DE DONNÉES PREPROD =====
+  postgres-preprod:
+    image: postgres:16
+    container_name: teamfitness-db-preprod
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: admin
+      POSTGRES_DB: fitness_preprod
+    ports:
+      - '5433:5432'
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U admin -d fitness_preprod"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    volumes:
+      - pgdata-preprod:/var/lib/postgresql/data
+    networks:
+      - teamfitness-network
+
+  # ===== BASE DE DONNÉES PROD =====
+  postgres-prod:
+    image: postgres:16
+    container_name: teamfitness-db-prod
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: produser
+      POSTGRES_PASSWORD: change_this_strong_password
+      POSTGRES_DB: fitness_prod
+    ports:
+      - '5434:5432'
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U produser -d fitness_prod"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    volumes:
+      - pgdata-prod:/var/lib/postgresql/data
+    networks:
+      - teamfitness-network
+
+volumes:
+  pgdata-dev:
+  pgdata-preprod:
+  pgdata-prod:
+
+networks:
+  teamfitness-network:
+    driver: bridge

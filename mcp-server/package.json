@@ -1,0 +1,33 @@
+{
+  "name": "@teamfitness/mcp-server",
+  "version": "1.1.0",
+  "description": "MCP Server for Team Fitness - Multi-environment support (dev/preprod/prod) for gym management, subscriptions, plannings via Model Context Protocol",
+  "type": "module",
+  "main": "index.js",
+  "bin": {
+    "teamfitness-mcp": "./index.js"
+  },
+  "scripts": {
+    "start": "node index.js",
+    "start:dev": "ACTIVE_ENV=dev node index.js",
+    "start:preprod": "ACTIVE_ENV=preprod node index.js",
+    "start:prod": "ACTIVE_ENV=prod node index.js",
+    "dev": "nodemon index.js"
+  },
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "team-fitness",
+    "gym-management"
+  ],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.0.4",
+    "axios": "^1.7.9",
+    "dotenv": "^16.4.7"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.10"
+  }
+}
