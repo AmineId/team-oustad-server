@@ -1,0 +1,9 @@
+# Ignorer les fichiers APK (trop volumineux pour Git)
+*.apk
+
+# Ignorer les backups
+backups/
+
+# Garder uniquement le fichier version.json et la documentation
+!version.json
+!README.md

@@ -8,8 +8,10 @@ info:
     email: support@teamfitness.com
 
 servers:
-  - url: http://localhost:3000
-    description: Serveur de développement
+  - url: https://api-pprod.team-oustad.com
+    description: Serveur de pré-production
+  - url: http://localhost:3001
+    description: Serveur de développement local
   - url: https://api.teamfitness.com
     description: Serveur de production
 
@@ -558,6 +560,369 @@ security:
   - bearerAuth: []
 
 paths:
+  /android/upload:
+    post:
+      tags:
+        - Android OTA Updates
+      summary: Upload APK with metadata
+      description: Upload a new APK file with version metadata (requires authentication)
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required:
+                - apk
+                - version_code
+                - version_name
+              properties:
+                apk:
+                  type: string
+                  format: binary
+                  description: APK file to upload
+                version_code:
+                  type: integer
+                  description: Version code (numeric, incremental)
+                  example: 2
+                version_name:
+                  type: string
+                  description: Version name (semantic versioning)
+                  example: "1.0.1"
+                changelog:
+                  type: string
+                  description: Changes in this version
+                  example: "Bug fixes and performance improvements"
+                min_supported_version:
+                  type: integer
+                  description: Minimum supported version code (for force update)
+                  example: 1
+                force_update:
+                  type: boolean
+                  description: Force users to update
+                  example: false
+                channel:
+                  type: string
+                  enum: [production, beta]
+                  description: Deployment channel
+                  example: production
+                  default: production
+      responses:
+        '200':
+          description: APK uploaded successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "APK uploaded successfully to production channel"
+                  version:
+                    type: object
+                    properties:
+                      version_code:
+                        type: integer
+                        example: 2
+                      version_name:
+                        type: string
+                        example: "1.0.1"
+                      download_url:
+                        type: string
+                        example: "https://app.team-oustad.com/android/app-release.apk"
+                      changelog:
+                        type: string
+                        example: "Bug fixes and performance improvements"
+                      min_supported_version:
+                        type: integer
+                        example: 1
+                      force_update:
+                        type: boolean
+                        example: false
+                      release_date:
+                        type: string
+                        format: date-time
+                        example: "2025-11-15T12:30:00.000Z"
+                      file_size:
+                        type: integer
+                        example: 25000000
+                      checksum:
+                        type: string
+                        example: "abc123def456..."
+                      channel:
+                        type: string
+                        example: "production"
+                  checksums:
+                    type: object
+                    properties:
+                      md5:
+                        type: string
+                        example: "d41d8cd98f00b204e9800998ecf8427e"
+                      sha256:
+                        type: string
+                        example: "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        '400':
+          description: Invalid input or missing required fields
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: "version_code and version_name are required"
+        '401':
+          description: Unauthorized - authentication required
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: "Authentication required"
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: "Internal server error"
+                  message:
+                    type: string
+
+  /android/check-update:
+    get:
+      tags:
+        - Android OTA Updates
+      summary: Check for available updates
+      description: Check if a new version is available for the Android app
+      parameters:
+        - in: query
+          name: current_version
+          required: true
+          schema:
+            type: integer
+          description: Current installed version code
+          example: 1
+        - in: query
+          name: channel
+          schema:
+            type: string
+            enum: [production, beta]
+          description: Update channel to check
+          example: production
+          default: production
+        - in: query
+          name: device_id
+          schema:
+            type: string
+          description: Device identifier (optional, for analytics)
+          example: "device-123"
+      responses:
+        '200':
+          description: Update availability information
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  update_available:
+                    type: boolean
+                    example: true
+                  current_version:
+                    type: integer
+                    example: 1
+                  latest_version:
+                    type: object
+                    nullable: true
+                    properties:
+                      version_code:
+                        type: integer
+                        example: 2
+                      version_name:
+                        type: string
+                        example: "1.0.1"
+                      download_url:
+                        type: string
+                        example: "https://app.team-oustad.com/android/app-release.apk"
+                      changelog:
+                        type: string
+                        example: "Bug fixes and improvements"
+                      force_update:
+                        type: boolean
+                        example: false
+                      file_size:
+                        type: integer
+                        example: 25000000
+                      checksum:
+                        type: string
+                        example: "abc123..."
+                      release_date:
+                        type: string
+                        format: date-time
+        '400':
+          description: Missing or invalid parameters
+        '500':
+          description: Server error
+
+  /android/download:
+    get:
+      tags:
+        - Android OTA Updates
+      summary: Download APK
+      description: Download the latest APK file
+      responses:
+        '200':
+          description: APK file
+          content:
+            application/vnd.android.package-archive:
+              schema:
+                type: string
+                format: binary
+        '404':
+          description: APK file not found
+        '500':
+          description: Server error
+
+  /android/version:
+    get:
+      tags:
+        - Android OTA Updates
+      summary: Get version metadata
+      description: Get metadata for the current published version
+      responses:
+        '200':
+          description: Version metadata
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  version_code:
+                    type: integer
+                  version_name:
+                    type: string
+                  download_url:
+                    type: string
+                  changelog:
+                    type: string
+                  min_supported_version:
+                    type: integer
+                  force_update:
+                    type: boolean
+                  release_date:
+                    type: string
+                    format: date-time
+                  file_size:
+                    type: integer
+                  checksum:
+                    type: string
+        '500':
+          description: Server error
+
+  /android/checksum:
+    get:
+      tags:
+        - Android OTA Updates
+      summary: Calculate APK checksum
+      description: Calculate and return checksums for the current APK
+      responses:
+        '200':
+          description: Checksum information
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  md5:
+                    type: string
+                  sha256:
+                    type: string
+                  file_size:
+                    type: integer
+        '404':
+          description: APK file not found
+        '500':
+          description: Server error
+
+  /android/beta/check-update:
+    get:
+      tags:
+        - Android OTA Updates - Beta Channel
+      summary: Check for beta updates
+      description: Check if a new beta version is available
+      parameters:
+        - in: query
+          name: current_version
+          required: true
+          schema:
+            type: integer
+          description: Current installed version code
+          example: 1
+        - in: query
+          name: device_id
+          schema:
+            type: string
+          description: Device identifier (optional)
+      responses:
+        '200':
+          description: Beta update availability information
+        '400':
+          description: Missing or invalid parameters
+        '500':
+          description: Server error
+
+  /android/beta/download:
+    get:
+      tags:
+        - Android OTA Updates - Beta Channel
+      summary: Download beta APK
+      description: Download the latest beta APK file
+      responses:
+        '200':
+          description: Beta APK file
+          content:
+            application/vnd.android.package-archive:
+              schema:
+                type: string
+                format: binary
+        '404':
+          description: Beta APK file not found
+        '500':
+          description: Server error
+
+  /android/beta/version:
+    get:
+      tags:
+        - Android OTA Updates - Beta Channel
+      summary: Get beta version metadata
+      description: Get metadata for the current beta version
+      responses:
+        '200':
+          description: Beta version metadata
+        '500':
+          description: Server error
+
+  /android/beta/checksum:
+    get:
+      tags:
+        - Android OTA Updates - Beta Channel
+      summary: Calculate beta APK checksum
+      description: Calculate and return checksums for the beta APK
+      responses:
+        '200':
+          description: Beta checksum information
+        '404':
+          description: Beta APK file not found
+        '500':
+          description: Server error
+
   /health:
     get:
       summary: Health check
@@ -3929,6 +4294,204 @@ paths:
                 $ref: '#/components/schemas/Error'
         '500':
           description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  # ==========================================
+  # Android OTA Updates
+  # ==========================================
+  /android/check-update:
+    get:
+      tags:
+        - Android OTA Updates
+      summary: Vérifier la disponibilité d'une mise à jour
+      description: Vérifie si une nouvelle version de l'application Android est disponible en comparant avec la version actuelle
+      parameters:
+        - in: query
+          name: current_version
+          required: true
+          schema:
+            type: integer
+            example: 1
+          description: Version actuelle installée (version_code)
+        - in: query
+          name: device_id
+          schema:
+            type: string
+            example: "device123abc"
+          description: Identifiant unique de l'appareil (optionnel, pour analytics)
+      responses:
+        '200':
+          description: Informations sur la mise à jour disponible
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  update_available:
+                    type: boolean
+                    example: true
+                  current_version:
+                    type: integer
+                    example: 1
+                  latest_version:
+                    type: object
+                    nullable: true
+                    properties:
+                      version_code:
+                        type: integer
+                        example: 2
+                      version_name:
+                        type: string
+                        example: "1.0.1"
+                      download_url:
+                        type: string
+                        example: "https://app.team-oustam.com/android/app-release.apk"
+                      changelog:
+                        type: string
+                        example: "Corrections de bugs et améliorations de performance"
+                      force_update:
+                        type: boolean
+                        example: false
+                      file_size:
+                        type: integer
+                        example: 25000000
+                      checksum:
+                        type: string
+                        example: "abc123def456789..."
+                      release_date:
+                        type: string
+                        format: date-time
+                        example: "2025-11-15T12:00:00Z"
+        '400':
+          description: Paramètre current_version manquant ou invalide
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Erreur serveur
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /android/download:
+    get:
+      tags:
+        - Android OTA Updates
+      summary: Télécharger la dernière version APK
+      description: Télécharge le fichier APK de la dernière version disponible
+      parameters:
+        - in: query
+          name: version
+          schema:
+            type: integer
+            example: 2
+          description: Version spécifique à télécharger (optionnel)
+      responses:
+        '200':
+          description: Fichier APK
+          content:
+            application/vnd.android.package-archive:
+              schema:
+                type: string
+                format: binary
+        '404':
+          description: Fichier APK non trouvé
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Erreur serveur
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /android/version:
+    get:
+      tags:
+        - Android OTA Updates
+      summary: Obtenir les informations de version
+      description: Retourne les métadonnées de la version actuelle disponible sur le serveur
+      responses:
+        '200':
+          description: Informations de version
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  version_code:
+                    type: integer
+                    example: 2
+                  version_name:
+                    type: string
+                    example: "1.0.1"
+                  download_url:
+                    type: string
+                    example: "https://app.team-oustam.com/android/app-release.apk"
+                  changelog:
+                    type: string
+                    example: "Corrections de bugs et améliorations"
+                  min_supported_version:
+                    type: integer
+                    example: 1
+                  force_update:
+                    type: boolean
+                    example: false
+                  release_date:
+                    type: string
+                    format: date-time
+                    example: "2025-11-15T12:00:00Z"
+                  file_size:
+                    type: integer
+                    example: 25000000
+                  checksum:
+                    type: string
+                    example: "abc123def456789..."
+        '500':
+          description: Erreur serveur
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /android/checksum:
+    get:
+      tags:
+        - Android OTA Updates
+      summary: Calculer le checksum de l'APK actuel
+      description: Calcule et retourne les checksums MD5 et SHA256 du fichier APK actuellement disponible
+      responses:
+        '200':
+          description: Checksums calculés
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  md5:
+                    type: string
+                    example: "5d41402abc4b2a76b9719d911017c592"
+                  sha256:
+                    type: string
+                    example: "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+                  file_size:
+                    type: integer
+                    example: 25000000
+        '404':
+          description: Fichier APK non trouvé
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Erreur serveur
           content:
             application/json:
               schema:

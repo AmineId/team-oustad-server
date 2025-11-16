@@ -1,0 +1,309 @@
+╔════════════════════════════════════════════════════════════════════════════╗
+║                                                                            ║
+║    ✅  ROUTAGE NGINX CONFIGURÉ AVEC SUCCÈS !  ✅                          ║
+║                                                                            ║
+╚════════════════════════════════════════════════════════════════════════════╝
+
+📅 Date : 15 novembre 2025
+🌐 Domaine : app.team-oustad.com
+🔒 SSL/TLS : Certificat Let's Encrypt (expire le 13 février 2026)
+✅ Status : OPÉRATIONNEL
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+📍 URLS PUBLIQUES DISPONIBLES
+
+┌────────────────────────────────────────────────────────────────────────┐
+│ 🔗 Endpoints Android OTA                                               │
+├────────────────────────────────────────────────────────────────────────┤
+│                                                                         │
+│ ✅ Check Update (API principale)                                       │
+│    https://app.team-oustad.com/android/check-update?current_version=1  │
+│                                                                         │
+│ ✅ Version Info (JSON statique)                                        │
+│    https://app.team-oustad.com/android/version.json                    │
+│                                                                         │
+│ ✅ Version API (Endpoint dynamique)                                    │
+│    https://app.team-oustad.com/android/version                         │
+│                                                                         │
+│ ✅ Download APK                                                         │
+│    https://app.team-oustad.com/android/download                        │
+│                                                                         │
+│ ✅ Checksum (Vérification SHA256)                                      │
+│    https://app.team-oustad.com/android/checksum                        │
+│                                                                         │
+└────────────────────────────────────────────────────────────────────────┘
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+🔧 CONFIGURATION NGINX
+
+Fichier de configuration :
+   /etc/nginx/sites-available/app.team-oustad.com
+
+Configuration active :
+   ✅ Proxy pass vers localhost:3001
+   ✅ Headers HTTPS configurés
+   ✅ Support des gros fichiers (100MB max)
+   ✅ Buffering désactivé pour le streaming
+   ✅ Redirection HTTP → HTTPS automatique
+   ✅ Certificat SSL Let's Encrypt actif
+
+Commandes utiles :
+   nginx -t                    # Tester la configuration
+   systemctl reload nginx      # Recharger Nginx
+   systemctl status nginx      # Voir le status
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+🧪 TESTS EFFECTUÉS - TOUS ✅
+
+┌─────────────────────────────────┬──────────┬─────────────────────────┐
+│ Endpoint                        │ Status   │ Résultat                │
+├─────────────────────────────────┼──────────┼─────────────────────────┤
+│ version.json                    │    ✅    │ JSON valide (HTTPS)     │
+│ check-update (v=1)              │    ✅    │ Pas de MAJ              │
+│ check-update (v=0)              │    ✅    │ MAJ détectée            │
+│ version (API)                   │    ✅    │ Réponse correcte        │
+│ download (APK)                  │    ⚠️    │ 404 (APK à uploader)    │
+│ checksum                        │    ⚠️    │ 404 (APK à uploader)    │
+│ Certificat SSL                  │    ✅    │ Valide jusqu'en 02/2026 │
+└─────────────────────────────────┴──────────┴─────────────────────────┘
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+📱 CONFIGURATION FLUTTER
+
+Utilisez ces URLs dans votre application Flutter :
+
+```dart
+// lib/config/api_config.dart
+class ApiConfig {
+  // URL de base
+  static const String BASE_URL = 'https://app.team-oustad.com';
+  
+  // OTA Update endpoints
+  static const String OTA_CHECK_URL = '$BASE_URL/android/check-update';
+  static const String OTA_VERSION_URL = '$BASE_URL/android/version.json';
+  static const String OTA_DOWNLOAD_URL = '$BASE_URL/android/download';
+  
+  // Exemple d'utilisation
+  static String checkUpdateUrl(int currentVersion) {
+    return '$OTA_CHECK_URL?current_version=$currentVersion';
+  }
+}
+```
+
+Exemple d'appel API :
+
+```dart
+import 'package:http/http.dart' as http;
+import 'dart:convert';
+
+Future<void> checkForUpdate() async {
+  final packageInfo = await PackageInfo.fromPlatform();
+  final currentVersion = int.parse(packageInfo.buildNumber);
+  
+  final url = Uri.parse(
+    ApiConfig.checkUpdateUrl(currentVersion)
+  );
+  
+  final response = await http.get(url);
+  
+  if (response.statusCode == 200) {
+    final data = json.decode(response.body);
+    
+    if (data['update_available'] == true) {
+      // Afficher dialogue de mise à jour
+      final version = data['latest_version'];
+      print('Update available: ${version['version_name']}');
+      print('Changelog: ${version['changelog']}');
+      print('Download: ${version['download_url']}');
+    }
+  }
+}
+```
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+🚀 PROCHAINES ÉTAPES
+
+1️⃣  DÉPLOYER VOTRE PREMIER APK
+
+   # Sur le serveur
+   cd /root/team-server/db-server
+   
+   # Utiliser le script de déploiement
+   ./scripts/deploy-android-apk.sh \
+     /chemin/vers/app-release.apk \
+     1 \
+     "1.0.0" \
+     "Version initiale de Team Fitness"
+
+2️⃣  METTRE À JOUR FLUTTER
+
+   Modifiez l'URL dans votre app Flutter :
+   
+   ```dart
+   static const String OTA_UPDATE_URL = 
+     'https://app.team-oustad.com/android/check-update';
+   ```
+
+3️⃣  TESTER
+
+   # Test depuis le serveur
+   ./scripts/test-android-ota-public.sh
+   
+   # Test depuis votre machine
+   curl https://app.team-oustad.com/android/version.json
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+🛠️  COMMANDES UTILES
+
+Tests :
+   ./scripts/test-android-ota-public.sh        # Test complet HTTPS
+   curl https://app.team-oustad.com/android/version.json
+   curl "https://app.team-oustad.com/android/check-update?current_version=1"
+
+Nginx :
+   systemctl status nginx                      # Status Nginx
+   systemctl reload nginx                      # Recharger config
+   nginx -t                                    # Tester config
+   tail -f /var/log/nginx/access.log          # Logs temps réel
+
+Certificat SSL :
+   certbot certificates                        # Voir les certificats
+   certbot renew --dry-run                     # Tester renouvellement
+   
+Serveur :
+   pm2 logs teamfitness-preprod               # Logs application
+   pm2 restart teamfitness-preprod            # Redémarrer app
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+🔒 SÉCURITÉ
+
+✅ HTTPS forcé (redirection HTTP → HTTPS)
+✅ Certificat SSL Let's Encrypt valide
+✅ Headers de sécurité configurés
+✅ Vérification de checksum SHA256 disponible
+✅ Limite de taille de fichier (100MB)
+✅ Renouvellement automatique du certificat SSL
+
+Renouvellement SSL :
+   Le certificat sera automatiquement renouvelé par Certbot
+   Expire le : 13 février 2026
+   Prochaine vérification : automatique (cron job)
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+📊 ARCHITECTURE
+
+┌─────────────────┐
+│  Flutter App    │
+│  (Mobile)       │
+└────────┬────────┘
+         │ HTTPS
+         ↓
+┌─────────────────────────────────────────────────────────────┐
+│  Nginx (Reverse Proxy)                                      │
+│  app.team-oustad.com:443 (HTTPS)                            │
+│  - SSL/TLS Termination                                      │
+│  - Proxy pass vers backend                                  │
+└────────┬────────────────────────────────────────────────────┘
+         │
+         ↓
+┌─────────────────────────────────────────────────────────────┐
+│  Node.js + Express                                          │
+│  localhost:3001                                             │
+│  - Routes /android/*                                        │
+│  - Fichiers statiques (public/android/)                    │
+│  - API dynamique                                            │
+└─────────────────────────────────────────────────────────────┘
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+📚 DOCUMENTATION
+
+📖 Guides complets :
+   • ANDROID_OTA_SETUP_COMPLETE.md
+   • QUICK_START_ANDROID_OTA.md
+   • public/android/README.md
+
+📖 Code Flutter :
+   • docs/development/flutter_ota_service_example.dart
+
+📖 Scripts disponibles :
+   • scripts/deploy-android-apk.sh          (déploiement APK)
+   • scripts/test-android-ota.sh            (tests local)
+   • scripts/test-android-ota-public.sh     (tests HTTPS)
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+✅ CHECKLIST FINALE
+
+Côté serveur :
+   ✅ Nginx installé et configuré
+   ✅ Domaine app.team-oustad.com configuré
+   ✅ Certificat SSL Let's Encrypt actif
+   ✅ Proxy pass vers port 3001 fonctionnel
+   ✅ Routes /android/* accessibles en HTTPS
+   ✅ Headers CORS et buffering configurés
+   ✅ Tests HTTPS validés
+   ⏳ APK à déployer (prochaine étape)
+
+Côté Flutter :
+   ⏳ Mettre à jour l'URL vers https://app.team-oustad.com
+   ⏳ Tester depuis l'app mobile
+   ⏳ Vérifier la détection de mise à jour
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+🆘 DÉPANNAGE
+
+Problème : Endpoints non accessibles
+Solution : 
+   1. systemctl status nginx
+   2. nginx -t
+   3. tail -f /var/log/nginx/error.log
+
+Problème : Certificat SSL invalide
+Solution :
+   1. certbot certificates
+   2. certbot renew
+   3. systemctl reload nginx
+
+Problème : 502 Bad Gateway
+Solution :
+   1. pm2 status
+   2. pm2 restart teamfitness-preprod
+   3. pm2 logs teamfitness-preprod
+
+Problème : APK ne télécharge pas
+Solution :
+   1. Vérifier que l'APK existe : ls -la public/android/
+   2. Vérifier les permissions : chmod 644 public/android/app-release.apk
+   3. Vérifier les logs Nginx
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+🎉 FÉLICITATIONS !
+
+Votre système Android OTA est maintenant accessible publiquement via HTTPS !
+
+🌐 URL principale : https://app.team-oustad.com/android
+
+Les utilisateurs de votre application Team Fitness pourront maintenant
+télécharger les mises à jour en toute sécurité via HTTPS.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+📞 Support
+
+Logs Nginx : /var/log/nginx/
+Logs App : pm2 logs teamfitness-preprod
+Config Nginx : /etc/nginx/sites-available/app.team-oustad.com
+Documentation : ANDROID_OTA_SETUP_COMPLETE.md
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━

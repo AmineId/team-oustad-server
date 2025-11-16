@@ -22,8 +22,8 @@ async function sendPasswordResetEmail(email, resetToken, isSetup = false) {
   console.log(`   Type: ${isSetup ? 'Activation compte' : 'Réinitialisation mot de passe'}`);
   
   const resetUrl = isSetup 
-    ? `${process.env.FRONTEND_URL || 'http://localhost:3000'}/setup-password?token=${resetToken}`
-    : `${process.env.FRONTEND_URL || 'http://localhost:3000'}/reset-password?token=${resetToken}`;
+    ? `${process.env.API_URL || 'http://localhost:3000'}/setup-password?token=${resetToken}`
+    : `${process.env.API_URL || 'http://localhost:3000'}/reset-password?token=${resetToken}`;
 
   console.log(`🔗 URL générée: ${resetUrl}`);
 
@@ -84,8 +84,8 @@ async function sendAccountSetupEmail(email, fullName, setupToken) {
   console.log(`   Nom: ${fullName}`);
   console.log(`   Token: ${setupToken}`);
   
-  // Si FRONTEND_URL est défini, l'utiliser, sinon utiliser la page statique de l'API
-  const baseUrl = process.env.FRONTEND_URL || process.env.API_URL || 'http://localhost:3000';
+  // Utiliser API_URL pour pointer vers le backend qui sert setup-password.html
+  const baseUrl = process.env.API_URL || 'http://localhost:3000';
   const setupUrl = `${baseUrl}/setup-password.html?email=${encodeURIComponent(email)}&token=${setupToken}`;
 
   console.log(`🔗 URL de configuration: ${setupUrl}`);

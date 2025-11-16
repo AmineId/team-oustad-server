@@ -33,6 +33,7 @@ const authRoutes = require('./routes/auth');
 const planningsRoutes = require('./routes/plannings');
 const subscriptionsRoutes = require('./routes/subscriptions');
 const subscriptionTypesRoutes = require('./routes/subscriptionTypes');
+const androidRoutes = require('./routes/android');
 
 // Use routes
 console.log('🔗 Configuration des routes API...');
@@ -42,7 +43,8 @@ app.use('/auth', authRoutes);
 app.use('/plannings', planningsRoutes);
 app.use('/subscriptions', subscriptionsRoutes);
 app.use('/subscription-types', subscriptionTypesRoutes);
-console.log('✅ Routes configurées: /gyms, /users, /auth, /plannings, /subscriptions, /subscription-types');
+app.use('/android', androidRoutes);
+console.log('✅ Routes configurées: /gyms, /users, /auth, /plannings, /subscriptions, /subscription-types, /android');
 
 // Health check (DB + server)
 app.get('/health', async (req, res) => {
@@ -60,8 +62,13 @@ app.get('/health', async (req, res) => {
 const PORT = process.env.PORT || 3000;
 // Listen on all interfaces so the server is reachable from emulators and other hosts
 const HOST = process.env.HOST || '0.0.0.0';
+const API_URL = process.env.API_URL || `http://localhost:${PORT}`;
 
-console.log(`🌐 Configuration serveur - Host: ${HOST}, Port: ${PORT}`);
+console.log(`🌐 Configuration serveur`);
+console.log(`   - Environment: ${process.env.NODE_ENV || 'development'}`);
+console.log(`   - Host: ${HOST}`);
+console.log(`   - Port: ${PORT}`);
+console.log(`   - API_URL (emails): ${API_URL}`);
 
 // Vérifier la configuration Firebase
 console.log('🔔 Vérification de la configuration Firebase...');
@@ -78,10 +85,19 @@ if (!firebaseServiceAccountPath) {
   try {
     const fs = require('fs');
     const path = require('path');
-    const resolvedPath = path.resolve(firebaseServiceAccountPath);
+    // Résoudre le chemin relatif au répertoire de travail courant (process.cwd())
+    const resolvedPath = path.resolve(process.cwd(), firebaseServiceAccountPath);
     
+    // Vérifier avec fs.existsSync qui suit les liens symboliques
     if (fs.existsSync(resolvedPath)) {
-      console.log(`✅ Firebase configuré: ${firebaseServiceAccountPath}`);
+      // Vérifier également que c'est un fichier valide et lisible
+      const stats = fs.lstatSync(resolvedPath);
+      if (stats.isSymbolicLink()) {
+        const realPath = fs.realpathSync(resolvedPath);
+        console.log(`✅ Firebase configuré: ${firebaseServiceAccountPath} -> ${path.basename(realPath)}`);
+      } else {
+        console.log(`✅ Firebase configuré: ${firebaseServiceAccountPath}`);
+      }
       console.log('📲 Les notifications push sont activées');
     } else {
       console.error(`❌ Fichier Firebase introuvable: ${resolvedPath}`);
@@ -110,10 +126,16 @@ console.log('✅ Job de notification des plannings: tous les jours à 6h00');
 app.listen(PORT, HOST, () => {
   const localUrl = `http://localhost:${PORT}`;
   const externalUrl = `http://${HOST}:${PORT}`;
-  console.log(`✅ Server is running
-  - Local:    ${localUrl}
-  - Network:  ${externalUrl}
-  - API Docs: ${localUrl}/api-docs
-  - Health:   ${localUrl}/health`);
-  console.log('🎉 Serveur prêt à recevoir des requêtes!');
+  const apiUrl = API_URL;
+  
+  console.log(`\n✅ Serveur Team Fitness démarré avec succès!`);
+  console.log(`\n📍 URLs d'accès:`);
+  console.log(`   - Local:      ${localUrl}`);
+  console.log(`   - Network:    ${externalUrl}`);
+  console.log(`   - API_URL:    ${apiUrl} (utilisé dans les emails)`);
+  console.log(`\n📚 Documentation et endpoints:`);
+  console.log(`   - API Docs:   ${localUrl}/api-docs`);
+  console.log(`   - Health:     ${localUrl}/health`);
+  console.log(`   - Setup Page: ${apiUrl}/setup-password.html`);
+  console.log(`\n🎉 Prêt à recevoir des requêtes!\n`);
 });
