@@ -1,0 +1,429 @@
+╔════════════════════════════════════════════════════════════════════════════╗
+║                                                                            ║
+║    ✅  CANAL BETA CONFIGURÉ AVEC SUCCÈS !  ✅                             ║
+║                                                                            ║
+╚════════════════════════════════════════════════════════════════════════════╝
+
+📅 Date : 15 novembre 2025
+🌐 Domaine : app.team-oustad.com
+🔒 SSL/TLS : Certificat Let's Encrypt actif
+✅ Status : OPÉRATIONNEL
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+📍 DEUX CANAUX DISPONIBLES
+
+┌────────────────────────────────────────────────────────────────────────┐
+│ 🟢 CANAL PRODUCTION (Stable)                                           │
+├────────────────────────────────────────────────────────────────────────┤
+│ ✅ Check Update                                                         │
+│    https://app.team-oustad.com/android/check-update?current_version=1  │
+│                                                                         │
+│ ✅ Version JSON                                                         │
+│    https://app.team-oustad.com/android/version.json                    │
+│                                                                         │
+│ ✅ Download APK                                                         │
+│    https://app.team-oustad.com/android/download                        │
+│                                                                         │
+│ 🎯 Public : Tous les utilisateurs                                      │
+│ 📦 Stabilité : ✅ Stable et testé                                      │
+│ 🔄 Fréquence MAJ : Moins fréquente                                     │
+└────────────────────────────────────────────────────────────────────────┘
+
+┌────────────────────────────────────────────────────────────────────────┐
+│ 🔶 CANAL BETA (Preprod - Tests)                                        │
+├────────────────────────────────────────────────────────────────────────┤
+│ ✅ Check Update Beta                                                    │
+│    https://app.team-oustad.com/android/beta/check-update?current_version=1 │
+│                                                                         │
+│ ✅ Version JSON Beta                                                    │
+│    https://app.team-oustad.com/android/beta/version.json               │
+│                                                                         │
+│ ✅ Download APK Beta                                                    │
+│    https://app.team-oustad.com/android/beta/download                   │
+│                                                                         │
+│ 🎯 Public : Beta-testeurs uniquement                                   │
+│ 📦 Stabilité : ⚠️ En test                                              │
+│ 🔄 Fréquence MAJ : Plus fréquente                                      │
+└────────────────────────────────────────────────────────────────────────┘
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+🧪 TESTS EFFECTUÉS - TOUS ✅
+
+┌─────────────────────────────────┬──────────┬─────────────────────────┐
+│ Endpoint                        │ Status   │ Résultat                │
+├─────────────────────────────────┼──────────┼─────────────────────────┤
+│ Production version.json         │    ✅    │ v1.0.0                  │
+│ Production check-update         │    ✅    │ Fonctionne              │
+│ Beta version.json               │    ✅    │ v1.0.0-beta.1           │
+│ Beta check-update               │    ✅    │ Fonctionne              │
+│ Beta download                   │    ⚠️    │ 404 (APK à uploader)    │
+│ Beta checksum                   │    ⚠️    │ 404 (APK à uploader)    │
+└─────────────────────────────────┴──────────┴─────────────────────────┘
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+📂 STRUCTURE DES FICHIERS
+
+```
+public/android/
+├── version.json              # Version production
+├── app-release.apk           # APK production
+├── README.md                 # Documentation
+├── .gitignore                # Ignore APK files
+│
+└── beta/                     # 🔶 CANAL BETA
+    ├── version.json          # Version beta (1.0.0-beta.1)
+    ├── app-release.apk       # APK beta (à ajouter)
+    ├── README.md             # Documentation beta
+    ├── .gitignore            # Ignore APK files
+    └── backups/              # Anciennes versions beta
+```
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+🚀 DÉPLOYER UNE VERSION
+
+┌────────────────────────────────────────────────────────────────────────┐
+│ 📦 PRODUCTION (Stable)                                                  │
+└────────────────────────────────────────────────────────────────────────┘
+
+./scripts/deploy-android-apk.sh \
+  ~/flutter/app/build/app/outputs/flutter-apk/app-release.apk \
+  2 \
+  "1.0.1" \
+  "Corrections de bugs et améliorations" \
+  production
+
+┌────────────────────────────────────────────────────────────────────────┐
+│ 🔶 BETA (Test)                                                          │
+└────────────────────────────────────────────────────────────────────────┘
+
+./scripts/deploy-android-apk.sh \
+  ~/flutter/app/build/app/outputs/flutter-apk/app-release.apk \
+  2 \
+  "1.0.1-beta.1" \
+  "Test des nouvelles fonctionnalités" \
+  beta
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+📱 CONFIGURATION FLUTTER
+
+┌────────────────────────────────────────────────────────────────────────┐
+│ Option 1: Toggle Beta dans l'app (Recommandé)                          │
+└────────────────────────────────────────────────────────────────────────┘
+
+```dart
+// lib/config/api_config.dart
+class ApiConfig {
+  static const String BASE_URL = 'https://app.team-oustad.com';
+  
+  // Déterminer le canal depuis les préférences
+  static Future<String> getUpdateChannel() async {
+    final prefs = await SharedPreferences.getInstance();
+    final isBeta = prefs.getBool('beta_channel_enabled') ?? false;
+    return isBeta ? 'beta' : 'production';
+  }
+  
+  static Future<String> getCheckUpdateUrl(int version) async {
+    final channel = await getUpdateChannel();
+    final path = channel == 'beta' ? '/android/beta' : '/android';
+    return '$BASE_URL$path/check-update?current_version=$version';
+  }
+}
+```
+
+```dart
+// lib/settings/beta_settings_page.dart
+class BetaSettings extends StatefulWidget {
+  @override
+  Widget build(BuildContext context) {
+    return SwitchListTile(
+      title: Text('Programme Beta'),
+      subtitle: Text('Recevoir les mises à jour beta en avant-première'),
+      value: _isBetaEnabled,
+      onChanged: (bool value) async {
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setBool('beta_channel_enabled', value);
+        
+        setState(() {
+          _isBetaEnabled = value;
+        });
+        
+        // Vérifier immédiatement les mises à jour
+        _checkForUpdates();
+        
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              value 
+                ? 'Canal Beta activé - Vous recevrez les mises à jour en avant-première' 
+                : 'Canal Production activé'
+            ),
+          ),
+        );
+      },
+    );
+  }
+}
+```
+
+┌────────────────────────────────────────────────────────────────────────┐
+│ Option 2: Builds séparés avec variables d'environnement                │
+└────────────────────────────────────────────────────────────────────────┘
+
+```dart
+// lib/config/api_config.dart
+class ApiConfig {
+  static const String BASE_URL = 'https://app.team-oustad.com';
+  
+  static const bool IS_BETA = bool.fromEnvironment(
+    'IS_BETA',
+    defaultValue: false,
+  );
+  
+  static String get updatePath => 
+    IS_BETA ? '/android/beta' : '/android';
+  
+  static String get OTA_CHECK_URL => 
+    '$BASE_URL$updatePath/check-update';
+}
+```
+
+Compilation:
+```bash
+# Version beta
+flutter build apk --release --dart-define=IS_BETA=true
+
+# Version production
+flutter build apk --release --dart-define=IS_BETA=false
+```
+
+┌────────────────────────────────────────────────────────────────────────┐
+│ Option 3: APK distincts (applicationId différent)                      │
+└────────────────────────────────────────────────────────────────────────┘
+
+android/app/build.gradle:
+```gradle
+flavorDimensions "environment"
+productFlavors {
+    production {
+        dimension "environment"
+        applicationId "com.teamfitness.app"
+    }
+    beta {
+        dimension "environment"
+        applicationId "com.teamfitness.app.beta"
+        versionNameSuffix "-beta"
+    }
+}
+```
+
+Compilation:
+```bash
+flutter build apk --release --flavor production
+flutter build apk --release --flavor beta
+```
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+🔄 WORKFLOW BETA → PRODUCTION
+
+1️⃣  DÉVELOPPEMENT
+   • Développer les nouvelles fonctionnalités
+   • Tests unitaires et d'intégration
+
+2️⃣  BETA (Preprod)
+   ```bash
+   ./scripts/deploy-android-apk.sh app.apk 10 "1.2.0-beta.1" "..." beta
+   ```
+   • Tests internes
+   • Feedback des beta-testeurs
+   • Validation QA
+   • Corrections de bugs
+
+3️⃣  PRODUCTION
+   ```bash
+   ./scripts/deploy-android-apk.sh app.apk 10 "1.2.0" "..." production
+   ```
+   • Déploiement pour tous les utilisateurs
+   • Monitoring actif
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+📋 CONVENTION DE NOMMAGE
+
+Production :
+   1.0.0, 1.0.1, 1.1.0, 2.0.0
+
+Beta :
+   1.0.0-beta.1     # Première beta de la v1.0.0
+   1.0.0-beta.2     # Deuxième beta de la v1.0.0
+   1.0.0-rc.1       # Release Candidate
+   1.0.0            # Version stable finale
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+⚠️ AVERTISSEMENT BETA DANS L'UI
+
+Affichez clairement le statut beta aux utilisateurs:
+
+```dart
+// En haut de l'écran d'accueil
+if (isBetaVersion) {
+  Container(
+    width: double.infinity,
+    padding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+    color: Colors.orange,
+    child: Row(
+      children: [
+        Icon(Icons.science, color: Colors.white),
+        SizedBox(width: 12),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'VERSION BETA',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 14,
+                ),
+              ),
+              Text(
+                'Fonctionnalités en test - Feedback apprécié',
+                style: TextStyle(
+                  color: Colors.white.withOpacity(0.9),
+                  fontSize: 12,
+                ),
+              ),
+            ],
+          ),
+        ),
+        IconButton(
+          icon: Icon(Icons.settings, color: Colors.white),
+          onPressed: () => _goToSettings(),
+        ),
+      ],
+    ),
+  );
+}
+```
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+🧪 TESTS DES CANAUX
+
+Test Production:
+   curl https://app.team-oustad.com/android/version.json
+   curl "https://app.team-oustad.com/android/check-update?current_version=1"
+
+Test Beta:
+   curl https://app.team-oustad.com/android/beta/version.json
+   curl "https://app.team-oustad.com/android/beta/check-update?current_version=1"
+
+Comparer les deux:
+   echo "=== Production ===" && \
+   curl -s https://app.team-oustad.com/android/version.json | grep version_name && \
+   echo "=== Beta ===" && \
+   curl -s https://app.team-oustad.com/android/beta/version.json | grep version_name
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+📊 DIFFÉRENCES PRODUCTION VS BETA
+
+┌──────────────────┬─────────────────┬──────────────────┐
+│ Aspect           │ Production      │ Beta             │
+├──────────────────┼─────────────────┼──────────────────┤
+│ URL              │ /android/       │ /android/beta/   │
+│ Stabilité        │ ✅ Stable       │ ⚠️ En test       │
+│ Public           │ Tous            │ Beta-testeurs    │
+│ Fréquence MAJ    │ Moins fréquente │ Plus fréquente   │
+│ Version exemple  │ 1.0.0           │ 1.0.0-beta.1     │
+│ Force Update     │ Rare            │ Plus courant     │
+│ Rollback         │ Difficile       │ Facile           │
+└──────────────────┴─────────────────┴──────────────────┘
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+🛠️ COMMANDES UTILES
+
+Déploiement:
+   # Production
+   ./scripts/deploy-android-apk.sh app.apk 2 "1.0.1" "..." production
+   
+   # Beta
+   ./scripts/deploy-android-apk.sh app.apk 2 "1.0.1-beta.1" "..." beta
+
+Tests:
+   # Test production
+   curl https://app.team-oustad.com/android/version.json
+   
+   # Test beta
+   curl https://app.team-oustad.com/android/beta/version.json
+
+Serveur:
+   pm2 restart teamfitness-preprod
+   pm2 logs teamfitness-preprod
+   pm2 logs teamfitness-preprod | grep "Beta"
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+📚 DOCUMENTATION
+
+📖 Fichiers disponibles:
+   • ANDROID_OTA_SETUP_COMPLETE.md
+   • QUICK_START_ANDROID_OTA.md
+   • public/android/README.md
+   • public/android/beta/README.md (NOUVEAU)
+   • docs/development/flutter_ota_service_example.dart
+
+📖 Scripts:
+   • scripts/deploy-android-apk.sh (mis à jour pour beta)
+   • scripts/test-android-ota.sh
+   • scripts/test-android-ota-public.sh
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+✅ CHECKLIST
+
+Serveur:
+   ✅ Routes beta créées (/android/beta/*)
+   ✅ Fichiers beta configurés
+   ✅ Script de déploiement mis à jour
+   ✅ Tests validés
+   ⏳ APK beta à déployer
+
+Flutter:
+   ⏳ Implémenter toggle beta dans les paramètres
+   ⏳ Afficher badge beta si activé
+   ⏳ Gérer les deux canaux dans le service OTA
+   ⏳ Tester depuis l'app mobile
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+🎉 FÉLICITATIONS !
+
+Vous disposez maintenant de DEUX canaux de distribution :
+
+🟢 PRODUCTION : https://app.team-oustad.com/android/
+   → Versions stables pour tous les utilisateurs
+
+🔶 BETA : https://app.team-oustad.com/android/beta/
+   → Versions de test pour les beta-testeurs
+
+Cela vous permet de tester les nouvelles fonctionnalités avant de les
+déployer à tous les utilisateurs !
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+📞 Support
+
+Documentation : public/android/beta/README.md
+Logs : pm2 logs teamfitness-preprod
+Tests : ./scripts/test-android-ota-public.sh
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━

@@ -1,0 +1,9 @@
+# Ignorer les fichiers APK beta
+*.apk
+
+# Ignorer les backups
+backups/
+
+# Garder uniquement le fichier version.json et la documentation
+!version.json
+!README.md

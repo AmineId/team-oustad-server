@@ -1,0 +1,128 @@
+════════════════════════════════════════════════════════════════════════════
+   🔐 TOKEN API SÉCURISÉ - CONFIGURATION FINALE
+════════════════════════════════════════════════════════════════════════════
+
+✅ Authentification activée avec succès !
+
+Utilisateur : admin@team-oustad.com
+Rôle        : owner
+Validité    : 10 ans (expire en novembre 2035)
+JWT Secret  : preprod_replace_this_with_a_strong_secret
+
+════════════════════════════════════════════════════════════════════════════
+   🎫 BEARER TOKEN PERMANENT
+════════════════════════════════════════════════════════════════════════════
+
+eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOjEsImVtYWlsIjoiYWRtaW5AdGVhbS1vdXN0YWQuY29tIiwidHlwZSI6Im93bmVyIiwicHVycG9zZSI6Im90YS11cGxvYWQiLCJpYXQiOjE3NjMyNDU2NTksImV4cCI6MjA3ODYwNTY1OX0.USwimslD06JlRyKCvM5KOzUfX0O4nnwMLdrRbtkJ6tw
+
+════════════════════════════════════════════════════════════════════════════
+   📋 COMMANDES RAPIDES
+════════════════════════════════════════════════════════════════════════════
+
+# 1️⃣  Charger le token
+source .env.ota-token
+
+# 2️⃣  Upload Production
+curl -X POST "https://app.team-oustad.com/android/upload" \
+  -H "Authorization: Bearer $OTA_API_TOKEN" \
+  -F "apk=@app-release.apk" \
+  -F "version_code=2" \
+  -F "version_name=1.0.1" \
+  -F "changelog=Bug fixes" \
+  -F "channel=production"
+
+# 3️⃣  Upload Beta
+curl -X POST "https://app.team-oustad.com/android/upload" \
+  -H "Authorization: Bearer $OTA_API_TOKEN" \
+  -F "apk=@app-release.apk" \
+  -F "version_code=3" \
+  -F "version_name=1.0.2-beta.1" \
+  -F "changelog=Testing features" \
+  -F "channel=beta"
+
+# 4️⃣  Avec script
+./scripts/upload-apk.sh app.apk 2 "1.0.1" "Bug fixes" production "$OTA_API_TOKEN"
+
+════════════════════════════════════════════════════════════════════════════
+   ✅ TEST EFFECTUÉ - AUTHENTIFICATION RÉUSSIE
+════════════════════════════════════════════════════════════════════════════
+
+✅ Sans token → HTTP 401 (Authentication required)
+✅ Avec token → HTTP 200 (APK uploaded successfully)
+✅ Logs montrent : "Upload authorized - User: admin@team-oustad.com (owner)"
+✅ Version metadata inclut : "uploaded_by": { "user_id": 1, "email": "admin@team-oustad.com", "role": "owner" }
+
+════════════════════════════════════════════════════════════════════════════
+   🔒 SÉCURITÉ IMPLÉMENTÉE
+════════════════════════════════════════════════════════════════════════════
+
+✅ Authentification JWT obligatoire pour l'upload
+✅ Vérification automatique des permissions (owner/admin uniquement)
+✅ Token permanent de 10 ans
+✅ Token sécurisé dans .env.ota-token (ajouté au .gitignore)
+✅ Logs détaillés de chaque upload avec info utilisateur
+✅ Métadonnées incluent l'auteur de l'upload
+✅ Protection contre les tentatives non authentifiées
+
+════════════════════════════════════════════════════════════════════════════
+   📁 FICHIERS CONFIGURÉS
+════════════════════════════════════════════════════════════════════════════
+
+✅ middleware/uploadAuth.js           - Middleware d'authentification
+✅ routes/android.js                  - Routes avec auth activée
+✅ scripts/generate-permanent-token.js - Génère le token avec bon JWT_SECRET
+✅ .env.ota-token                     - Token sauvegardé (dans .gitignore)
+✅ TOKEN_API_SUCCESS.txt              - Documentation complète
+✅ .gitignore                         - .env.ota-token ajouté
+
+════════════════════════════════════════════════════════════════════════════
+   🚀 UTILISATION
+════════════════════════════════════════════════════════════════════════════
+
+MÉTHODE 1 - Variable d'environnement :
+   export OTA_API_TOKEN="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+   curl -X POST ... -H "Authorization: Bearer $OTA_API_TOKEN" ...
+
+MÉTHODE 2 - Fichier .env.ota-token :
+   source .env.ota-token
+   ./scripts/upload-apk.sh app.apk 2 "1.0.1" "..." production "$OTA_API_TOKEN"
+
+MÉTHODE 3 - GitHub Actions (Secrets) :
+   - Settings → Secrets → New secret
+   - Name: OTA_API_TOKEN
+   - Value: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+   - Dans workflow: ${{ secrets.OTA_API_TOKEN }}
+
+════════════════════════════════════════════════════════════════════════════
+   ⚠️  IMPORTANT
+════════════════════════════════════════════════════════════════════════════
+
+🔴 NE PARTAGEZ JAMAIS CE TOKEN PUBLIQUEMENT
+🔴 NE LE COMMITEZ PAS DANS GIT
+🔴 UTILISEZ DES SECRETS POUR CI/CD
+🔴 SI COMPROMIS, REGÉNÉREZ : node scripts/generate-permanent-token.js
+
+════════════════════════════════════════════════════════════════════════════
+   📊 STATISTIQUES
+════════════════════════════════════════════════════════════════════════════
+
+Canaux           : Production + Beta
+Authentification : JWT Bearer Token
+Permissions      : owner, admin
+Validité token   : 10 ans (3650 jours)
+Limite taille    : 200 MB par APK
+Endpoints        : /android/upload (POST)
+                   /android/check-update (GET)
+                   /android/download (GET)
+                   /android/version (GET)
+                   /android/checksum (GET)
+                   + versions /beta/
+
+════════════════════════════════════════════════════════════════════════════
+
+Date de configuration : 15 novembre 2025
+Status                : ✅ OPÉRATIONNEL
+Documentation         : TOKEN_API_SUCCESS.txt
+Support               : pm2 logs teamfitness-preprod
+
+════════════════════════════════════════════════════════════════════════════

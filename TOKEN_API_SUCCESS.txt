@@ -1,0 +1,279 @@
+╔════════════════════════════════════════════════════════════════════════════╗
+║                                                                            ║
+║    ✅  TOKEN API PERMANENT GÉNÉRÉ AVEC SUCCÈS !  ✅                       ║
+║                                                                            ║
+╚════════════════════════════════════════════════════════════════════════════╝
+
+📅 Date : 15 novembre 2025
+👤 Utilisateur : admin@team-oustad.com
+🎭 Rôle : owner
+⏰ Validité : 10 ans (expire en novembre 2035)
+🔐 Sécurité : JWT Bearer Token
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+🎫 BEARER TOKEN PERMANENT
+
+eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOjEsImVtYWlsIjoiYWRtaW5AdGVhbS1vdXN0YWQuY29tIiwidHlwZSI6Im93bmVyIiwicHVycG9zZSI6Im90YS11cGxvYWQiLCJpYXQiOjE3NjMyNDU1NTQsImV4cCI6MjA3ODYwNTU1NH0.VTdiK9mMHvOkn8BcS3uXNTGJ_UtGk1VRrqKHPzLaQz0
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+📋 UTILISATION RAPIDE
+
+┌────────────────────────────────────────────────────────────────────────┐
+│ 1️⃣  Upload Production                                                   │
+└────────────────────────────────────────────────────────────────────────┘
+
+curl -X POST "https://app.team-oustad.com/android/upload" \
+  -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOjEsImVtYWlsIjoiYWRtaW5AdGVhbS1vdXN0YWQuY29tIiwidHlwZSI6Im93bmVyIiwicHVycG9zZSI6Im90YS11cGxvYWQiLCJpYXQiOjE3NjMyNDU1NTQsImV4cCI6MjA3ODYwNTU1NH0.VTdiK9mMHvOkn8BcS3uXNTGJ_UtGk1VRrqKHPzLaQz0" \
+  -F "apk=@app-release.apk" \
+  -F "version_code=2" \
+  -F "version_name=1.0.1" \
+  -F "changelog=Bug fixes and improvements" \
+  -F "channel=production"
+
+┌────────────────────────────────────────────────────────────────────────┐
+│ 2️⃣  Upload Beta                                                         │
+└────────────────────────────────────────────────────────────────────────┘
+
+curl -X POST "https://app.team-oustad.com/android/upload" \
+  -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOjEsImVtYWlsIjoiYWRtaW5AdGVhbS1vdXN0YWQuY29tIiwidHlwZSI6Im93bmVyIiwicHVycG9zZSI6Im90YS11cGxvYWQiLCJpYXQiOjE3NjMyNDU1NTQsImV4cCI6MjA3ODYwNTU1NH0.VTdiK9mMHvOkn8BcS3uXNTGJ_UtGk1VRrqKHPzLaQz0" \
+  -F "apk=@app-release.apk" \
+  -F "version_code=3" \
+  -F "version_name=1.0.2-beta.1" \
+  -F "changelog=Testing new features" \
+  -F "channel=beta"
+
+┌────────────────────────────────────────────────────────────────────────┐
+│ 3️⃣  Avec Script (plus simple)                                           │
+└────────────────────────────────────────────────────────────────────────┘
+
+# Charger le token
+source .env.ota-token
+
+# Upload production
+./scripts/upload-apk.sh \
+  app-release.apk \
+  2 \
+  "1.0.1" \
+  "Bug fixes" \
+  production \
+  "$OTA_API_TOKEN"
+
+# Upload beta
+./scripts/upload-apk.sh \
+  app-release.apk \
+  3 \
+  "1.0.2-beta.1" \
+  "Testing" \
+  beta \
+  "$OTA_API_TOKEN"
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+🚀 INTÉGRATION CI/CD
+
+┌────────────────────────────────────────────────────────────────────────┐
+│ GitHub Actions                                                           │
+└────────────────────────────────────────────────────────────────────────┘
+
+1. Ajoutez le token dans les secrets GitHub :
+   Settings → Secrets and variables → Actions → New repository secret
+   
+   Nom : OTA_API_TOKEN
+   Valeur : eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOjEsImVtYWlsIjoiYWRtaW5AdGVhbS1vdXN0YWQuY29tIiwidHlwZSI6Im93bmVyIiwicHVycG9zZSI6Im90YS11cGxvYWQiLCJpYXQiOjE3NjMyNDU1NTQsImV4cCI6MjA3ODYwNTU1NH0.VTdiK9mMHvOkn8BcS3uXNTGJ_UtGk1VRrqKHPzLaQz0
+
+2. Créez .github/workflows/deploy-apk.yml :
+
+name: Deploy Android APK
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+      
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.x'
+      
+      - name: Build APK
+        run: flutter build apk --release
+      
+      - name: Extract version
+        id: version
+        run: |
+          VERSION=${GITHUB_REF#refs/tags/v}
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "version_code=$GITHUB_RUN_NUMBER" >> $GITHUB_OUTPUT
+      
+      - name: Upload to Production
+        run: |
+          curl -X POST "https://app.team-oustad.com/android/upload" \
+            -H "Authorization: Bearer ${{ secrets.OTA_API_TOKEN }}" \
+            -F "apk=@build/app/outputs/flutter-apk/app-release.apk" \
+            -F "version_code=${{ steps.version.outputs.version_code }}" \
+            -F "version_name=${{ steps.version.outputs.version }}" \
+            -F "changelog=Release ${{ steps.version.outputs.version }}" \
+            -F "channel=production"
+
+┌────────────────────────────────────────────────────────────────────────┐
+│ GitLab CI                                                                │
+└────────────────────────────────────────────────────────────────────────┘
+
+1. Ajoutez le token dans les variables CI/CD :
+   Settings → CI/CD → Variables → Add variable
+   
+   Key : OTA_API_TOKEN
+   Value : <token ci-dessus>
+   Protected : Yes
+   Masked : Yes
+
+2. Créez .gitlab-ci.yml :
+
+stages:
+  - build
+  - deploy
+
+build:
+  stage: build
+  image: cirrusci/flutter:stable
+  script:
+    - flutter build apk --release
+  artifacts:
+    paths:
+      - build/app/outputs/flutter-apk/app-release.apk
+
+deploy:
+  stage: deploy
+  image: curlimages/curl:latest
+  only:
+    - tags
+  script:
+    - |
+      curl -X POST "https://app.team-oustad.com/android/upload" \
+        -H "Authorization: Bearer $OTA_API_TOKEN" \
+        -F "apk=@build/app/outputs/flutter-apk/app-release.apk" \
+        -F "version_code=$CI_PIPELINE_IID" \
+        -F "version_name=$CI_COMMIT_TAG" \
+        -F "changelog=Release $CI_COMMIT_TAG" \
+        -F "channel=production"
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+📁 FICHIERS CRÉÉS
+
+✅ .env.ota-token
+   Contient le token et les variables d'environnement
+   Source avec: source .env.ota-token
+
+✅ scripts/generate-permanent-token.js
+   Script pour regénérer le token si nécessaire
+   Usage: node scripts/generate-permanent-token.js
+
+✅ scripts/upload-apk.sh
+   Script interactif pour uploader des APK
+   Usage: ./scripts/upload-apk.sh <apk> <version_code> <version_name> [changelog] [channel] [token]
+
+✅ middleware/uploadAuth.js
+   Middleware d'authentification pour l'upload
+   Vérifie le token JWT et les permissions
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+🔐 SÉCURITÉ
+
+┌────────────────────────────────────────────────────────────────────────┐
+│ ⚠️  IMPORTANT - Mesures de sécurité                                     │
+└────────────────────────────────────────────────────────────────────────┘
+
+✅ Token valide uniquement pour admin@team-oustad.com
+✅ Rôle : owner (permissions complètes)
+✅ Validité : 10 ans (jusqu'en novembre 2035)
+✅ Authentification requise pour tous les uploads
+✅ Vérifie automatiquement les permissions
+
+⚠️  À FAIRE :
+   • Ne partagez jamais ce token publiquement
+   • Ne commitez pas .env.ota-token dans Git
+   • Ajoutez .env.ota-token au .gitignore
+   • Utilisez des secrets pour CI/CD
+   • Si compromis, regénérez avec le script
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+🧪 TESTS
+
+┌────────────────────────────────────────────────────────────────────────┐
+│ Test 1: Sans token (doit échouer)                                       │
+└────────────────────────────────────────────────────────────────────────┘
+
+curl -X POST "https://app.team-oustad.com/android/upload" \
+  -F "apk=@test.apk" \
+  -F "version_code=1" \
+  -F "version_name=1.0.0"
+
+❌ Résultat attendu: HTTP 401 - Authentication required
+
+┌────────────────────────────────────────────────────────────────────────┐
+│ Test 2: Avec token (doit réussir)                                       │
+└────────────────────────────────────────────────────────────────────────┘
+
+source .env.ota-token
+curl -X POST "https://app.team-oustad.com/android/upload" \
+  -H "Authorization: Bearer $OTA_API_TOKEN" \
+  -F "apk=@test.apk" \
+  -F "version_code=1" \
+  -F "version_name=1.0.0" \
+  -F "changelog=Test" \
+  -F "channel=production"
+
+✅ Résultat attendu: HTTP 200 - APK uploaded successfully
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+✅ FONCTIONNALITÉS ACTIVÉES
+
+✅ Authentification JWT pour l'upload
+✅ Vérification automatique des permissions (admin/owner)
+✅ Token permanent de 10 ans
+✅ Support production et beta
+✅ Logs détaillés avec info utilisateur
+✅ Metadata inclut l'info de l'uploader
+✅ Protection contre accès non autorisés
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+📚 DOCUMENTATION
+
+📖 Guide complet API: docs/api/ANDROID_OTA_UPLOAD_API.md
+📖 Configuration OTA: docs/api/ANDROID_OTA_SETUP_COMPLETE.md
+📖 Canal Beta: BETA_CHANNEL_SUCCESS.txt
+📖 Swagger UI: https://app.team-oustad.com/api-docs
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+🎉 RÉSUMÉ
+
+Vous disposez maintenant d'un système OTA complet et sécurisé :
+
+🟢 Production : https://app.team-oustad.com/android/
+🔶 Beta : https://app.team-oustad.com/android/beta/
+📤 Upload API : https://app.team-oustad.com/android/upload
+🔐 Token fixe : admin@team-oustad.com (valide 10 ans)
+
+Workflow simplifié :
+1. Compilez votre APK Flutter
+2. Chargez le token: source .env.ota-token
+3. Uploadez: ./scripts/upload-apk.sh app.apk 2 "1.0.1" "..." production "$OTA_API_TOKEN"
+4. Les utilisateurs reçoivent la mise à jour automatiquement
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━

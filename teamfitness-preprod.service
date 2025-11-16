@@ -1,0 +1,23 @@
+[Unit]
+Description=Team Fitness API - Preprod
+Documentation=https://github.com/TeamFitness/db-server
+After=network.target postgresql.service docker.service
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/root/team-server/db-server
+Environment=NODE_ENV=preprod
+EnvironmentFile=/root/team-server/db-server/.env.preprod
+ExecStart=/usr/bin/node index.js
+Restart=always
+RestartSec=10
+StandardOutput=append:/root/team-server/db-server/logs/preprod-out.log
+StandardError=append:/root/team-server/db-server/logs/preprod-error.log
+
+# Limites de ressources
+LimitNOFILE=65536
+MemoryLimit=1G
+
+[Install]
+WantedBy=multi-user.target
