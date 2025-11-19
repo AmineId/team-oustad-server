@@ -7,21 +7,21 @@ const multer = require('multer');
 const uploadAuth = require('../middleware/uploadAuth');
 
 // Configure multer for APK uploads
+// NOTE: Multer processes file upload BEFORE body parsing is complete.
+// We need to use a temporary directory first, then move the file after we know the channel.
 const storage = multer.diskStorage({
   destination: function (req, file, cb) {
-    const channel = req.body.channel || 'production';
-    // Upload to channel-specific directory (release or beta)
-    const channelFolder = channel === 'beta' ? 'beta' : 'release';
-    const uploadPath = path.join(__dirname, '../public/android', channelFolder);
+    // Use a temp directory first - we'll move the file after we parse the channel
+    const uploadPath = path.join(__dirname, '../public/android/temp');
     // Ensure directory exists
     fs.mkdir(uploadPath, { recursive: true })
       .then(() => cb(null, uploadPath))
       .catch(err => cb(err));
   },
   filename: function (req, file, cb) {
-    const channel = req.body.channel || 'production';
-    // Name file based on channel: app-release.apk or app-beta.apk
-    const fileName = channel === 'beta' ? 'app-beta.apk' : 'app-release.apk';
+    // Use a temporary unique name
+    const timestamp = Date.now();
+    const fileName = `temp-upload-${timestamp}.apk`;
     cb(null, fileName);
   }
 });
@@ -499,6 +499,10 @@ router.post('/upload', uploadAuth, upload.single('apk'), async (req, res) => {
     
     // Validate required fields
     if (!version_code || !version_name) {
+      // Clean up temp file
+      if (req.file) {
+        await fs.unlink(req.file.path).catch(() => {});
+      }
       return res.status(400).json({
         error: 'version_code and version_name are required'
       });
@@ -512,6 +516,8 @@ router.post('/upload', uploadAuth, upload.single('apk'), async (req, res) => {
 
     const uploadChannel = channel || 'production';
     if (!['production', 'beta'].includes(uploadChannel)) {
+      // Clean up temp file
+      await fs.unlink(req.file.path).catch(() => {});
       return res.status(400).json({
         error: 'channel must be either "production" or "beta"'
       });
@@ -520,16 +526,62 @@ router.post('/upload', uploadAuth, upload.single('apk'), async (req, res) => {
     console.log(`📤 Uploading APK to ${uploadChannel} channel...`);
     console.log(`   Uploaded by: ${uploadUser.email} (${uploadUser.type})`);
     console.log(`   Version: ${version_name} (${version_code})`);
-    console.log(`   File: ${req.file.filename} (${req.file.size} bytes)`);
+    console.log(`   Temp file: ${req.file.filename} (${req.file.size} bytes)`);
 
-    // Calculate checksums
+    // Determine target paths based on channel
+    const channelFolder = uploadChannel === 'beta' ? 'beta' : 'release';
+    const channelPath = getChannelPath(uploadChannel);
+    const apkFileName = getApkFileName(uploadChannel);
+    const finalApkPath = path.join(channelPath, apkFileName);
+    const versionPath = path.join(channelPath, 'version.json');
+    const backupDir = path.join(channelPath, 'backups');
+    
+    // Ensure channel directory exists
+    await fs.mkdir(channelPath, { recursive: true });
+
+    // Calculate checksums from temp file
     const fileBuffer = await fs.readFile(req.file.path);
     const md5Hash = crypto.createHash('md5').update(fileBuffer).digest('hex');
     const sha256Hash = crypto.createHash('sha256').update(fileBuffer).digest('hex');
 
+    console.log(`   📝 Checksums calculated:`);
+    console.log(`      MD5: ${md5Hash}`);
+    console.log(`      SHA256: ${sha256Hash}`);
+
+    // Backup old APK and version metadata if exists
+    try {
+      await fs.access(versionPath);
+      await fs.access(finalApkPath);
+      
+      // Read old version to get version name
+      const oldVersionData = await fs.readFile(versionPath, 'utf-8');
+      const oldVersion = JSON.parse(oldVersionData);
+      
+      // Create backup directory
+      await fs.mkdir(backupDir, { recursive: true });
+      
+      // Backup APK with its version name (different naming for beta vs release)
+      const apkPrefix = uploadChannel === 'beta' ? 'apk-beta' : 'apk-release';
+      const backupApkName = `${apkPrefix}-v${oldVersion.version_name}.apk`;
+      const backupApkPath = path.join(backupDir, backupApkName);
+      await fs.copyFile(finalApkPath, backupApkPath);
+      console.log(`   ✅ Old APK backed up: ${backupApkName}`);
+      
+      // Backup metadata with timestamp
+      const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+      await fs.copyFile(versionPath, path.join(backupDir, `version-${timestamp}.json`));
+      console.log(`   ✅ Old version metadata backed up`);
+    } catch (error) {
+      // No existing version or APK, skip backup
+      console.log(`   ℹ️  No previous version to backup`);
+    }
+
+    // Move temp file to final destination
+    console.log(`   📦 Moving APK to: ${finalApkPath}`);
+    await fs.rename(req.file.path, finalApkPath);
+    console.log(`   ✅ APK moved successfully`);
+
     // Prepare version metadata
-    const channelFolder = uploadChannel === 'beta' ? 'beta' : 'release';
-    const apkFileName = getApkFileName(uploadChannel);
     const baseUrl = `https://app.team-oustad.com/android/${channelFolder}`;
     const versionMetadata = {
       version_code: parseInt(version_code),
@@ -549,40 +601,6 @@ router.post('/upload', uploadAuth, upload.single('apk'), async (req, res) => {
       versionMetadata.is_beta = true;
     }
 
-    // Backup old APK and version metadata if exists
-    const channelPath = getChannelPath(uploadChannel);
-    const versionPath = path.join(channelPath, 'version.json');
-    const currentApkFileName = getApkFileName(uploadChannel);
-    const currentApkPath = path.join(channelPath, currentApkFileName);
-    const backupDir = path.join(channelPath, 'backups');
-    
-    try {
-      await fs.access(versionPath);
-      await fs.access(currentApkPath);
-      
-      // Read old version to get version name
-      const oldVersionData = await fs.readFile(versionPath, 'utf-8');
-      const oldVersion = JSON.parse(oldVersionData);
-      
-      // Create backup directory
-      await fs.mkdir(backupDir, { recursive: true });
-      
-      // Backup APK with its version name (different naming for beta vs release)
-      const apkPrefix = uploadChannel === 'beta' ? 'apk-beta' : 'apk-release';
-      const backupApkName = `${apkPrefix}-v${oldVersion.version_name}.apk`;
-      const backupApkPath = path.join(backupDir, backupApkName);
-      await fs.copyFile(currentApkPath, backupApkPath);
-      console.log(`   ✅ Old APK backed up: ${backupApkName}`);
-      
-      // Backup metadata with timestamp
-      const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-      await fs.copyFile(versionPath, path.join(backupDir, `version-${timestamp}.json`));
-      console.log(`   ✅ Old version metadata backed up`);
-    } catch (error) {
-      // No existing version or APK, skip backup
-      console.log(`   ℹ️  No previous version to backup`);
-    }
-
     // Save version metadata with upload info
     versionMetadata.uploaded_by = {
       user_id: uploadUser.sub,
@@ -594,7 +612,7 @@ router.post('/upload', uploadAuth, upload.single('apk'), async (req, res) => {
 
     console.log(`✅ APK uploaded successfully to ${uploadChannel} channel`);
     console.log(`   Uploaded by: ${uploadUser.email}`);
-    console.log(`   Filename: ${currentApkFileName}`);
+    console.log(`   Filename: ${apkFileName}`);
     console.log(`   MD5: ${md5Hash}`);
     console.log(`   SHA256: ${sha256Hash}`);
 
@@ -608,6 +626,12 @@ router.post('/upload', uploadAuth, upload.single('apk'), async (req, res) => {
     });
   } catch (error) {
     console.error('❌ Error uploading APK:', error);
+    
+    // Clean up temp file if it exists
+    if (req.file && req.file.path) {
+      await fs.unlink(req.file.path).catch(() => {});
+    }
+    
     res.status(500).json({
       error: 'Internal server error',
       message: error.message
