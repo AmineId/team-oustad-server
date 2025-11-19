@@ -1,14 +1,14 @@
 {
-  "version_code": 13,
-  "version_name": "1.0.0-beta.11",
+  "version_code": 15,
+  "version_name": "1.0.0-beta.13",
   "download_url": "https://app.team-oustad.com/android/beta/app-beta.apk",
   "file_name": "app-beta.apk",
   "changelog": "Version update",
   "min_supported_version": 1,
   "force_update": false,
-  "release_date": "2025-11-16T19:25:34.025Z",
+  "release_date": "2025-11-19T21:23:30.147Z",
   "file_size": 57011619,
-  "checksum": "3615edab0e1cc9e971464e8ef0cfe7ecd17a240dbaab3f875ac45092ae5824b0",
+  "checksum": "532d7a7c1b7f1938f92d241c3e2ea974c44f960ba4a1ad68e0eab6ad63cabd10",
   "channel": "beta",
   "is_beta": true,
   "uploaded_by": {
