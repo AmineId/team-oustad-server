@@ -166,10 +166,16 @@ router.post('/login', async (req, res) => {
         isFirstLogin,
         user: {
           id: user.id,
+          displayId: user.displayId,
           email: user.email,
           fullName: user.fullName,
+          role: user.role,
           gymId: user.gymId,
           gym: user.gym,
+          fcmToken: user.fcmToken,
+          lastLoginAt: user.lastLoginAt,
+          createdAt: user.createdAt,
+          updatedAt: user.updatedAt,
           type: 'admin'
         }
       };
@@ -185,10 +191,16 @@ router.post('/login', async (req, res) => {
         isFirstLogin,
         user: {
           id: user.id,
+          displayId: user.displayId,
           email: user.email,
           fullName: user.fullName,
+          role: user.role,
           gymId: user.gymId,
           gym: user.gym,
+          fcmToken: user.fcmToken,
+          lastLoginAt: user.lastLoginAt,
+          createdAt: user.createdAt,
+          updatedAt: user.updatedAt,
           permissions: {
             canManageAdmins: user.owner?.canManageAdmins || false,
             canManageGyms: user.owner?.canManageGyms || false,
@@ -210,10 +222,23 @@ router.post('/login', async (req, res) => {
         isFirstLogin,
         user: {
           id: user.id,
+          displayId: user.displayId,
           email: user.email,
           fullName: user.fullName,
+          role: user.role,
           gymId: user.gymId,
           gym: user.gym,
+          fcmToken: user.fcmToken,
+          lastLoginAt: user.lastLoginAt,
+          createdAt: user.createdAt,
+          updatedAt: user.updatedAt,
+          member: {
+            birthDate: user.member?.birthDate,
+            phone: user.member?.phone,
+            profession: user.member?.profession,
+            fitnessLevel: user.member?.fitnessLevel,
+            joinedAt: user.member?.joinedAt,
+          },
           subscriptions: user.member?.subscriptions || [],
           payments: user.member?.payments || [],
           type: 'member'

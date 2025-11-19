@@ -4500,3 +4500,464 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+
+  /members/{id}/profile:
+    put:
+      tags:
+        - Members
+      summary: Mettre à jour le profil d'un membre
+      description: Met à jour les informations personnelles du membre (date de naissance, téléphone, profession, niveau sportif, photo de profil)
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+          description: ID de l'utilisateur membre
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                birthDate:
+                  type: string
+                  format: date
+                  description: Date de naissance
+                  example: "1990-05-15"
+                phone:
+                  type: string
+                  description: Numéro de téléphone
+                  example: "+33612345678"
+                profession:
+                  type: string
+                  enum: [Actif, Etudiant]
+                  description: Statut professionnel
+                  example: "Actif"
+                fitnessLevel:
+                  type: string
+                  enum: [debutant, intermediaire, avance, expert, athletique]
+                  description: Niveau sportif
+                  example: "intermediaire"
+                profileImage:
+                  type: string
+                  description: Image de profil encodée en base64
+                  example: "data:image/jpeg;base64,/9j/4AAQSkZJRg..."
+      responses:
+        '200':
+          description: Profil mis à jour avec succès
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "Profil membre mis à jour avec succès"
+                  member:
+                    type: object
+                    properties:
+                      userId:
+                        type: integer
+                      email:
+                        type: string
+                      fullName:
+                        type: string
+                      displayId:
+                        type: string
+                      birthDate:
+                        type: string
+                        format: date
+                      phone:
+                        type: string
+                      profession:
+                        type: string
+                      fitnessLevel:
+                        type: string
+                      joinedAt:
+                        type: string
+                        format: date-time
+        '400':
+          description: Données invalides
+        '403':
+          description: Accès interdit
+        '404':
+          description: Membre non trouvé
+        '500':
+          description: Erreur serveur
+
+  /members/{id}/goals:
+    post:
+      tags:
+        - Members
+        - Goals
+      summary: Créer un objectif pour un membre
+      description: Crée un nouvel objectif avec les données morphologiques (poids, tour de taille)
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+          description: ID de l'utilisateur membre
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - title
+              properties:
+                title:
+                  type: string
+                  description: Titre de l'objectif
+                  example: "Perte de poids"
+                description:
+                  type: string
+                  description: Description détaillée
+                  example: "Perdre 10kg en 3 mois"
+                targetDate:
+                  type: string
+                  format: date
+                  description: Date cible pour atteindre l'objectif
+                  example: "2025-02-15"
+                startWeight:
+                  type: number
+                  format: float
+                  description: Poids de départ en kg
+                  example: 85.5
+                targetWeight:
+                  type: number
+                  format: float
+                  description: Poids cible en kg
+                  example: 75.0
+                startWaist:
+                  type: number
+                  format: float
+                  description: Tour de taille initial en cm
+                  example: 95.0
+                targetWaist:
+                  type: number
+                  format: float
+                  description: Tour de taille cible en cm
+                  example: 85.0
+      responses:
+        '201':
+          description: Objectif créé avec succès
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "Objectif créé avec succès"
+                  goal:
+                    type: object
+                    properties:
+                      id:
+                        type: integer
+                      displayId:
+                        type: string
+                      title:
+                        type: string
+                      description:
+                        type: string
+                      targetDate:
+                        type: string
+                        format: date
+                      startWeight:
+                        type: number
+                      targetWeight:
+                        type: number
+                      startWaist:
+                        type: number
+                      targetWaist:
+                        type: number
+                      status:
+                        type: string
+                      createdAt:
+                        type: string
+                        format: date-time
+        '400':
+          description: Données invalides
+        '403':
+          description: Accès interdit
+        '404':
+          description: Membre non trouvé
+        '500':
+          description: Erreur serveur
+    get:
+      tags:
+        - Members
+        - Goals
+      summary: Récupérer tous les objectifs d'un membre
+      description: Récupère tous les objectifs (actifs, atteints, abandonnés) d'un membre
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+          description: ID de l'utilisateur membre
+      responses:
+        '200':
+          description: Liste des objectifs
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  goals:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id:
+                          type: integer
+                        displayId:
+                          type: string
+                        title:
+                          type: string
+                        description:
+                          type: string
+                        targetDate:
+                          type: string
+                          format: date
+                        startWeight:
+                          type: number
+                        targetWeight:
+                          type: number
+                        startWaist:
+                          type: number
+                        targetWaist:
+                          type: number
+                        status:
+                          type: string
+                        achievedAt:
+                          type: string
+                          format: date-time
+                        createdAt:
+                          type: string
+                          format: date-time
+        '403':
+          description: Accès interdit
+        '404':
+          description: Membre non trouvé
+        '500':
+          description: Erreur serveur
+
+  /members/{id}/measurements:
+    post:
+      tags:
+        - Members
+        - Measurements
+      summary: Créer une nouvelle mesure pour un membre
+      description: Ajoute des mesures morphologiques pour suivre la progression (poids, tour de taille, poitrine, etc.)
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+          description: ID de l'utilisateur membre
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                weight:
+                  type: number
+                  format: float
+                  description: Poids en kg
+                  example: 82.5
+                waist:
+                  type: number
+                  format: float
+                  description: Tour de taille en cm
+                  example: 90.0
+                chest:
+                  type: number
+                  format: float
+                  description: Tour de poitrine en cm
+                  example: 100.0
+                hips:
+                  type: number
+                  format: float
+                  description: Tour de hanches en cm
+                  example: 95.0
+                thigh:
+                  type: number
+                  format: float
+                  description: Tour de cuisse en cm
+                  example: 60.0
+                arm:
+                  type: number
+                  format: float
+                  description: Tour de bras en cm
+                  example: 35.0
+                bodyFat:
+                  type: number
+                  format: float
+                  description: Pourcentage de masse grasse
+                  example: 18.5
+                muscleMass:
+                  type: number
+                  format: float
+                  description: Masse musculaire en kg
+                  example: 65.0
+                notes:
+                  type: string
+                  description: Notes additionnelles
+                  example: "Mesure après entraînement"
+                measuredAt:
+                  type: string
+                  format: date-time
+                  description: Date de la mesure (par défaut maintenant)
+                  example: "2025-11-19T10:30:00Z"
+      responses:
+        '201':
+          description: Mesure créée avec succès
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "Mesure créée avec succès"
+                  measurement:
+                    type: object
+                    properties:
+                      id:
+                        type: integer
+                      displayId:
+                        type: string
+                      weight:
+                        type: number
+                      waist:
+                        type: number
+                      chest:
+                        type: number
+                      hips:
+                        type: number
+                      thigh:
+                        type: number
+                      arm:
+                        type: number
+                      bodyFat:
+                        type: number
+                      muscleMass:
+                        type: number
+                      notes:
+                        type: string
+                      measuredAt:
+                        type: string
+                        format: date-time
+                      measuredBy:
+                        type: integer
+                      createdAt:
+                        type: string
+                        format: date-time
+        '400':
+          description: Données invalides
+        '403':
+          description: Accès interdit
+        '404':
+          description: Membre non trouvé
+        '500':
+          description: Erreur serveur
+    get:
+      tags:
+        - Members
+        - Measurements
+      summary: Récupérer toutes les mesures d'un membre
+      description: Récupère l'historique des mesures pour suivre la progression dans le temps
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+          description: ID de l'utilisateur membre
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 50
+          description: Nombre maximum de mesures à retourner
+        - name: startDate
+          in: query
+          schema:
+            type: string
+            format: date
+          description: Filtrer les mesures à partir de cette date
+        - name: endDate
+          in: query
+          schema:
+            type: string
+            format: date
+          description: Filtrer les mesures jusqu'à cette date
+      responses:
+        '200':
+          description: Liste des mesures
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  measurements:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id:
+                          type: integer
+                        displayId:
+                          type: string
+                        weight:
+                          type: number
+                        waist:
+                          type: number
+                        chest:
+                          type: number
+                        hips:
+                          type: number
+                        thigh:
+                          type: number
+                        arm:
+                          type: number
+                        bodyFat:
+                          type: number
+                        muscleMass:
+                          type: number
+                        notes:
+                          type: string
+                        measuredAt:
+                          type: string
+                          format: date-time
+                        measuredBy:
+                          type: integer
+                        createdAt:
+                          type: string
+                          format: date-time
+        '403':
+          description: Accès interdit
+        '404':
+          description: Membre non trouvé
+        '500':
+          description: Erreur serveur
