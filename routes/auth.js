@@ -139,6 +139,16 @@ router.post('/login', async (req, res) => {
 
     console.log(`✅ Connexion réussie pour: ${user.fullName} (${user.role})`);
 
+    // Détecter si c'est la première connexion
+    const isFirstLogin = !user.lastLoginAt;
+    console.log(`🔔 Première connexion: ${isFirstLogin ? 'OUI ✨' : 'NON'}`);
+
+    // Mettre à jour la date de dernière connexion
+    await prisma.user.update({
+      where: { id: user.id },
+      data: { lastLoginAt: new Date() }
+    });
+
     // Token valid for 30 days
     const token = jwt.sign({
       sub: user.id,
@@ -153,6 +163,7 @@ router.post('/login', async (req, res) => {
       console.log(`👨‍💼 Réponse admin préparée pour: ${user.fullName}`);
       const responseData = {
         token,
+        isFirstLogin,
         user: {
           id: user.id,
           email: user.email,
@@ -171,6 +182,7 @@ router.post('/login', async (req, res) => {
       console.log(`👑 Réponse owner préparée pour: ${user.fullName}`);
       const responseData = {
         token,
+        isFirstLogin,
         user: {
           id: user.id,
           email: user.email,
@@ -195,6 +207,7 @@ router.post('/login', async (req, res) => {
       console.log(`👤 Réponse membre préparée pour: ${user.fullName}`);
       const responseData = {
         token,
+        isFirstLogin,
         user: {
           id: user.id,
           email: user.email,

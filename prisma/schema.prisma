@@ -20,6 +20,7 @@ model User {
   qrCode      Bytes?   // Image QR code générée et stockée
   profileImage Bytes?  // Photo de profil de l'utilisateur
   fcmToken    String?  // Token Firebase Cloud Messaging pour les notifications push
+  lastLoginAt DateTime? // Date de la dernière connexion (null = jamais connecté)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 

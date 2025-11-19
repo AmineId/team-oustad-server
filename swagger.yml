@@ -263,6 +263,10 @@ components:
         token:
           type: string
           example: "eyJhbGciOiJIUzI1NiIs..."
+        isFirstLogin:
+          type: boolean
+          description: "Indique si c'est la première connexion de l'utilisateur (true si lastLoginAt était null)"
+          example: true
         user:
           $ref: '#/components/schemas/User'
 
