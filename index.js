@@ -34,6 +34,7 @@ const planningsRoutes = require('./routes/plannings');
 const subscriptionsRoutes = require('./routes/subscriptions');
 const subscriptionTypesRoutes = require('./routes/subscriptionTypes');
 const androidRoutes = require('./routes/android');
+const membersRoutes = require('./routes/members');
 
 // Use routes
 console.log('🔗 Configuration des routes API...');
@@ -44,7 +45,8 @@ app.use('/plannings', planningsRoutes);
 app.use('/subscriptions', subscriptionsRoutes);
 app.use('/subscription-types', subscriptionTypesRoutes);
 app.use('/android', androidRoutes);
-console.log('✅ Routes configurées: /gyms, /users, /auth, /plannings, /subscriptions, /subscription-types, /android');
+app.use('/members', membersRoutes);
+console.log('✅ Routes configurées: /gyms, /users, /auth, /plannings, /subscriptions, /subscription-types, /android, /members');
 
 // Health check (DB + server)
 app.get('/health', async (req, res) => {
