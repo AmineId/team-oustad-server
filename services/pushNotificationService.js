@@ -53,6 +53,12 @@ function initializeFirebase() {
  * @returns {Promise<Object>} Résultat de l'envoi
  */
 async function sendPushNotification(fcmToken, notification) {
+  // Vérifier que le token FCM existe et n'est pas vide
+  if (!fcmToken || fcmToken.trim() === '') {
+    console.log('⚠️ Token FCM manquant ou vide - Notification non envoyée');
+    return { success: false, error: 'Token FCM manquant' };
+  }
+
   console.log(`📲 Envoi notification push - Token: ${fcmToken.substring(0, 20)}...`);
 
   if (!initializeFirebase()) {
@@ -87,6 +93,13 @@ async function sendPushNotification(fcmToken, notification) {
     
     return { success: true, messageId: response };
   } catch (error) {
+    // Gérer spécifiquement les tokens invalides ou non enregistrés
+    if (error.code === 'messaging/registration-token-not-registered' || 
+        error.code === 'messaging/invalid-registration-token') {
+      console.warn(`⚠️ Token FCM invalide ou non enregistré - Token: ${fcmToken.substring(0, 20)}...`);
+      return { success: false, error: 'Token FCM invalide', tokenInvalid: true };
+    }
+    
     console.error('❌ Erreur envoi notification push:', error);
     return { success: false, error: error.message };
   }
@@ -99,7 +112,19 @@ async function sendPushNotification(fcmToken, notification) {
  * @returns {Promise<Object>} Résultat de l'envoi groupé
  */
 async function sendMulticastPushNotification(fcmTokens, notification) {
-  console.log(`📲 Envoi notification multicast - ${fcmTokens.length} destinataires`);
+  // Filtrer les tokens valides (non vides)
+  const validTokens = fcmTokens.filter(token => token && token.trim() !== '');
+  
+  if (validTokens.length === 0) {
+    console.log('⚠️ Aucun token FCM valide - Notifications non envoyées');
+    return { success: false, error: 'Aucun token FCM valide' };
+  }
+  
+  if (validTokens.length < fcmTokens.length) {
+    console.warn(`⚠️ ${fcmTokens.length - validTokens.length} token(s) invalide(s) ignoré(s)`);
+  }
+
+  console.log(`📲 Envoi notification multicast - ${validTokens.length} destinataires`);
 
   if (!initializeFirebase()) {
     console.log('⚠️ Firebase non initialisé - Notifications non envoyées');
@@ -112,7 +137,7 @@ async function sendMulticastPushNotification(fcmTokens, notification) {
         title: notification.title,
         body: notification.body
       },
-      tokens: fcmTokens
+      tokens: validTokens
     };
 
     if (notification.data) {
@@ -126,13 +151,19 @@ async function sendMulticastPushNotification(fcmTokens, notification) {
     }
 
     const response = await admin.messaging().sendEachForMulticast(message);
-    console.log(`✅ ${response.successCount}/${fcmTokens.length} notifications envoyées avec succès`);
+    console.log(`✅ ${response.successCount}/${validTokens.length} notifications envoyées avec succès`);
     
     if (response.failureCount > 0) {
       console.warn(`⚠️ ${response.failureCount} notifications ont échoué`);
       response.responses.forEach((resp, idx) => {
         if (!resp.success) {
-          console.error(`❌ Échec pour token ${fcmTokens[idx].substring(0, 20)}... : ${resp.error}`);
+          const errorCode = resp.error?.code;
+          if (errorCode === 'messaging/registration-token-not-registered' || 
+              errorCode === 'messaging/invalid-registration-token') {
+            console.warn(`⚠️ Token FCM invalide ignoré: ${validTokens[idx].substring(0, 20)}...`);
+          } else {
+            console.error(`❌ Échec pour token ${validTokens[idx].substring(0, 20)}... : ${resp.error}`);
+          }
         }
       });
     }
