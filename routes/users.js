@@ -482,15 +482,15 @@ router.get('/', auth, async (req, res) => {
     const users = await prisma.user.findMany({
       where: whereClause,
       include: {
-        gym: { select: { id: true, name: true } },
-        member: {
+        Gym: { select: { id: true, name: true } },
+        Member: {
           include: {
-            subscriptions: { where: { status: 'active' } },
-            payments: { orderBy: { createdAt: 'desc' }, take: 3 }
+            Subscription: { where: { status: 'active' } },
+            Payment: { orderBy: { createdAt: 'desc' }, take: 3 }
           }
         },
-        admin: true,
-        owner: true
+        Admin: true,
+        Owner: true
       },
       orderBy: { createdAt: 'desc' }
     });
@@ -513,10 +513,10 @@ router.get('/:id/qr', auth, async (req, res) => {
     const user = await prisma.user.findUnique({
       where: { id },
       include: {
-        gym: { select: { id: true, name: true } },
-        member: true,
-        admin: true,
-        owner: true
+        Gym: { select: { id: true, name: true } },
+        Member: true,
+        Admin: true,
+        Owner: true
       }
     });
 
@@ -949,10 +949,10 @@ router.put('/:id', auth, async (req, res) => {
       where: { id },
       data: updateData,
       include: {
-        gym: { select: { id: true, name: true } },
-        member: true,
-        admin: true,
-        owner: true
+        Gym: { select: { id: true, name: true } },
+        Member: true,
+        Admin: true,
+        Owner: true
       }
     });
 
@@ -1642,20 +1642,20 @@ router.get('/:id', auth, async (req, res) => {
     const user = await prisma.user.findUnique({
       where: { id },
       include: {
-        gym: { select: { id: true, name: true } },
-        member: {
+        Gym: { select: { id: true, name: true } },
+        Member: {
           include: {
-            subscriptions: {
+            Subscription: {
               where: { status: 'active' }
             },
-            payments: {
+            Payment: {
               orderBy: { createdAt: 'desc' },
               take: 5
             }
           }
         },
-        admin: true,
-        owner: true
+        Admin: true,
+        Owner: true
       }
     });
 
@@ -2268,19 +2268,19 @@ router.get('/gym/:gymId/members', auth, async (req, res) => {
         role: 'member'
       },
       include: {
-        member: {
+        Member: {
           include: {
-            subscriptions: {
+            Subscription: {
               where: { status: 'active' },
               include: {
-                subscriptionType: true,
-                payments: {
+                SubscriptionType: true,
+                Payment: {
                   orderBy: { createdAt: 'desc' },
                   take: 1
                 }
               }
             },
-            payments: {
+            Payment: {
               orderBy: { createdAt: 'desc' },
               take: 5
             }
