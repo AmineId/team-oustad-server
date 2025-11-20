@@ -62,7 +62,8 @@ async function main() {
             uniqueCode: crypto.randomUUID().substring(0, 8).toUpperCase(),
             email: 'owner@teamfitness.com',
             password: ownerPassword,
-            fullName: 'Sarah Johnson',
+            firstName: 'Sarah',
+            lastName: 'Johnson',
             role: 'owner',
             notificationsEnabled: true
           },
@@ -71,7 +72,8 @@ async function main() {
             uniqueCode: crypto.randomUUID().substring(0, 8).toUpperCase(),
             email: 'admin@teamfitness.com',
             password: hashed,
-            fullName: 'Mike Anderson',
+            firstName: 'Mike',
+            lastName: 'Anderson',
             role: 'admin',
             notificationsEnabled: true
           },
@@ -80,7 +82,8 @@ async function main() {
             uniqueCode: crypto.randomUUID().substring(0, 8).toUpperCase(),
             email: 'bob@example.com',
             password: memberPassword,
-            fullName: 'Bob Williams',
+            firstName: 'Bob',
+            lastName: 'Williams',
             role: 'member',
             notificationsEnabled: true
           },
@@ -89,7 +92,8 @@ async function main() {
             uniqueCode: crypto.randomUUID().substring(0, 8).toUpperCase(),
             email: 'charlie@example.com',
             password: memberPassword,
-            fullName: 'Charlie Brown',
+            firstName: 'Charlie',
+            lastName: 'Brown',
             role: 'member',
             notificationsEnabled: true
           },
@@ -98,7 +102,8 @@ async function main() {
             uniqueCode: crypto.randomUUID().substring(0, 8).toUpperCase(),
             email: 'alice@example.com',
             password: memberPassword,
-            fullName: 'Alice Smith',
+            firstName: 'Alice',
+            lastName: 'Smith',
             role: 'member',
             notificationsEnabled: true
           },
@@ -122,7 +127,8 @@ async function main() {
             uniqueCode: crypto.randomUUID().substring(0, 8).toUpperCase(),
             email: 'admin2@teamfitness.com',
             password: hashed,
-            fullName: 'Lisa Martinez',
+            firstName: 'Lisa',
+            lastName: 'Martinez',
             role: 'admin',
             notificationsEnabled: true
           },
@@ -131,7 +137,8 @@ async function main() {
             uniqueCode: crypto.randomUUID().substring(0, 8).toUpperCase(),
             email: 'david@example.com',
             password: memberPassword,
-            fullName: 'David Johnson',
+            firstName: 'David',
+            lastName: 'Johnson',
             role: 'member',
             notificationsEnabled: true
           },
@@ -140,7 +147,8 @@ async function main() {
             uniqueCode: crypto.randomUUID().substring(0, 8).toUpperCase(),
             email: 'emma@example.com',
             password: memberPassword,
-            fullName: 'Emma Davis',
+            firstName: 'Emma',
+            lastName: 'Davis',
             role: 'member',
             notificationsEnabled: true
           },
@@ -227,18 +235,18 @@ async function main() {
       maxGymsAllowed: 10,
     }
   });
-  console.log(`✅ Owner: ${ownerUser.fullName}`);
+  console.log(`✅ Owner: ${ownerUser.firstName} ${ownerUser.lastName}`);
 
   // Admin profiles
   await prisma.admin.create({
     data: { userId: adminUser.id }
   });
-  console.log(`✅ Admin: ${adminUser.fullName}`);
+  console.log(`✅ Admin: ${adminUser.firstName} ${adminUser.lastName}`);
 
   await prisma.admin.create({
     data: { userId: admin2User.id }
   });
-  console.log(`✅ Admin: ${admin2User.fullName}`);
+  console.log(`✅ Admin: ${admin2User.firstName} ${admin2User.lastName}`);
 
   // Member profiles
   const bobMember = await prisma.member.create({
@@ -248,7 +256,7 @@ async function main() {
       workoutNotificationsEnabled: true
     }
   });
-  console.log(`✅ Member: ${bobUser.fullName}`);
+  console.log(`✅ Member: ${bobUser.firstName} ${bobUser.lastName}`);
 
   const charlieMember = await prisma.member.create({
     data: {
@@ -257,7 +265,7 @@ async function main() {
       workoutNotificationsEnabled: true
     }
   });
-  console.log(`✅ Member: ${charlieUser.fullName}`);
+  console.log(`✅ Member: ${charlieUser.firstName} ${charlieUser.lastName}`);
 
   const aliceMember = await prisma.member.create({
     data: {
@@ -266,7 +274,7 @@ async function main() {
       workoutNotificationsEnabled: true
     }
   });
-  console.log(`✅ Member: ${aliceUser.fullName}`);
+  console.log(`✅ Member: ${aliceUser.firstName} ${aliceUser.lastName}`);
 
   const davidMember = await prisma.member.create({
     data: {
@@ -275,7 +283,7 @@ async function main() {
       workoutNotificationsEnabled: true
     }
   });
-  console.log(`✅ Member: ${davidUser.fullName}`);
+  console.log(`✅ Member: ${davidUser.firstName} ${davidUser.lastName}`);
 
   const emmaMember = await prisma.member.create({
     data: {
@@ -284,7 +292,7 @@ async function main() {
       workoutNotificationsEnabled: false
     }
   });
-  console.log(`✅ Member: ${emmaUser.fullName}\n`);
+  console.log(`✅ Member: ${emmaUser.firstName} ${emmaUser.lastName}\n`);
 
   // Créer les types d'abonnements
   console.log('🏷️  Création des types d\'abonnements...');
@@ -417,7 +425,7 @@ async function main() {
       autoRenew: true,
     },
   });
-  console.log(`✅ Abonnement ${premiumType.name} pour ${bobUser.fullName}`);
+  console.log(`✅ Abonnement ${premiumType.name} pour ${bobUser.firstName} ${bobUser.lastName}`);
 
   // Charlie - Basic actif récent
   const charlieStartDate = new Date();
@@ -436,7 +444,7 @@ async function main() {
       autoRenew: true,
     },
   });
-  console.log(`✅ Abonnement ${basicType.name} pour ${charlieUser.fullName}`);
+  console.log(`✅ Abonnement ${basicType.name} pour ${charlieUser.firstName} ${charlieUser.lastName}`);
 
   // Alice - VIP actif de longue date
   const aliceStartDate = new Date();
@@ -455,7 +463,7 @@ async function main() {
       autoRenew: true,
     },
   });
-  console.log(`✅ Abonnement ${vipType.name} pour ${aliceUser.fullName}`);
+  console.log(`✅ Abonnement ${vipType.name} pour ${aliceUser.firstName} ${aliceUser.lastName}`);
 
   // David - Standard actif
   const davidStartDate = new Date();
@@ -474,7 +482,7 @@ async function main() {
       autoRenew: false,
     },
   });
-  console.log(`✅ Abonnement ${standardType.name} pour ${davidUser.fullName}`);
+  console.log(`✅ Abonnement ${standardType.name} pour ${davidUser.firstName} ${davidUser.lastName}`);
 
   // Emma - Corporate pausé (problème de paiement)
   const emmaStartDate = new Date();
@@ -493,7 +501,7 @@ async function main() {
       autoRenew: false,
     },
   });
-  console.log(`✅ Abonnement ${corporateType.name} (pausé) pour ${emmaUser.fullName}`);
+  console.log(`✅ Abonnement ${corporateType.name} (pausé) pour ${emmaUser.firstName} ${emmaUser.lastName}`);
 
   // Créer 2 membres supplémentaires pour plus de cas de tests
   const testMember1User = await prisma.user.create({
@@ -502,7 +510,8 @@ async function main() {
       uniqueCode: crypto.randomUUID().substring(0, 8).toUpperCase(),
       email: 'frank@example.com',
       password: memberPassword,
-      fullName: 'Frank Martin',
+      firstName: 'Frank',
+      lastName: 'Martin',
       role: 'member',
       gymId: gym1.id,
       notificationsEnabled: true
@@ -533,7 +542,7 @@ async function main() {
       autoRenew: true,
     },
   });
-  console.log(`✅ Abonnement ${studentType.name} pour ${testMember1User.fullName}`);
+  console.log(`✅ Abonnement ${studentType.name} pour ${testMember1User.firstName} ${testMember1User.lastName}`);
 
   const testMember2User = await prisma.user.create({
     data: {
@@ -541,7 +550,8 @@ async function main() {
       uniqueCode: crypto.randomUUID().substring(0, 8).toUpperCase(),
       email: 'grace@example.com',
       password: memberPassword,
-      fullName: 'Grace Lee',
+      firstName: 'Grace',
+      lastName: 'Lee',
       role: 'member',
       gymId: gym2.id,
       notificationsEnabled: true
@@ -572,7 +582,7 @@ async function main() {
       autoRenew: false,
     },
   });
-  console.log(`✅ Abonnement ${trialType.name} pour ${testMember2User.fullName}`);
+  console.log(`✅ Abonnement ${trialType.name} pour ${testMember2User.firstName} ${testMember2User.lastName}`);
 
   // Créer un abonnement expiré pour tester
   const testMember3User = await prisma.user.create({
@@ -581,7 +591,8 @@ async function main() {
       uniqueCode: crypto.randomUUID().substring(0, 8).toUpperCase(),
       email: 'henry@example.com',
       password: memberPassword,
-      fullName: 'Henry Wilson',
+      firstName: 'Henry',
+      lastName: 'Wilson',
       role: 'member',
       gymId: gym1.id,
       notificationsEnabled: true
@@ -612,7 +623,7 @@ async function main() {
       autoRenew: false,
     },
   });
-  console.log(`✅ Abonnement ${seniorType.name} (expiré) pour ${testMember3User.fullName}`);
+  console.log(`✅ Abonnement ${seniorType.name} (expiré) pour ${testMember3User.firstName} ${testMember3User.lastName}`);
 
   // Créer un abonnement annulé
   const testMember4User = await prisma.user.create({
@@ -621,7 +632,8 @@ async function main() {
       uniqueCode: crypto.randomUUID().substring(0, 8).toUpperCase(),
       email: 'iris@example.com',
       password: memberPassword,
-      fullName: 'Iris Thompson',
+      firstName: 'Iris',
+      lastName: 'Thompson',
       role: 'member',
       gymId: gym2.id,
       notificationsEnabled: true
@@ -652,7 +664,7 @@ async function main() {
       autoRenew: false,
     },
   });
-  console.log(`✅ Abonnement ${basicType.name} (annulé) pour ${testMember4User.fullName}`);
+  console.log(`✅ Abonnement ${basicType.name} (annulé) pour ${testMember4User.firstName} ${testMember4User.lastName}`);
 
   // Créer un abonnement avec l'ancien type inactif (pour tester la persistance)
   const testMember5User = await prisma.user.create({
@@ -661,7 +673,8 @@ async function main() {
       uniqueCode: crypto.randomUUID().substring(0, 8).toUpperCase(),
       email: 'jack@example.com',
       password: memberPassword,
-      fullName: 'Jack Brown',
+      firstName: 'Jack',
+      lastName: 'Brown',
       role: 'member',
       gymId: gym1.id,
       notificationsEnabled: true
@@ -692,7 +705,7 @@ async function main() {
       autoRenew: false,
     },
   });
-  console.log(`✅ Abonnement ${inactiveType.name} (type inactif, abonnement actif) pour ${testMember5User.fullName}\n`);
+  console.log(`✅ Abonnement ${inactiveType.name} (type inactif, abonnement actif) pour ${testMember5User.firstName} ${testMember5User.lastName}\n`);
 
   // Abonnement EN ATTENTE - Pour tester l'acquittement de paiement
   // Olivia - Nouvel abonnement Découverte en attente de premier paiement
@@ -702,7 +715,8 @@ async function main() {
       uniqueCode: crypto.randomUUID().substring(0, 8).toUpperCase(),
       email: 'olivia@example.com',
       password: memberPassword,
-      fullName: 'Olivia Martinez',
+      firstName: 'Olivia',
+      lastName: 'Martinez',
       role: 'member',
       gymId: gym1.id,
       notificationsEnabled: true
@@ -732,7 +746,7 @@ async function main() {
       autoRenew: true,
     },
   });
-  console.log(`✅ Abonnement ${trialType.name} (EN ATTENTE) pour ${oliviaUser.fullName} - À activer via /acknowledge\n`);
+  console.log(`✅ Abonnement ${trialType.name} (EN ATTENTE) pour ${oliviaUser.firstName} ${oliviaUser.lastName} - À activer via /acknowledge\n`);
 
   // Créer des paiements pour les abonnements
   console.log('💰 Création des paiements...');
@@ -1156,7 +1170,8 @@ async function main() {
       uniqueCode: crypto.randomUUID().substring(0, 8).toUpperCase(),
       email: 'peter@example.com',
       password: memberPassword,
-      fullName: 'Peter Parker',
+      firstName: 'Peter',
+      lastName: 'Parker',
       role: 'member',
       gymId: gym1.id,
       notificationsEnabled: true
@@ -1185,7 +1200,7 @@ async function main() {
       autoRenew: true,
     },
   });
-  console.log(`✅ Abonnement ${standardType.name} NOUVEAU pour ${peterUser.fullName}`);
+  console.log(`✅ Abonnement ${standardType.name} NOUVEAU pour ${peterUser.firstName} ${peterUser.lastName}`);
 
   // Tous les paiements en PENDING - C'est le cas idéal d'un abonnement qui vient d'être créé
   for (let i = 0; i < 12; i++) {
@@ -1216,7 +1231,8 @@ async function main() {
       uniqueCode: crypto.randomUUID().substring(0, 8).toUpperCase(),
       email: 'mary@example.com',
       password: memberPassword,
-      fullName: 'Mary Jane',
+      firstName: 'Mary',
+      lastName: 'Jane',
       role: 'member',
       gymId: gym1.id,
       notificationsEnabled: true
@@ -1246,7 +1262,7 @@ async function main() {
       paymentFrequency: 3 // Trimestriel
     },
   });
-  console.log(`✅ Abonnement ${premiumType.name} TRIMESTRIEL pour ${maryUser.fullName}`);
+  console.log(`✅ Abonnement ${premiumType.name} TRIMESTRIEL pour ${maryUser.firstName} ${maryUser.lastName}`);
 
   // 4 paiements trimestriels (tous les 3 mois) - TOUS PENDING
   for (let i = 0; i < 4; i++) {
@@ -1277,7 +1293,8 @@ async function main() {
       uniqueCode: crypto.randomUUID().substring(0, 8).toUpperCase(),
       email: 'nathan@example.com',
       password: memberPassword,
-      fullName: 'Nathan Drake',
+      firstName: 'Nathan',
+      lastName: 'Drake',
       role: 'member',
       gymId: gym2.id,
       notificationsEnabled: true
@@ -1307,7 +1324,7 @@ async function main() {
       paymentFrequency: 6 // Semestriel
     },
   });
-  console.log(`✅ Abonnement ${vipType.name} SEMESTRIEL pour ${nathanUser.fullName}`);
+  console.log(`✅ Abonnement ${vipType.name} SEMESTRIEL pour ${nathanUser.firstName} ${nathanUser.lastName}`);
 
   // 2 paiements semestriels (tous les 6 mois) - TOUS PENDING
   for (let i = 0; i < 2; i++) {
@@ -1338,7 +1355,8 @@ async function main() {
       uniqueCode: crypto.randomUUID().substring(0, 8).toUpperCase(),
       email: 'sarah@example.com',
       password: memberPassword,
-      fullName: 'Sarah Connor',
+      firstName: 'Sarah',
+      lastName: 'Connor',
       role: 'member',
       gymId: gym2.id,
       notificationsEnabled: true
@@ -1368,7 +1386,7 @@ async function main() {
       paymentFrequency: 1 // Oneshot annuel
     },
   });
-  console.log(`✅ Abonnement ${corporateType.name} ONESHOT ANNUEL pour ${sarahUser.fullName}`);
+  console.log(`✅ Abonnement ${corporateType.name} ONESHOT ANNUEL pour ${sarahUser.firstName} ${sarahUser.lastName}`);
 
   // 1 seul paiement pour toute l'année - PENDING
   paymentsData.push({
@@ -1710,7 +1728,7 @@ async function main() {
       },
     ]
   });
-  console.log(`✅ Planning créé pour ${bobUser.fullName}: ${bobPlanning.title}`);
+  console.log(`✅ Planning créé pour ${bobUser.firstName} ${bobUser.lastName}: ${bobPlanning.title}`);
 
   // Planning 2: Alice - Programme Cardio et Tonification
   const alicePlanning = await prisma.planning.create({
@@ -1804,7 +1822,7 @@ async function main() {
       },
     ]
   });
-  console.log(`✅ Planning créé pour ${aliceUser.fullName}: ${alicePlanning.title}`);
+  console.log(`✅ Planning créé pour ${aliceUser.firstName} ${aliceUser.lastName}: ${alicePlanning.title}`);
 
   // Planning 3: Charlie - Programme Débutant
   const charliePlanning = await prisma.planning.create({
@@ -1880,7 +1898,7 @@ async function main() {
       },
     ]
   });
-  console.log(`✅ Planning créé pour ${charlieUser.fullName}: ${charliePlanning.title}\n`);
+  console.log(`✅ Planning créé pour ${charlieUser.firstName} ${charlieUser.lastName}: ${charliePlanning.title}\n`);
 
 
   // Créer des tokens de réinitialisation de mot de passe pour tests
