@@ -24,6 +24,14 @@ async function deleteUserByEmail(email) {
       displayId: user.displayId
     });
     
+    // Supprimer les tokens de réinitialisation de mot de passe
+    const tokens = await prisma.passwordResetToken.deleteMany({
+      where: { userId: user.id }
+    });
+    if (tokens.count > 0) {
+      console.log(`🗑️  ${tokens.count} token(s) de réinitialisation supprimé(s)`);
+    }
+    
     // Supprimer le profil spécifique selon le rôle
     if (user.role === 'member' && user.Member) {
       await prisma.member.delete({ where: { userId: user.id } });
