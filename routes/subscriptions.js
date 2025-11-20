@@ -242,8 +242,8 @@ router.get('/member/:memberId', auth, async (req, res) => {
     const subscriptions = await prisma.subscription.findMany({
       where: { memberId },
       include: {
-        subscriptionType: true,
-        payments: {
+        SubscriptionType: true,
+        Payment: {
           orderBy: { monthNumber: 'asc' }
         }
       },
@@ -254,9 +254,9 @@ router.get('/member/:memberId', auth, async (req, res) => {
     if (subscriptions.length > 0) {
       console.log(`📊 Résumé:`, subscriptions.map(s => ({
         id: s.id,
-        type: s.subscriptionType.name,
+        type: s.SubscriptionType.name,
         status: s.status,
-        payments: s.payments.length
+        payments: s.Payment.length
       })));
     }
     
@@ -297,9 +297,9 @@ router.post('/payments/:paymentId/acknowledge', auth, async (req, res) => {
     const payment = await prisma.payment.findUnique({
       where: { id: paymentId },
       include: {
-        subscription: true,
-        member: {
-          include: { user: true }
+        Subscription: true,
+        Member: {
+          include: { User: true }
         }
       }
     });
@@ -309,7 +309,7 @@ router.post('/payments/:paymentId/acknowledge', auth, async (req, res) => {
       return res.status(404).json({ error: 'Paiement non trouvé' });
     }
     
-    console.log(`✅ Paiement trouvé: ${payment.amount}€ pour ${payment.member.user.fullName}`);
+    console.log(`✅ Paiement trouvé: ${payment.amount}€ pour ${payment.Member.User.fullName}`);
     console.log(`📊 Statut actuel: ${payment.status}, Abonnement: ${payment.subscriptionId}`);
     
     const requester = req.user;
@@ -403,8 +403,8 @@ router.post('/payments/:paymentId/complete', auth, async (req, res) => {
     const payment = await prisma.payment.findUnique({
       where: { id: paymentId },
       include: {
-        member: {
-          include: { user: true }
+        Member: {
+          include: { User: true }
         }
       }
     });
@@ -478,10 +478,10 @@ router.get('/payments/upcoming', auth, async (req, res) => {
     const upcomingPayments = await prisma.payment.findMany({
       where: whereClause,
       include: {
-        subscription: true,
-        member: {
+        Subscription: true,
+        Member: {
           include: {
-            user: true
+            User: true
           }
         }
       },

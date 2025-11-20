@@ -54,7 +54,7 @@ router.get('/:id', async (req, res) => {
       where: { id: typeId },
       include: {
         _count: {
-          select: { subscriptions: true }
+          select: { Subscription: true }
         }
       }
     });
@@ -65,7 +65,7 @@ router.get('/:id', async (req, res) => {
     }
     
     console.log(`✅ Type trouvé: ${type.name}`);
-    console.log(`📊 Prix: ${type.monthlyPrice}€/mois, ${type._count.subscriptions} abonnement(s) actif(s)`);
+    console.log(`📊 Prix: ${type.monthlyPrice}€/mois, ${type._count.Subscription} abonnement(s) actif(s)`);
     console.log(`📤 Réponse détails type ${typeId}`);
     
     res.json({ type });

@@ -238,7 +238,7 @@ router.get('/', auth, async (req, res) => {
     const gyms = await prisma.gym.findMany({
       where: whereClause,
       include: {
-        users: {
+        User: {
           select: {
             id: true,
             email: true,
@@ -246,9 +246,9 @@ router.get('/', auth, async (req, res) => {
             role: true
           }
         },
-        openingHours: true,
+        OpeningHour: true,
         _count: {
-          select: { users: true }
+          select: { User: true }
         }
       },
       orderBy: { createdAt: 'desc' }
@@ -368,7 +368,7 @@ router.get('/:id', auth, async (req, res) => {
     const gym = await prisma.gym.findUnique({
       where: { id },
       include: {
-        users: {
+        User: {
           select: {
             id: true,
             email: true,
@@ -376,11 +376,11 @@ router.get('/:id', auth, async (req, res) => {
             role: true
           }
         },
-        openingHours: {
+        OpeningHour: {
           orderBy: { dayOfWeek: 'asc' }
         },
         _count: {
-          select: { users: true }
+          select: { User: true }
         }
       }
     });
@@ -500,8 +500,8 @@ router.put('/:id', auth, async (req, res) => {
       where: { id },
       data: updateData,
       include: {
-        openingHours: true,
-        _count: { select: { users: true } }
+        OpeningHour: true,
+        _count: { select: { User: true } }
       }
     });
 
