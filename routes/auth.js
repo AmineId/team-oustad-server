@@ -7,6 +7,7 @@ const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
 const { sendPasswordResetEmail, sendAccountSetupEmail } = require('../services/emailService');
 const { getActiveSubscription, getSubscriptionsWithStatus } = require('../utils/subscriptionUtils');
+const { getFullName, formatUserWithFullName } = require('../utils/nameUtils');
 
 const prisma = new PrismaClient();
 
@@ -245,7 +246,7 @@ router.post('/login', async (req, res) => {
       return res.status(401).json({ error: 'Invalid credentials' });
     }
 
-    console.log(`✅ Utilisateur trouvé: ${user.fullName} (${user.role}) - ID: ${user.id}`);
+    console.log(`✅ Utilisateur trouvé: ${getFullName(user)} (${user.role}) - ID: ${user.id}`);
 
     // Check password
     const valid = await bcrypt.compare(password, user.password);
@@ -256,7 +257,7 @@ router.post('/login', async (req, res) => {
       return res.status(401).json({ error: 'Invalid credentials' });
     }
 
-    console.log(`✅ Connexion réussie pour: ${user.fullName} (${user.role})`);
+    console.log(`✅ Connexion réussie pour: ${getFullName(user)} (${user.role})`);
 
     // Récupérer le statut onboarding du membre (seulement pour les membres)
     const onboarding = user.role === 'member' ? (user.Member?.onboarding || false) : false;
@@ -280,7 +281,7 @@ router.post('/login', async (req, res) => {
 
     // Return different data based on user role
     if (user.role === 'admin') {
-      console.log(`👨‍💼 Réponse admin préparée pour: ${user.fullName}`);
+      console.log(`👨‍💼 Réponse admin préparée pour: ${getFullName(user)}`);
       const responseData = {
         
         token,
@@ -290,7 +291,9 @@ router.post('/login', async (req, res) => {
           displayId: user.displayId,
           email: user.email,
           phoneNumber: user.phoneNumber,
-          fullName: user.fullName,
+          firstName: user.firstName,
+          lastName: user.lastName,
+          fullName: getFullName(user),
           role: user.role,
           gymId: user.gymId,
           gym: user.Gym,
@@ -307,7 +310,7 @@ router.post('/login', async (req, res) => {
       });
       res.json(responseData);
     } else if (user.role === 'owner') {
-      console.log(`👑 Réponse owner préparée pour: ${user.fullName}`);
+      console.log(`👑 Réponse owner préparée pour: ${getFullName(user)}`);
       const responseData = {
         token,
         onboarding,
@@ -316,7 +319,9 @@ router.post('/login', async (req, res) => {
           displayId: user.displayId,
           email: user.email,
           phoneNumber: user.phoneNumber,
-          fullName: user.fullName,
+          firstName: user.firstName,
+          lastName: user.lastName,
+          fullName: getFullName(user),
           role: user.role,
           gymId: user.gymId,
           gym: user.Gym,
@@ -339,7 +344,7 @@ router.post('/login', async (req, res) => {
       });
       res.json(responseData);
     } else if (user.role === 'member') {
-      console.log(`👤 Réponse membre préparée pour: ${user.fullName}`);
+      console.log(`👤 Réponse membre préparée pour: ${getFullName(user)}`);
       const responseData = {
         token,
         onboarding,
@@ -348,7 +353,9 @@ router.post('/login', async (req, res) => {
           displayId: user.displayId,
           email: user.email,
           phoneNumber: user.phoneNumber,
-          fullName: user.fullName,
+          firstName: user.firstName,
+          lastName: user.lastName,
+          fullName: getFullName(user),
           role: user.role,
           gymId: user.gymId,
           gym: user.Gym,
@@ -376,7 +383,7 @@ router.post('/login', async (req, res) => {
       });
       res.json(responseData);
     } else {
-      console.log(`❓ Rôle inconnu: ${user.role} pour ${user.fullName}`);
+      console.log(`❓ Rôle inconnu: ${user.role} pour ${getFullName(user)}`);
       return res.status(400).json({ error: 'Invalid user role' });
     }
   } catch (e) {
@@ -496,13 +503,13 @@ router.post('/scan-qr', auth, async (req, res) => {
     }
 
     if (member.role !== 'member') {
-      console.log(`❌ Utilisateur trouvé mais n'est pas membre: ${member.fullName} (rôle: ${member.role})`);
+      console.log(`❌ Utilisateur trouvé mais n'est pas membre: ${getFullName(member)} (rôle: ${member.role})`);
       return res.status(400).json({ error: 'QR code is not for a member' });
     }
 
     // Vérifier que le membre appartient à la même salle que l'admin
     if (member.gymId !== req.user.gymId) {
-      console.log(`❌ Membre ${member.fullName} n'appartient pas à la salle de l'admin (membre: ${member.gymId}, admin: ${req.user.gymId})`);
+      console.log(`❌ Membre ${getFullName(member)} n'appartient pas à la salle de l'admin (membre: ${member.gymId}, admin: ${req.user.gymId})`);
       return res.status(403).json({ error: 'Member does not belong to your gym' });
     }
 
@@ -511,22 +518,24 @@ router.post('/scan-qr', auth, async (req, res) => {
       const activeSubscription = getActiveSubscription(member.Member);
 
       if (!activeSubscription) {
-        console.log(`❌ Membre ${member.fullName} n'a pas d'abonnement actif`);
+        console.log(`❌ Membre ${getFullName(member)} n'a pas d'abonnement actif`);
         return res.status(403).json({
           error: 'Accès refusé - Aucun abonnement actif',
           reason: 'no_active_subscription',
           member: {
             id: member.userId,
-            fullName: member.fullName,
+            firstName: member.firstName,
+          lastName: member.lastName,
+          fullName: getFullName(member),
             email: member.email
           }
         });
       }
 
-      console.log(`✅ Abonnement valide pour ${member.fullName} - Statut: ${activeSubscription.activeCheck.details ? 'Paiement dû dans ' + activeSubscription.activeCheck.details.daysUntilDue + ' jours' : 'Actif'}`);
+      console.log(`✅ Abonnement valide pour ${getFullName(member)} - Statut: ${activeSubscription.activeCheck.details ? 'Paiement dû dans ' + activeSubscription.activeCheck.details.daysUntilDue + ' jours' : 'Actif'}`);
     }
 
-    console.log(`✅ Accès autorisé pour ${member.fullName} - Abonnement valide jusqu'au ${activeSubscription.endDate}`);
+    console.log(`✅ Accès autorisé pour ${getFullName(member)} - Abonnement valide jusqu'au ${activeSubscription.endDate}`);
 
     // Enregistrer l'accès
     await prisma.accessLog.create({
@@ -542,7 +551,9 @@ router.post('/scan-qr', auth, async (req, res) => {
       success: true,
       member: {
         id: member.userId,
-        fullName: member.fullName,
+        firstName: member.firstName,
+          lastName: member.lastName,
+          fullName: getFullName(member),
         email: member.email,
         displayId: member.displayId,
         subscription: activeSubscription ? {
@@ -655,16 +666,18 @@ router.get('/me', auth, async (req, res) => {
       return res.status(404).json({ error: 'User not found' });
     }
 
-    console.log(`✅ Utilisateur trouvé: ${user.fullName} (${user.role}) - ID: ${user.id}, uniqueCode: ${user.uniqueCode}`);
+    console.log(`✅ Utilisateur trouvé: ${getFullName(user)} (${user.role}) - ID: ${user.id}, uniqueCode: ${user.uniqueCode}`);
 
     if (user.role === 'admin') {
-      console.log(`👨‍💼 Réponse admin pour: ${user.fullName}`);
+      console.log(`👨‍💼 Réponse admin pour: ${getFullName(user)}`);
       // Pour les admins : retourner leur salle
       const responseData = formatUser({
         id: user.id,
         displayId: user.displayId,
         email: user.email,
-        fullName: user.fullName,
+        firstName: user.firstName,
+          lastName: user.lastName,
+          fullName: getFullName(user),
         uniqueCode: user.uniqueCode,
         gym: user.Gym,
         type: 'admin'
@@ -672,7 +685,7 @@ router.get('/me', auth, async (req, res) => {
       console.log(`📤 Réponse /me admin:`, responseData);
       res.json(responseData);
     } else if (user.role === 'owner') {
-      console.log(`👑 Réponse owner pour: ${user.fullName}`);
+      console.log(`👑 Réponse owner pour: ${getFullName(user)}`);
       // Pour les owners : retourner toutes les salles avec statistiques
       const allGyms = await prisma.gym.findMany({
         include: {
@@ -711,7 +724,9 @@ router.get('/me', auth, async (req, res) => {
         id: user.id,
         displayId: user.displayId,
         email: user.email,
-        fullName: user.fullName,
+        firstName: user.firstName,
+          lastName: user.lastName,
+          fullName: getFullName(user),
         uniqueCode: user.uniqueCode,
         gyms: gymsWithStats,
         permissions: {
@@ -728,7 +743,7 @@ router.get('/me', auth, async (req, res) => {
       });
       res.json(responseData);
     } else if (user.role === 'member') {
-      console.log(`👤 Réponse membre pour: ${user.fullName}`);
+      console.log(`👤 Réponse membre pour: ${getFullName(user)}`);
       // Pour les membres : abonnement actif + derniers paiements
       const activeSubscription = getActiveSubscription(user.Member);
       const subscriptionsWithStatus = getSubscriptionsWithStatus(user.Member);
@@ -737,7 +752,9 @@ router.get('/me', auth, async (req, res) => {
         id: user.id,
         displayId: user.displayId,
         email: user.email,
-        fullName: user.fullName,
+        firstName: user.firstName,
+          lastName: user.lastName,
+          fullName: getFullName(user),
         uniqueCode: user.uniqueCode,
         gym: user.Gym,
         activeSubscription: activeSubscription,
@@ -752,7 +769,7 @@ router.get('/me', auth, async (req, res) => {
       });
       res.json(responseData);
     } else {
-      console.log(`❓ Rôle inconnu: ${user.role} pour ${user.fullName}`);
+      console.log(`❓ Rôle inconnu: ${user.role} pour ${getFullName(user)}`);
       return res.status(400).json({ error: 'Invalid user role' });
     }
   } catch (e) {
@@ -1144,7 +1161,9 @@ router.post('/send-setup-email', auth, async (req, res) => {
       user: {
         id: user.id,
         email: user.email,
-        fullName: user.fullName,
+        firstName: user.firstName,
+          lastName: user.lastName,
+          fullName: getFullName(user),
         gym: user.Gym.name
       }
     });

@@ -5,6 +5,7 @@ const router = express.Router();
 const prisma = new PrismaClient();
 const auth = require('../middleware/auth');
 const { generateUserIdByRole } = require('../utils/idGenerator');
+const { getFullName } = require('../utils/nameUtils');
 
 // Utility helpers
 function handleError(res, e, status = 400) {

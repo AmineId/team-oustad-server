@@ -2,6 +2,7 @@ const { PrismaClient } = require('@prisma/client');
 const prisma = new PrismaClient();
 const { notifyPaymentStatusChange } = require('./pushNotificationService');
 const { generateSubscriptionId, generatePaymentId } = require('../utils/idGenerator');
+const { getFullName } = require('../utils/nameUtils');
 
 /**
  * Crée un abonnement annuel avec paiements automatiques
