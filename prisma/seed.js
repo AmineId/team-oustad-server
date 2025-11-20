@@ -61,8 +61,7 @@ async function main() {
             displayId: generateUserIdByRole('owner'),
             email: 'owner@teamfitness.com',
             password: ownerPassword,
-            firstName: 'Sarah',
-            lastName: 'Johnson',
+            fullName: 'Sarah Johnson',
             role: 'owner',
             notificationsEnabled: true
           },
@@ -70,8 +69,7 @@ async function main() {
             displayId: generateUserIdByRole('admin'),
             email: 'admin@teamfitness.com',
             password: hashed,
-            firstName: 'Mike',
-            lastName: 'Anderson',
+            fullName: 'Mike Anderson',
             role: 'admin',
             notificationsEnabled: true
           },
@@ -79,8 +77,7 @@ async function main() {
             displayId: generateUserIdByRole('member'),
             email: 'bob@example.com',
             password: memberPassword,
-            firstName: 'Bob',
-            lastName: 'Williams',
+            fullName: 'Bob Williams',
             role: 'member',
             notificationsEnabled: true
           },
@@ -88,8 +85,7 @@ async function main() {
             displayId: generateUserIdByRole('member'),
             email: 'charlie@example.com',
             password: memberPassword,
-            firstName: 'Charlie',
-            lastName: 'Brown',
+            fullName: 'Charlie Brown',
             role: 'member',
             notificationsEnabled: true
           },
@@ -97,8 +93,7 @@ async function main() {
             displayId: generateUserIdByRole('member'),
             email: 'alice@example.com',
             password: memberPassword,
-            firstName: 'Alice',
-            lastName: 'Smith',
+            fullName: 'Alice Smith',
             role: 'member',
             notificationsEnabled: true
           },
@@ -121,8 +116,7 @@ async function main() {
             displayId: generateUserIdByRole('admin'),
             email: 'admin2@teamfitness.com',
             password: hashed,
-            firstName: 'Lisa',
-            lastName: 'Martinez',
+            fullName: 'Lisa Martinez',
             role: 'admin',
             notificationsEnabled: true
           },
