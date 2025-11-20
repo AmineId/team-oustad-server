@@ -287,28 +287,28 @@ router.post('/', auth, async (req, res) => {
 
     // Préparer les données utilisateur (gérer fullName ou firstName/lastName)
     const { splitFullName } = require('../utils/nameUtils');
+    const crypto = require('crypto');
     let userData;
     
     if (firstName && lastName) {
       // Utiliser firstName et lastName directement
       userData = {
         firstName,
-        lastName,
-        fullName: fullName || null // fullName optionnel pour rétrocompat
+        lastName
       };
     } else if (fullName) {
       // Splitter fullName en firstName et lastName
       const names = splitFullName(fullName);
       userData = {
         firstName: names.firstName,
-        lastName: names.lastName,
-        fullName: fullName
+        lastName: names.lastName
       };
     }
 
     const user = await prisma.user.create({
       data: {
         displayId: generateUserIdByRole(role),
+        uniqueCode: crypto.randomUUID().substring(0, 8).toUpperCase(),
         email: sanitizedEmail,
         phoneNumber: phoneNumber || null,
         password: hashedPassword,
@@ -745,8 +745,7 @@ router.put('/fcm-token', auth, async (req, res) => {
       select: {
         id: true,
         email: true,
-        firstName: true,
-              lastName: true,
+        fullName: true,
         fcmToken: true
       }
     });
@@ -1352,8 +1351,7 @@ router.get('/:id/profile-image', auth, async (req, res) => {
 
     const targetUser = await prisma.user.findUnique({
       where: { id },
-      select: { id: true, firstName: true,
-              lastName: true, gymId: true, role: true, profileImage: true }
+      select: { id: true, fullName: true, gymId: true, role: true, profileImage: true }
     });
 
     if (!targetUser) {
@@ -1505,8 +1503,7 @@ router.delete('/:id/profile-image', auth, async (req, res) => {
 
     const targetUser = await prisma.user.findUnique({
       where: { id },
-      select: { id: true, firstName: true,
-              lastName: true, gymId: true, role: true, profileImage: true }
+      select: { id: true, fullName: true, gymId: true, role: true, profileImage: true }
     });
 
     if (!targetUser) {
@@ -2417,8 +2414,7 @@ router.get('/gyms/all', auth, requireOwner, async (req, res) => {
           select: {
             id: true,
             email: true,
-            firstName: true,
-              lastName: true,
+            fullName: true,
             role: true,
           }
         },
