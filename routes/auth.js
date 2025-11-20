@@ -24,10 +24,10 @@ const sanitizeEmail = (email) => {
 
 /**
  * @swagger
- * /auth/login:
+ * /auth/check-phone:
  *   post:
- *     summary: Connexion utilisateur
- *     description: Authentifie un utilisateur et retourne un token JWT
+ *     summary: Vérifier si un numéro de téléphone existe
+ *     description: Vérifie si un numéro de téléphone est déjà enregistré et si un mot de passe est configuré
  *     tags: [Authentification]
  *     requestBody:
  *       required: true
@@ -36,13 +36,112 @@ const sanitizeEmail = (email) => {
  *           schema:
  *             type: object
  *             required:
- *               - email
+ *               - phoneNumber
+ *             properties:
+ *               phoneNumber:
+ *                 type: string
+ *                 example: "+33612345678"
+ *     responses:
+ *       200:
+ *         description: Numéro vérifié avec succès
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 exists:
+ *                   type: boolean
+ *                   example: true
+ *                 hasPassword:
+ *                   type: boolean
+ *                   example: true
+ *                 message:
+ *                   type: string
+ *                   example: "Ce numéro existe déjà avec un mot de passe configuré"
+ *       400:
+ *         description: Numéro de téléphone manquant
+ *       500:
+ *         description: Erreur serveur
+ */
+router.post('/check-phone', async (req, res) => {
+  const { phoneNumber } = req.body;
+  console.log(`📱 Vérification numéro de téléphone - PhoneNumber: ${phoneNumber}`);
+  
+  if (!phoneNumber) {
+    console.log(`❌ Numéro de téléphone manquant`);
+    return res.status(400).json({ error: 'Numéro de téléphone requis' });
+  }
+
+  try {
+    const user = await prisma.user.findUnique({
+      where: { phoneNumber },
+      select: {
+        id: true,
+        phoneNumber: true,
+        password: true,
+        email: true
+      }
+    });
+
+    if (!user) {
+      console.log(`✅ Numéro ${phoneNumber} n'existe pas - Création possible`);
+      return res.json({
+        exists: false,
+        hasPassword: false,
+        message: 'Ce numéro n\'est pas encore enregistré'
+      });
+    }
+
+    // Vérifier si le mot de passe est configuré
+    // Un mot de passe temporaire long (généré automatiquement) indique qu'aucun mot de passe n'a été défini
+    const hasPassword = user.password && user.password.length > 0;
+
+    console.log(`⚠️ Numéro ${phoneNumber} existe déjà - hasPassword: ${hasPassword}`);
+    
+    if (hasPassword) {
+      return res.status(409).json({
+        exists: true,
+        hasPassword: true,
+        error: 'Vous avez déjà un compte avec un mot de passe. Si vous l\'avez oublié, cliquez sur "Réinitialiser le mot de passe"',
+        hasEmail: !!user.email
+      });
+    } else {
+      return res.json({
+        exists: true,
+        hasPassword: false,
+        message: 'Ce numéro existe mais aucun mot de passe n\'est configuré'
+      });
+    }
+
+  } catch (e) {
+    console.error(`💥 Erreur vérification numéro de téléphone:`, e);
+    res.status(500).json({ error: e.message });
+  }
+});
+
+/**
+ * @swagger
+ * /auth/login:
+ *   post:
+ *     summary: Connexion utilisateur
+ *     description: Authentifie un utilisateur avec email ou numéro de téléphone et retourne un token JWT
+ *     tags: [Authentification]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
  *               - password
  *             properties:
  *               email:
  *                 type: string
  *                 format: email
  *                 example: "admin@teamfitness.com"
+ *               phoneNumber:
+ *                 type: string
+ *                 example: "+33612345678"
  *               password:
  *                 type: string
  *                 example: "admin123"
@@ -84,45 +183,65 @@ const sanitizeEmail = (email) => {
  *       500:
  *         description: Erreur serveur
  */
-// Login: expect { email, password }
+// Login: expect { email or phoneNumber, password }
 router.post('/login', async (req, res) => {
-  const { email, password } = req.body;
-  console.log(`🔐 Tentative de connexion - Email: ${email}`);
+  const { email, phoneNumber, password } = req.body;
+  const identifier = email || phoneNumber;
+  console.log(`🔐 Tentative de connexion - Identifiant: ${identifier}`);
   
-  if (!email || !password) {
-    console.log(`❌ Connexion échouée - Email ou password manquant`);
-    return res.status(400).json({ error: 'email and password required' });
-  }
-
-  // Sanitize email to remove any null bytes or control characters
-  const sanitizedEmail = sanitizeEmail(email);
-  
-  if (sanitizedEmail !== email.toLowerCase().trim()) {
-    console.log(`⚠️  Email contenait des caractères invalides, nettoyé: ${sanitizedEmail}`);
+  if ((!email && !phoneNumber) || !password) {
+    console.log(`❌ Connexion échouée - Identifiant ou password manquant`);
+    return res.status(400).json({ error: 'email or phoneNumber and password required' });
   }
 
   try {
-    // Find user by email
-    const user = await prisma.user.findUnique({
-      where: { email: sanitizedEmail },
-      include: {
-        admin: true,
-        member: {
-          include: {
-            subscriptions: {
-              include: {
-                payments: true
-              }
-            },
-            payments: true
-          }
-        },
-        gym: true
+    let user;
+    
+    // Find user by email or phoneNumber
+    if (email) {
+      const sanitizedEmail = sanitizeEmail(email);
+      if (sanitizedEmail !== email.toLowerCase().trim()) {
+        console.log(`⚠️  Email contenait des caractères invalides, nettoyé: ${sanitizedEmail}`);
       }
-    });
+      user = await prisma.user.findUnique({
+        where: { email: sanitizedEmail },
+        include: {
+          admin: true,
+          member: {
+            include: {
+              subscriptions: {
+                include: {
+                  payments: true
+                }
+              },
+              payments: true
+            }
+          },
+          gym: true
+        }
+      });
+    } else if (phoneNumber) {
+      user = await prisma.user.findUnique({
+        where: { phoneNumber: phoneNumber },
+        include: {
+          admin: true,
+          member: {
+            include: {
+              subscriptions: {
+                include: {
+                  payments: true
+                }
+              },
+              payments: true
+            }
+          },
+          gym: true
+        }
+      });
+    }
 
     if (!user) {
-      console.log(`❌ Connexion échouée - Utilisateur non trouvé: ${email}`);
+      console.log(`❌ Connexion échouée - Utilisateur non trouvé: ${identifier}`);
       return res.status(401).json({ error: 'Invalid credentials' });
     }
 
@@ -133,7 +252,7 @@ router.post('/login', async (req, res) => {
     console.log(`🔍 Vérification password: ${valid ? '✅ VALIDE' : '❌ INVALIDE'}`);
 
     if (!valid) {
-      console.log(`❌ Connexion échouée - Mot de passe incorrect pour: ${email}`);
+      console.log(`❌ Connexion échouée - Mot de passe incorrect pour: ${identifier}`);
       return res.status(401).json({ error: 'Invalid credentials' });
     }
 
@@ -153,10 +272,11 @@ router.post('/login', async (req, res) => {
     const token = jwt.sign({
       sub: user.id,
       email: user.email,
+      phoneNumber: user.phoneNumber,
       type: user.role
     }, JWT_SECRET, { expiresIn: '30d' });
 
-    console.log(`🎫 Token JWT généré pour: ${user.email}`);
+    console.log(`🎫 Token JWT généré pour: ${user.email || user.phoneNumber}`);
 
     // Return different data based on user role
     if (user.role === 'admin') {
@@ -169,6 +289,7 @@ router.post('/login', async (req, res) => {
           id: user.id,
           displayId: user.displayId,
           email: user.email,
+          phoneNumber: user.phoneNumber,
           fullName: user.fullName,
           role: user.role,
           gymId: user.gymId,
@@ -194,6 +315,7 @@ router.post('/login', async (req, res) => {
           id: user.id,
           displayId: user.displayId,
           email: user.email,
+          phoneNumber: user.phoneNumber,
           fullName: user.fullName,
           role: user.role,
           gymId: user.gymId,
@@ -211,7 +333,7 @@ router.post('/login', async (req, res) => {
           type: 'owner'
         }
       };
-      console.log(`� Réponse login owner:`, {
+      console.log(`📤 Réponse login owner:`, {
         token: token.substring(0, 20) + '...',
         user: responseData.user
       });
@@ -225,6 +347,7 @@ router.post('/login', async (req, res) => {
           id: user.id,
           displayId: user.displayId,
           email: user.email,
+          phoneNumber: user.phoneNumber,
           fullName: user.fullName,
           role: user.role,
           gymId: user.gymId,
@@ -638,13 +761,13 @@ router.get('/me', auth, async (req, res) => {
   }
 });
 
-// Forgot password: expect { email } - For admins and members
+// Forgot password: expect { email or phoneNumber } - For admins and members
 /**
  * @swagger
  * /auth/forgot-password:
  *   post:
  *     summary: Request password reset
- *     description: Send a password reset code to the user's email address
+ *     description: Send a password reset code to the user's email address (requires email)
  *     tags: [Authentication]
  *     requestBody:
  *       required: true
@@ -652,14 +775,16 @@ router.get('/me', auth, async (req, res) => {
  *         application/json:
  *           schema:
  *             type: object
- *             required:
- *               - email
  *             properties:
  *               email:
  *                 type: string
  *                 format: email
  *                 description: User's email address
  *                 example: "user@example.com"
+ *               phoneNumber:
+ *                 type: string
+ *                 description: User's phone number (email must exist for reset)
+ *                 example: "+33612345678"
  *     responses:
  *       200:
  *         description: Reset code sent successfully
@@ -672,7 +797,7 @@ router.get('/me', auth, async (req, res) => {
  *                   type: string
  *                   example: "Si cet email existe, un code de réinitialisation a été envoyé"
  *       400:
- *         description: Email is required
+ *         description: Email or phoneNumber is required
  *         content:
  *           application/json:
  *             schema:
@@ -680,7 +805,7 @@ router.get('/me', auth, async (req, res) => {
  *               properties:
  *                 error:
  *                   type: string
- *                   example: "Email requis"
+ *                   example: "Email ou phoneNumber requis"
  *       500:
  *         description: Server error
  *         content:
@@ -693,17 +818,28 @@ router.get('/me', auth, async (req, res) => {
  *                   example: "Erreur lors de l'envoi du code"
  */
 router.post('/forgot-password', async (req, res) => {
-  const { email } = req.body;
-  if (!email) return res.status(400).json({ error: 'Email requis' });
-
-  const sanitizedEmail = sanitizeEmail(email);
+  const { email, phoneNumber } = req.body;
+  if (!email && !phoneNumber) return res.status(400).json({ error: 'Email ou phoneNumber requis' });
 
   try {
-    // Find user by email
-    const user = await prisma.user.findUnique({ where: { email: sanitizedEmail } });
+    let user;
+    
+    // Find user by email or phoneNumber
+    if (email) {
+      const sanitizedEmail = sanitizeEmail(email);
+      user = await prisma.user.findUnique({ where: { email: sanitizedEmail } });
+    } else if (phoneNumber) {
+      user = await prisma.user.findUnique({ where: { phoneNumber } });
+    }
+    
     if (!user) {
-      // Pour sécurité, on ne révèle pas si l'email existe ou pas
-      return res.json({ message: 'Si cet email existe, un code de réinitialisation a été envoyé' });
+      // Pour sécurité, on ne révèle pas si l'identifiant existe ou pas
+      return res.json({ message: 'Si cet identifiant existe, un code de réinitialisation a été envoyé' });
+    }
+    
+    // Vérifier que l'utilisateur a un email pour recevoir le code
+    if (!user.email) {
+      return res.status(400).json({ error: 'Cet utilisateur n\'a pas d\'email configuré. Contactez un administrateur.' });
     }
 
     // Générer un token unique (6 chiffres)
@@ -719,7 +855,7 @@ router.post('/forgot-password', async (req, res) => {
     });
 
     // Envoyer l'email
-    await sendPasswordResetEmail(email, resetToken);
+    await sendPasswordResetEmail(user.email, resetToken);
 
     const responseData = { message: 'Code de réinitialisation envoyé par email' };
     console.log(`📤 Réponse forgot-password:`, responseData);
@@ -730,7 +866,7 @@ router.post('/forgot-password', async (req, res) => {
   }
 });
 
-// Reset password: expect { email, token, newPassword }
+// Reset password: expect { email or phoneNumber, token, newPassword }
 /**
  * @swagger
  * /auth/reset-password:
@@ -745,7 +881,6 @@ router.post('/forgot-password', async (req, res) => {
  *           schema:
  *             type: object
  *             required:
- *               - email
  *               - token
  *               - newPassword
  *             properties:
@@ -754,6 +889,10 @@ router.post('/forgot-password', async (req, res) => {
  *                 format: email
  *                 description: User's email address
  *                 example: "user@example.com"
+ *               phoneNumber:
+ *                 type: string
+ *                 description: User's phone number
+ *                 example: "+33612345678"
  *               token:
  *                 type: string
  *                 description: 6-digit reset token
@@ -785,7 +924,7 @@ router.post('/forgot-password', async (req, res) => {
  *                   type: string
  *                   examples:
  *                     missing_fields:
- *                       value: "Email, token et nouveau mot de passe requis"
+ *                       value: "Email ou phoneNumber, token et nouveau mot de passe requis"
  *                     weak_password:
  *                       value: "Le mot de passe doit contenir au moins 6 caractères"
  *                     invalid_token:
@@ -812,20 +951,26 @@ router.post('/forgot-password', async (req, res) => {
  *                   example: "Erreur lors de la réinitialisation"
  */
 router.post('/reset-password', async (req, res) => {
-  const { email, token, newPassword } = req.body;
-  if (!email || !token || !newPassword) {
-    return res.status(400).json({ error: 'Email, token et nouveau mot de passe requis' });
+  const { email, phoneNumber, token, newPassword } = req.body;
+  if ((!email && !phoneNumber) || !token || !newPassword) {
+    return res.status(400).json({ error: 'Email ou phoneNumber, token et nouveau mot de passe requis' });
   }
 
   if (newPassword.length < 6) {
     return res.status(400).json({ error: 'Le mot de passe doit contenir au moins 6 caractères' });
   }
 
-  const sanitizedEmail = sanitizeEmail(email);
-
   try {
-    // Find user by email
-    const user = await prisma.user.findUnique({ where: { email: sanitizedEmail } });
+    let user;
+    
+    // Find user by email or phoneNumber
+    if (email) {
+      const sanitizedEmail = sanitizeEmail(email);
+      user = await prisma.user.findUnique({ where: { email: sanitizedEmail } });
+    } else if (phoneNumber) {
+      user = await prisma.user.findUnique({ where: { phoneNumber } });
+    }
+    
     if (!user) return res.status(404).json({ error: 'Utilisateur non trouvé' });
 
     // Vérifier le token
@@ -1024,7 +1169,6 @@ router.post('/send-setup-email', auth, async (req, res) => {
  *           schema:
  *             type: object
  *             required:
- *               - email
  *               - token
  *               - password
  *             properties:
@@ -1033,6 +1177,10 @@ router.post('/send-setup-email', auth, async (req, res) => {
  *                 format: email
  *                 description: User's email address
  *                 example: "newuser@example.com"
+ *               phoneNumber:
+ *                 type: string
+ *                 description: User's phone number
+ *                 example: "+33612345678"
  *               token:
  *                 type: string
  *                 description: 6-digit setup token
@@ -1061,12 +1209,12 @@ router.post('/send-setup-email', auth, async (req, res) => {
  *         description: Server error
  */
 router.post('/setup-password', async (req, res) => {
-  const { email, token, password } = req.body;
-  console.log(`🔐 Création mot de passe initial - Email: ${email}`);
+  const { email, phoneNumber, token, password } = req.body;
+  console.log(`🔐 Création mot de passe initial - Email: ${email}, PhoneNumber: ${phoneNumber}`);
 
-  if (!email || !token || !password) {
+  if ((!email && !phoneNumber) || !token || !password) {
     console.log(`❌ Champs manquants`);
-    return res.status(400).json({ error: 'Email, token et mot de passe requis' });
+    return res.status(400).json({ error: 'Email ou phoneNumber, token et mot de passe requis' });
   }
 
   if (password.length < 6) {
@@ -1074,13 +1222,19 @@ router.post('/setup-password', async (req, res) => {
     return res.status(400).json({ error: 'Le mot de passe doit contenir au moins 6 caractères' });
   }
 
-  const sanitizedEmail = sanitizeEmail(email);
-
   try {
-    // Find user by email
-    const user = await prisma.user.findUnique({ where: { email: sanitizedEmail } });
+    let user;
+    
+    // Find user by email or phoneNumber
+    if (email) {
+      const sanitizedEmail = sanitizeEmail(email);
+      user = await prisma.user.findUnique({ where: { email: sanitizedEmail } });
+    } else if (phoneNumber) {
+      user = await prisma.user.findUnique({ where: { phoneNumber } });
+    }
+    
     if (!user) {
-      console.log(`❌ Utilisateur non trouvé: ${email}`);
+      console.log(`❌ Utilisateur non trouvé: ${email || phoneNumber}`);
       return res.status(404).json({ error: 'Utilisateur non trouvé' });
     }
 
@@ -1116,7 +1270,7 @@ router.post('/setup-password', async (req, res) => {
       data: { used: true },
     });
 
-    console.log(`✅ Mot de passe créé pour ${email}`);
+    console.log(`✅ Mot de passe créé pour ${user.email || user.phoneNumber}`);
     res.json({ message: 'Mot de passe créé avec succès' });
   } catch (e) {
     console.error('Erreur setup-password:', e);

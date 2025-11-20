@@ -108,6 +108,10 @@ const canAccessMemberProfile = async (req, res, next) => {
  *                 type: boolean
  *                 description: Enable/disable workout session notifications
  *                 example: true
+ *               onboarding:
+ *                 type: boolean
+ *                 description: Onboarding status (true = in progress, false = completed)
+ *                 example: false
  *     responses:
  *       200:
  *         description: Profile updated successfully
@@ -123,7 +127,7 @@ router.put('/:id/profile', auth, canAccessMemberProfile, async (req, res) => {
 
   try {
     const memberId = Number(req.params.id);
-    const { birthDate, phone, profession, fitnessLevel, profileImage, preferredTrainingDays, workoutNotificationsEnabled } = req.body;
+    const { birthDate, phone, profession, fitnessLevel, profileImage, preferredTrainingDays, workoutNotificationsEnabled, onboarding } = req.body;
 
     const updateData = {};
     
@@ -133,6 +137,8 @@ router.put('/:id/profile', auth, canAccessMemberProfile, async (req, res) => {
     if (phone !== undefined) memberUpdateData.phone = phone;
     if (profession !== undefined) memberUpdateData.profession = profession;
     if (fitnessLevel !== undefined) memberUpdateData.fitnessLevel = fitnessLevel;
+    if (onboarding !== undefined) memberUpdateData.onboarding = onboarding;
+    if (onboarding !== undefined) memberUpdateData.onboarding = onboarding;
     if (preferredTrainingDays !== undefined) {
       // Valider que c'est un tableau de nombres entre 0 et 6
       if (Array.isArray(preferredTrainingDays) && preferredTrainingDays.every(day => typeof day === 'number' && day >= 0 && day <= 6)) {
@@ -209,6 +215,7 @@ router.put('/:id/profile', auth, canAccessMemberProfile, async (req, res) => {
         fitnessLevel: updatedMember.fitnessLevel,
         preferredTrainingDays: updatedMember.preferredTrainingDays,
         workoutNotificationsEnabled: updatedMember.workoutNotificationsEnabled,
+        onboarding: updatedMember.onboarding,
         joinedAt: updatedMember.joinedAt
       }
     });

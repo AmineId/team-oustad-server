@@ -33,6 +33,10 @@ components:
           type: string
           format: email
           example: "user@example.com"
+        phoneNumber:
+          type: string
+          example: "+33612345678"
+          description: "Numéro de téléphone de l'utilisateur"
         fullName:
           type: string
           example: "John Doe"
@@ -50,7 +54,6 @@ components:
           $ref: '#/components/schemas/Gym'
       required:
         - id
-        - email
         - fullName
         - role
         - displayId
@@ -246,13 +249,17 @@ components:
     LoginRequest:
       type: object
       required:
-        - email
         - password
       properties:
         email:
           type: string
           format: email
           example: "user@example.com"
+          description: "Email de l'utilisateur (email OU phoneNumber requis)"
+        phoneNumber:
+          type: string
+          example: "+33612345678"
+          description: "Numéro de téléphone de l'utilisateur (email OU phoneNumber requis)"
         password:
           type: string
           example: "password123"
@@ -958,17 +965,102 @@ paths:
                   error:
                     type: string
 
-  /auth/login:
+  /auth/check-phone:
     post:
-      summary: User login
-      description: Authenticate user and return JWT token
+      summary: Vérifier si un numéro de téléphone existe
+      description: Vérifie si un numéro de téléphone est déjà enregistré et si un mot de passe est configuré. Utile avant la création d'un compte.
       tags: [Authentication]
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/LoginRequest'
+              type: object
+              required:
+                - phoneNumber
+              properties:
+                phoneNumber:
+                  type: string
+                  example: "+33612345678"
+                  description: "Numéro de téléphone à vérifier"
+      responses:
+        '200':
+          description: Numéro vérifié avec succès
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  exists:
+                    type: boolean
+                    example: true
+                    description: "Indique si le numéro existe déjà"
+                  hasPassword:
+                    type: boolean
+                    example: true
+                    description: "Indique si un mot de passe est configuré"
+                  message:
+                    type: string
+                    example: "Ce numéro existe déjà avec un mot de passe configuré"
+        '409':
+          description: Le numéro existe déjà avec un mot de passe
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  exists:
+                    type: boolean
+                    example: true
+                  hasPassword:
+                    type: boolean
+                    example: true
+                  hasEmail:
+                    type: boolean
+                    example: true
+                    description: "Indique si l'utilisateur a un email configuré (pour la réinitialisation)"
+                  error:
+                    type: string
+                    example: "Vous avez déjà un compte avec un mot de passe. Si vous l'avez oublié, cliquez sur \"Réinitialiser le mot de passe\""
+        '400':
+          description: Numéro de téléphone manquant
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Erreur serveur
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /auth/login:
+    post:
+      summary: User login
+      description: Authenticate user with email or phone number and return JWT token
+      tags: [Authentication]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - password
+              properties:
+                email:
+                  type: string
+                  format: email
+                  example: "user@example.com"
+                  description: "Email de l'utilisateur (email OU phoneNumber requis)"
+                phoneNumber:
+                  type: string
+                  example: "+33612345678"
+                  description: "Numéro de téléphone (email OU phoneNumber requis)"
+                password:
+                  type: string
+                  example: "password123"
       responses:
         '200':
           description: Login successful
@@ -1125,7 +1217,7 @@ paths:
   /auth/forgot-password:
     post:
       summary: Request password reset
-      description: Send a password reset code to the user's email address
+      description: Send a password reset code to the user's email address (requires email)
       tags: [Authentication]
       requestBody:
         required: true
@@ -1133,14 +1225,16 @@ paths:
           application/json:
             schema:
               type: object
-              required:
-                - email
               properties:
                 email:
                   type: string
                   format: email
                   description: User's email address
                   example: "user@example.com"
+                phoneNumber:
+                  type: string
+                  description: User's phone number (email must exist for reset)
+                  example: "+33612345678"
       responses:
         '200':
           description: Reset code sent successfully
@@ -1177,7 +1271,6 @@ paths:
             schema:
               type: object
               required:
-                - email
                 - token
                 - newPassword
               properties:
@@ -1186,6 +1279,10 @@ paths:
                   format: email
                   description: User's email address
                   example: "user@example.com"
+                phoneNumber:
+                  type: string
+                  description: User's phone number
+                  example: "+33612345678"
                 token:
                   type: string
                   description: 6-digit reset token
@@ -1304,7 +1401,6 @@ paths:
             schema:
               type: object
               required:
-                - email
                 - token
                 - password
               properties:
@@ -1313,6 +1409,10 @@ paths:
                   format: email
                   description: User's email address
                   example: "newuser@example.com"
+                phoneNumber:
+                  type: string
+                  description: User's phone number
+                  example: "+33612345678"
                 token:
                   type: string
                   description: 6-digit setup token
@@ -1365,7 +1465,13 @@ paths:
   /users:
     post:
       summary: Create a new user
-      description: Create a new user with role-based permissions. Admins can create members, owners can create admins and members. If no password is provided, a setup email will be sent automatically.
+      description: |
+        Create a new user with role-based permissions. Admins can create members, owners can create admins and members.
+        
+        **3 modes de création:**
+        - **Avec email uniquement**: Email de bienvenue envoyé si pas de mot de passe fourni
+        - **Avec phoneNumber uniquement**: Mot de passe OBLIGATOIRE, pas d'email envoyé
+        - **Avec email ET phoneNumber**: Email de bienvenue envoyé si pas de mot de passe fourni, connexion possible avec les deux
       tags: [Users]
       security:
         - bearerAuth: []
@@ -1376,7 +1482,6 @@ paths:
             schema:
               type: object
               required:
-                - email
                 - fullName
                 - role
                 - gymId
@@ -1384,12 +1489,18 @@ paths:
                 email:
                   type: string
                   format: email
-                  description: User's email address
+                  description: User's email address (email OU phoneNumber requis)
                   example: "member@example.com"
+                phoneNumber:
+                  type: string
+                  description: User's phone number (email OU phoneNumber requis)
+                  example: "+33612345678"
                 password:
                   type: string
                   minLength: 6
-                  description: User's password (optional - if not provided, a setup email will be sent)
+                  description: |
+                    User's password (optionnel si email fourni - email de bienvenue sera envoyé)
+                    OBLIGATOIRE si phoneNumber uniquement (pas d'email de bienvenue)
                   example: "password123"
                 fullName:
                   type: string
@@ -1406,7 +1517,7 @@ paths:
                   example: 1
                 sendSetupEmail:
                   type: boolean
-                  description: Whether to send setup email when password is not provided (default true)
+                  description: Whether to send setup email when password is not provided (default true, ignored if phoneNumber only)
                   example: true
                   default: true
                 permissions:

@@ -208,12 +208,13 @@ const requireAdmin = async (req, res, next) => {
  */
 router.post('/', auth, async (req, res) => {
   try {
-    const { email, password, fullName, role, gymId, permissions, sendSetupEmail = true } = req.body;
-    console.log(`👤 Création utilisateur - Email: ${email}, Role: ${role}, Gym: ${gymId}`);
+    const { email, phoneNumber, password, fullName, role, gymId, permissions, sendSetupEmail = true } = req.body;
+    console.log(`👤 Création utilisateur - Email: ${email}, PhoneNumber: ${phoneNumber}, Role: ${role}, Gym: ${gymId}`);
 
-    if (!email || !fullName || !role || !gymId) {
+    // Au moins email ou phoneNumber doit être fourni
+    if ((!email && !phoneNumber) || !fullName || !role || !gymId) {
       console.log(`❌ Champs manquants pour création utilisateur`);
-      return res.status(400).json({ error: 'Email, fullName, role et gymId requis' });
+      return res.status(400).json({ error: 'Email ou phoneNumber, fullName, role et gymId requis' });
     }
 
     // Vérifier les permissions selon le rôle du créateur
@@ -240,18 +241,28 @@ router.post('/', auth, async (req, res) => {
       return res.status(403).json({ error: 'Vous n\'avez pas les permissions pour créer cet utilisateur' });
     }
 
-    // Sanitize email
-    const sanitizedEmail = sanitizeEmail(email);
+    // Sanitize email si fourni
+    const sanitizedEmail = email ? sanitizeEmail(email) : null;
 
-    // Vérifier que l'email n'existe pas déjà
-    const existingUser = await prisma.user.findUnique({ where: { email: sanitizedEmail } });
-    if (existingUser) {
-      console.log(`❌ Email déjà utilisé: ${email}`);
-      return res.status(400).json({ error: 'Cet email est déjà utilisé' });
+    // Vérifier que l'email ou le phoneNumber n'existe pas déjà
+    if (sanitizedEmail) {
+      const existingUserByEmail = await prisma.user.findUnique({ where: { email: sanitizedEmail } });
+      if (existingUserByEmail) {
+        console.log(`❌ Email déjà utilisé: ${email}`);
+        return res.status(400).json({ error: 'Cet email est déjà utilisé' });
+      }
+    }
+    
+    if (phoneNumber) {
+      const existingUserByPhone = await prisma.user.findUnique({ where: { phoneNumber } });
+      if (existingUserByPhone) {
+        console.log(`❌ Numéro de téléphone déjà utilisé: ${phoneNumber}`);
+        return res.status(400).json({ error: 'Ce numéro de téléphone est déjà utilisé' });
+      }
     }
 
     // Si pas de mot de passe fourni, on génère un mot de passe temporaire
-    // et on enverra un email pour que l'utilisateur crée son propre mot de passe
+    // Si créé avec phoneNumber, le mot de passe est requis (pas d'email de bienvenue)
     let hashedPassword;
     let shouldSendSetupEmail = false;
     
@@ -259,10 +270,15 @@ router.post('/', auth, async (req, res) => {
       hashedPassword = await bcrypt.hash(password, 10);
       console.log(`🔐 Mot de passe fourni et hashé`);
     } else {
+      // Si phoneNumber sans mot de passe: erreur car on ne peut pas envoyer d'email
+      if (phoneNumber && !email) {
+        console.log(`❌ Mot de passe requis pour création avec phoneNumber uniquement`);
+        return res.status(400).json({ error: 'Le mot de passe est requis pour les utilisateurs créés avec un numéro de téléphone uniquement' });
+      }
       // Générer un mot de passe temporaire aléatoire
       const tempPassword = crypto.randomBytes(32).toString('hex');
       hashedPassword = await bcrypt.hash(tempPassword, 10);
-      shouldSendSetupEmail = sendSetupEmail !== false; // Par défaut, on envoie l'email
+      shouldSendSetupEmail = sendSetupEmail !== false && !!email; // Envoyer uniquement si email fourni
       console.log(`🔐 Mot de passe temporaire généré, email sera envoyé: ${shouldSendSetupEmail}`);
     }
 
@@ -270,6 +286,7 @@ router.post('/', auth, async (req, res) => {
       data: {
         displayId: generateUserIdByRole(role),
         email: sanitizedEmail,
+        phoneNumber: phoneNumber || null,
         password: hashedPassword,
         fullName,
         role,
@@ -335,8 +352,9 @@ router.post('/', auth, async (req, res) => {
       console.log(`✅ Profil owner créé pour ${user.fullName}`);
     }
 
-    // Si pas de mot de passe fourni, envoyer l'email d'activation
-    if (shouldSendSetupEmail) {
+    // Si pas de mot de passe fourni et email disponible, envoyer l'email d'activation
+    // Ne pas envoyer d'email si créé avec phoneNumber uniquement
+    if (shouldSendSetupEmail && email) {
       try {
         // Générer un token unique (6 chiffres)
         const setupToken = crypto.randomInt(100000, 999999).toString();
@@ -358,6 +376,8 @@ router.post('/', auth, async (req, res) => {
         console.error(`⚠️ Erreur envoi email d'activation:`, emailError);
         // Ne pas échouer la création si l'email échoue
       }
+    } else if (phoneNumber && !email) {
+      console.log(`📱 Utilisateur créé avec phoneNumber uniquement - Pas d'email de bienvenue envoyé`);
     }
 
     // Retourner l'utilisateur sans le mot de passe
@@ -365,7 +385,9 @@ router.post('/', auth, async (req, res) => {
     res.status(201).json({
       message: shouldSendSetupEmail 
         ? 'Utilisateur créé avec succès. Un email d\'activation a été envoyé.'
-        : 'Utilisateur créé avec succès',
+        : phoneNumber && !email
+          ? 'Utilisateur créé avec succès. Le membre peut se connecter avec son numéro de téléphone.'
+          : 'Utilisateur créé avec succès',
       user: safeUser,
       setupEmailSent: shouldSendSetupEmail
     });
