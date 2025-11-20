@@ -712,6 +712,7 @@ async function main() {
   const oliviaMember = await prisma.member.create({
     data: {
       userId: oliviaUser.id,
+      uniqueCode: crypto.randomUUID().substring(0, 8).toUpperCase(),
       workoutNotificationsEnabled: true
     }
   });
