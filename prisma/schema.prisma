@@ -7,279 +7,247 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-model User {
-  id          Int      @id @default(autoincrement())
-  displayId   String   @unique // Format: MEMBER-a8f3d9e2b1c4f567, ADMIN-9f2e1d3c4b5a6789, OWNER-1a2b3c4d5e6f7890
-  email       String   @unique
-  password    String
-  fullName    String
-  role        String   // 'member', 'admin', 'superadmin', 'owner'
-  gymId       Int
-  gym         Gym      @relation(fields: [gymId], references: [id])
-  uniqueCode  String   @unique @default(cuid()) // Code unique pour QR code d'accès
-  qrCode      Bytes?   // Image QR code générée et stockée
-  profileImage Bytes?  // Photo de profil de l'utilisateur
-  fcmToken    String?  // Token Firebase Cloud Messaging pour les notifications push
-  notificationsEnabled Boolean @default(true) // Activer/désactiver toutes les notifications (switch général)
-  lastLoginAt DateTime? // Date de la dernière connexion (null = jamais connecté)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+model Admin {
+  userId Int  @id
+  User   User @relation(fields: [userId], references: [id])
+}
 
-  // Relations conditionnelles
-  admin       Admin?
-  member      Member?
-  owner       Owner?
-  passwordResetTokens PasswordResetToken[]
-  planningsAsCoach Planning[] // Plannings où cet admin est le coach
+model Exercise {
+  id               Int                @id @default(autoincrement())
+  name             String
+  description      String?
+  category         String
+  muscleGroup      String[]
+  equipment        String[]
+  difficulty       String
+  instructions     String?
+  createdAt        DateTime           @default(now())
+  updatedAt        DateTime
+  displayId        String             @unique
+  PlanningExercise PlanningExercise[]
 }
 
 model Gym {
-  id        Int       @id @default(autoincrement())
-  displayId String    @unique // Format: GYM-f1e2d3c4b5a69788
-  name      String
-  address   String
-  phone     String?   // Numéro de contact
-  image     Bytes?    // Image de la salle de sport
-  users     User[]
-  openingHours OpeningHour[]
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
+  id          Int           @id @default(autoincrement())
+  name        String
+  address     String
+  createdAt   DateTime      @default(now())
+  phone       String?
+  updatedAt   DateTime
+  image       Bytes?
+  displayId   String        @unique
+  OpeningHour OpeningHour[]
+  User        User[]
+}
+
+model Member {
+  joinedAt                    DateTime            @default(now())
+  userId                      Int                 @id
+  uniqueCode                  String              @unique
+  birthDate                   DateTime?
+  phone                       String?
+  profession                  String?
+  fitnessLevel                String?
+  onboarding                  Boolean             @default(true)
+  preferredTrainingDays       Int[]               @default([])
+  workoutNotificationsEnabled Boolean             @default(true)
+  User                        User                @relation(fields: [userId], references: [id])
+  MemberGoal                  MemberGoal[]
+  MemberMeasurement           MemberMeasurement[]
+  Payment                     Payment[]
+  Planning                    Planning[]
+  Subscription                Subscription[]
+}
+
+model MemberGoal {
+  id           Int       @id @default(autoincrement())
+  displayId    String    @unique
+  memberId     Int
+  title        String
+  description  String?
+  targetDate   DateTime?
+  startWeight  Float?
+  targetWeight Float?
+  startWaist   Float?
+  targetWaist  Float?
+  status       String    @default("active")
+  achievedAt   DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime
+  Member       Member    @relation(fields: [memberId], references: [userId], onDelete: Cascade)
+}
+
+model MemberMeasurement {
+  id         Int      @id @default(autoincrement())
+  displayId  String   @unique
+  memberId   Int
+  weight     Float?
+  waist      Float?
+  chest      Float?
+  hips       Float?
+  thigh      Float?
+  arm        Float?
+  bodyFat    Float?
+  muscleMass Float?
+  notes      String?
+  measuredBy Int?
+  measuredAt DateTime @default(now())
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime
+  Member     Member   @relation(fields: [memberId], references: [userId], onDelete: Cascade)
+
+  @@index([memberId, measuredAt])
 }
 
 model OpeningHour {
-  id          Int      @id @default(autoincrement())
-  gymId       Int
-  gym         Gym      @relation(fields: [gymId], references: [id], onDelete: Cascade)
-  dayOfWeek   Int      // 0 = dimanche, 1 = lundi, ..., 6 = samedi
-  openTime    String   // Format HH:MM (ex: "09:00")
-  closeTime   String   // Format HH:MM (ex: "18:00")
-  isClosed    Boolean  @default(false) // Si fermé ce jour-là
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id        Int      @id @default(autoincrement())
+  gymId     Int
+  dayOfWeek Int
+  openTime  String
+  closeTime String
+  isClosed  Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime
+  Gym       Gym      @relation(fields: [gymId], references: [id], onDelete: Cascade)
 
   @@unique([gymId, dayOfWeek])
 }
 
-model Admin {
-  userId    Int      @id
-  user      User     @relation(fields: [userId], references: [id])
-}
-
 model Owner {
-  userId    Int      @id
-  user      User     @relation(fields: [userId], references: [id])
-  // Propriétés spécifiques aux owners
+  userId          Int     @id
   canManageAdmins Boolean @default(true)
   canManageGyms   Boolean @default(true)
   canViewReports  Boolean @default(true)
   maxGymsAllowed  Int     @default(5)
-}
-
-model Member {
-  userId      Int      @id
-  user        User     @relation(fields: [userId], references: [id])
-  uniqueCode  String   @unique @default(cuid()) // Code unique pour QR code
-  joinedAt    DateTime @default(now())
-  onboarding  Boolean  @default(true) // True jusqu'à ce que le membre complète l'onboarding
-  
-  // Nouvelles informations personnelles
-  birthDate    DateTime? // Date de naissance
-  phone        String?   // Numéro de téléphone
-  profession   String?   // "Actif" ou "Etudiant"
-  fitnessLevel String?   // debutant, intermediaire, avance, expert, athletique
-  
-  // Préférences d'entraînement
-  preferredTrainingDays Int[] @default([]) // Jours préférés pour s'entraîner (0=dimanche, 1=lundi, ..., 6=samedi)
-  
-  // Préférences de notifications
-  workoutNotificationsEnabled Boolean @default(true) // Activer/désactiver les notifications de séances à venir
-  
-  // Relations
-  payments      Payment[]
-  subscriptions Subscription[]
-  plannings     Planning[] // Plannings d'entraînement
-  goals         MemberGoal[] // Objectifs du membre
-  measurements  MemberMeasurement[] // Historique des mesures morphologiques
-}
-
-model Payment {
-  id            Int      @id @default(autoincrement())
-  displayId     String   @unique // Format: PAY-3b4c5d6e7f8a9012
-  memberId      Int
-  member        Member   @relation(fields: [memberId], references: [userId])
-  subscriptionId Int?
-  subscription  Subscription? @relation(fields: [subscriptionId], references: [id])
-  amount        Float
-  currency      String   @default("EUR")
-  status        String   // pending, completed, failed, refunded, overdue
-  type          String   // subscription, one-time
-  paymentMethod String?  // card, paypal, bank_transfer (null pour les paiements générés automatiquement)
-  transactionId String?  @unique
-  description   String?
-  dueDate       DateTime @default(now()) // Date à laquelle le paiement est dû
-  paidAt        DateTime? // Date effective du paiement (null si non payé)
-  monthNumber   Int?     // Numéro du mois (1-12) pour les abonnements annuels
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
-}
-
-model SubscriptionType {
-  id            Int      @id @default(autoincrement())
-  displayId     String   @unique // Format: SUBTYPE-a1b2c3d4e5f67890
-  name          String   @unique // "Basic", "Standard", "Premium", "VIP"
-  description   String?  // Description du type d'abonnement
-  monthlyPrice  Float    // Prix mensuel (sera utilisé pour générer les 12 paiements)
-  features      String[] // Liste des fonctionnalités incluses
-  isActive      Boolean  @default(true) // Permet de désactiver un type sans le supprimer
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
-  
-  // Relations
-  subscriptions Subscription[]
-}
-
-model Subscription {
-  id                 Int              @id @default(autoincrement())
-  displayId          String           @unique // Format: SUB-7a8b9c0d1e2f3456
-  memberId           Int
-  member             Member           @relation(fields: [memberId], references: [userId])
-  subscriptionTypeId Int
-  subscriptionType   SubscriptionType @relation(fields: [subscriptionTypeId], references: [id])
-  status             String           // active, cancelled, expired, paused, pending
-  startDate          DateTime
-  endDate            DateTime?
-  autoRenew          Boolean          @default(true)
-  paymentFrequency   Int              @default(12) // Nombre de paiements: 1 (oneshot), 3 (trimestriel), 6 (semestriel), 12 (mensuel annuel)
-  payments           Payment[]
-  createdAt          DateTime         @default(now())
-  updatedAt          DateTime         @updatedAt
+  User            User    @relation(fields: [userId], references: [id])
 }
 
 model PasswordResetToken {
   id        Int      @id @default(autoincrement())
-  userId    Int
-  user      User     @relation(fields: [userId], references: [id])
   token     String   @unique
   expiresAt DateTime
   used      Boolean  @default(false)
   createdAt DateTime @default(now())
+  userId    Int
+  User      User     @relation(fields: [userId], references: [id])
 }
 
-model Exercise {
-  id          Int      @id @default(autoincrement())
-  displayId   String   @unique // Format: EXER-c5d6e7f8a9b01234
-  name        String   // Nom de l'exercice
-  description String?  // Description de l'exercice
-  category    String   // cardio, strength, flexibility, balance, etc.
-  muscleGroup String[] // ["chest", "triceps"], ["legs"], ["core"], etc.
-  equipment   String[] // ["dumbbells", "barbell"], ["none"], ["resistance_band"], etc.
-  difficulty  String   // beginner, intermediate, advanced
-  instructions String? // Instructions détaillées
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  
-  // Relations
-  planningExercises PlanningExercise[]
+model Payment {
+  id             Int           @id @default(autoincrement())
+  memberId       Int
+  amount         Float
+  currency       String        @default("EUR")
+  status         String
+  type           String
+  paymentMethod  String?
+  transactionId  String?       @unique
+  description    String?
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime
+  subscriptionId Int?
+  dueDate        DateTime      @default(now())
+  monthNumber    Int?
+  paidAt         DateTime?
+  displayId      String        @unique
+  Member         Member        @relation(fields: [memberId], references: [userId])
+  Subscription   Subscription? @relation(fields: [subscriptionId], references: [id])
 }
 
 model Planning {
-  id          Int      @id @default(autoincrement())
-  displayId   String   @unique // Format: PLAN-9d0e1f2a3b4c5678
+  id          Int           @id @default(autoincrement())
   memberId    Int
-  member      Member   @relation(fields: [memberId], references: [userId])
-  coachId     Int      // Admin qui agit comme coach
-  coach       User     @relation(fields: [coachId], references: [id])
-  title       String   // Titre du planning
-  description String?  // Description du planning
-  startDate   DateTime // Date de début du planning
-  endDate     DateTime // Date de fin du planning
-  status      String   @default("active") // active, completed, cancelled
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-
-  // Relations
-  days        PlanningDay[]
+  coachId     Int
+  title       String
+  description String?
+  startDate   DateTime
+  endDate     DateTime
+  status      String        @default("active")
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime
+  displayId   String        @unique
+  User        User          @relation(fields: [coachId], references: [id])
+  Member      Member        @relation(fields: [memberId], references: [userId])
+  PlanningDay PlanningDay[]
 }
 
 model PlanningDay {
-  id         Int      @id @default(autoincrement())
-  planningId Int
-  planning   Planning @relation(fields: [planningId], references: [id], onDelete: Cascade)
-  dayOfWeek  Int      // Jour de la semaine (0=dimanche, 1=lundi, ..., 6=samedi)
+  id               Int                @id @default(autoincrement())
+  planningId       Int
+  dayOfWeek        Int
+  Planning         Planning           @relation(fields: [planningId], references: [id], onDelete: Cascade)
+  PlanningExercise PlanningExercise[]
 
   @@unique([planningId, dayOfWeek])
-
-  // Relations
-  exercises  PlanningExercise[]
 }
 
 model PlanningExercise {
   id            Int         @id @default(autoincrement())
-  planningDayId Int
-  planningDay   PlanningDay @relation(fields: [planningDayId], references: [id], onDelete: Cascade)
   exerciseId    Int
-  exercise      Exercise    @relation(fields: [exerciseId], references: [id])
-  sets          Int?        // Nombre de séries
-  reps          Int?        // Nombre de répétitions
-  duration      Int?        // Durée en minutes (pour cardio)
-  weight        Float?      // Poids en kg
-  restTime      Int?        // Temps de repos en secondes
-  notes         String?     // Notes spécifiques pour cet exercice
-  order         Int         @default(0) // Ordre dans le jour
+  sets          Int?
+  reps          Int?
+  duration      Int?
+  weight        Float?
+  restTime      Int?
+  notes         String?
+  order         Int         @default(0)
+  planningDayId Int
+  Exercise      Exercise    @relation(fields: [exerciseId], references: [id])
+  PlanningDay   PlanningDay @relation(fields: [planningDayId], references: [id], onDelete: Cascade)
 
   @@unique([planningDayId, exerciseId, order])
 }
 
-model MemberGoal {
-  id          Int      @id @default(autoincrement())
-  displayId   String   @unique // Format: GOAL-a1b2c3d4e5f67890
-  memberId    Int
-  member      Member   @relation(fields: [memberId], references: [userId], onDelete: Cascade)
-  
-  // Objectif
-  title       String   // Ex: "Perte de poids", "Prise de masse", "Remise en forme"
-  description String?  // Description détaillée de l'objectif
-  targetDate  DateTime? // Date cible pour atteindre l'objectif
-  
-  // Données morphologiques initiales (au moment de définir l'objectif)
-  startWeight    Float?   // Poids de départ en kg
-  targetWeight   Float?   // Poids cible en kg
-  startWaist     Float?   // Tour de taille initial en cm
-  targetWaist    Float?   // Tour de taille cible en cm
-  
-  // Statut
-  status      String   @default("active") // active, achieved, abandoned
-  achievedAt  DateTime? // Date à laquelle l'objectif a été atteint
-  
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+model Subscription {
+  id                 Int              @id @default(autoincrement())
+  memberId           Int
+  status             String
+  startDate          DateTime
+  endDate            DateTime?
+  autoRenew          Boolean          @default(true)
+  createdAt          DateTime         @default(now())
+  updatedAt          DateTime
+  subscriptionTypeId Int
+  paymentFrequency   Int              @default(12)
+  displayId          String           @unique
+  Payment            Payment[]
+  Member             Member           @relation(fields: [memberId], references: [userId])
+  SubscriptionType   SubscriptionType @relation(fields: [subscriptionTypeId], references: [id])
 }
 
-model MemberMeasurement {
-  id          Int      @id @default(autoincrement())
-  displayId   String   @unique // Format: MEAS-b2c3d4e5f6a78901
-  memberId    Int
-  member      Member   @relation(fields: [memberId], references: [userId], onDelete: Cascade)
-  
-  // Mesures morphologiques
-  weight      Float?   // Poids en kg
-  waist       Float?   // Tour de taille en cm
-  chest       Float?   // Tour de poitrine en cm
-  hips        Float?   // Tour de hanches en cm
-  thigh       Float?   // Tour de cuisse en cm
-  arm         Float?   // Tour de bras en cm
-  bodyFat     Float?   // Pourcentage de masse grasse
-  muscleMass  Float?   // Masse musculaire en kg
-  
-  // Métadonnées
-  notes       String?  // Notes additionnelles
-  measuredBy  Int?     // ID du coach/admin qui a pris les mesures
-  
-  // Horodatage
-  measuredAt  DateTime @default(now()) // Date de la mesure
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  
-  // Index pour recherche rapide par date
-  @@index([memberId, measuredAt])
+model SubscriptionType {
+  id           Int            @id @default(autoincrement())
+  name         String         @unique
+  description  String?
+  monthlyPrice Float
+  features     String[]
+  isActive     Boolean        @default(true)
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime
+  displayId    String         @unique
+  Subscription Subscription[]
+}
+
+model User {
+  id                   Int                  @id @default(autoincrement())
+  email                String               @unique
+  password             String
+  fullName             String
+  role                 String
+  gymId                Int
+  createdAt            DateTime             @default(now())
+  updatedAt            DateTime
+  uniqueCode           String               @unique
+  qrCode               Bytes?
+  profileImage         Bytes?
+  fcmToken             String?
+  displayId            String               @unique
+  lastLoginAt          DateTime?
+  notificationsEnabled Boolean              @default(true)
+  phoneNumber          String?              @unique
+  Admin                Admin?
+  Member               Member?
+  Owner                Owner?
+  PasswordResetToken   PasswordResetToken[]
+  Planning             Planning[]
+  Gym                  Gym                  @relation(fields: [gymId], references: [id])
 }
