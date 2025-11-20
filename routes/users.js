@@ -745,7 +745,8 @@ router.put('/fcm-token', auth, async (req, res) => {
       select: {
         id: true,
         email: true,
-        fullName: true,
+        firstName: true,
+              lastName: true,
         fcmToken: true
       }
     });
@@ -1351,7 +1352,8 @@ router.get('/:id/profile-image', auth, async (req, res) => {
 
     const targetUser = await prisma.user.findUnique({
       where: { id },
-      select: { id: true, fullName: true, gymId: true, role: true, profileImage: true }
+      select: { id: true, firstName: true,
+              lastName: true, gymId: true, role: true, profileImage: true }
     });
 
     if (!targetUser) {
@@ -1503,7 +1505,8 @@ router.delete('/:id/profile-image', auth, async (req, res) => {
 
     const targetUser = await prisma.user.findUnique({
       where: { id },
-      select: { id: true, fullName: true, gymId: true, role: true, profileImage: true }
+      select: { id: true, firstName: true,
+              lastName: true, gymId: true, role: true, profileImage: true }
     });
 
     if (!targetUser) {
@@ -2414,7 +2417,8 @@ router.get('/gyms/all', auth, requireOwner, async (req, res) => {
           select: {
             id: true,
             email: true,
-            fullName: true,
+            firstName: true,
+              lastName: true,
             role: true,
           }
         },

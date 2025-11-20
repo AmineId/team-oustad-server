@@ -411,9 +411,11 @@ router.post('/', auth, requireCoach, async (req, res) => {
       },
       include: {
         member: {
-          include: { user: { select: { id: true, fullName: true, email: true } } }
+          include: { user: { select: { id: true, firstName: true,
+              lastName: true, email: true } } }
         },
-        coach: { select: { id: true, fullName: true, email: true } },
+        coach: { select: { id: true, firstName: true,
+              lastName: true, email: true } },
         days: {
           include: {
             exercises: {
@@ -543,9 +545,11 @@ router.get('/', auth, async (req, res) => {
       where: whereClause,
       include: {
         member: {
-          include: { user: { select: { id: true, fullName: true, email: true } } }
+          include: { user: { select: { id: true, firstName: true,
+              lastName: true, email: true } } }
         },
-        coach: { select: { id: true, fullName: true, email: true } },
+        coach: { select: { id: true, firstName: true,
+              lastName: true, email: true } },
         days: {
           include: {
             exercises: {
@@ -870,7 +874,7 @@ router.post('/:planningId/days/:dayOfWeek/exercises', auth, requireCoach, async 
           include: {
             planning: {
               include: {
-                member: { include: { user: { select: { fullName: true } } } }
+                member: { include: { user: { select: { firstName: true, lastName: true } } } }
               }
             }
           }
@@ -1185,7 +1189,8 @@ router.get('/member/:memberId', auth, async (req, res) => {
     // Vérifier que le membre existe (essayer d'abord par member.userId, puis par userId pour compatibilité frontend)
     let member = await prisma.member.findUnique({
       where: { userId: memberId },
-      include: { user: { select: { id: true, fullName: true, email: true, gymId: true } } }
+      include: { user: { select: { id: true, firstName: true,
+              lastName: true, email: true, gymId: true } } }
     });
 
     if (!member) {
@@ -1193,7 +1198,8 @@ router.get('/member/:memberId', auth, async (req, res) => {
       // Peut-être que le frontend a passé l'userId au lieu du memberId. Tenter une recherche par userId.
       member = await prisma.member.findUnique({
         where: { userId: memberId },
-        include: { user: { select: { id: true, fullName: true, email: true, gymId: true } } }
+        include: { user: { select: { id: true, firstName: true,
+              lastName: true, email: true, gymId: true } } }
       });
       if (member) {
         console.log(`ℹ️ Membre trouvé via userId: userId ${memberId} -> userId ${member.userId}`);
@@ -1262,7 +1268,8 @@ router.get('/member/:memberId', auth, async (req, res) => {
     const plannings = await prisma.planning.findMany({
       where: whereClause,
       include: {
-        coach: { select: { id: true, fullName: true, email: true } },
+        coach: { select: { id: true, firstName: true,
+              lastName: true, email: true } },
         days: {
           include: {
             exercises: {
@@ -1444,7 +1451,8 @@ router.get('/next-day/:memberId', auth, async (req, res) => {
     // Vérifier que le membre existe (essayer d'abord par member.userId, puis par userId pour compatibilité frontend)
     let member = await prisma.member.findUnique({
       where: { userId: memberId },
-      include: { user: { select: { id: true, fullName: true, email: true, gymId: true } } }
+      include: { user: { select: { id: true, firstName: true,
+              lastName: true, email: true, gymId: true } } }
     });
 
     if (!member) {
@@ -1452,7 +1460,8 @@ router.get('/next-day/:memberId', auth, async (req, res) => {
       // Peut-être que le frontend a passé l'userId au lieu du memberId. Tenter une recherche par userId.
       member = await prisma.member.findUnique({
         where: { userId: memberId },
-        include: { user: { select: { id: true, fullName: true, email: true, gymId: true } } }
+        include: { user: { select: { id: true, firstName: true,
+              lastName: true, email: true, gymId: true } } }
       });
       if (member) {
         console.log(`ℹ️ Membre trouvé via userId: userId ${memberId} -> userId ${member.userId}`);
@@ -1531,7 +1540,8 @@ router.get('/next-day/:memberId', auth, async (req, res) => {
         endDate: { gte: today }
       },
       include: {
-        coach: { select: { id: true, fullName: true, email: true } },
+        coach: { select: { id: true, firstName: true,
+              lastName: true, email: true } },
         days: {
           include: {
             exercises: {

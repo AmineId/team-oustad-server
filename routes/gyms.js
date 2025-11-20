@@ -242,7 +242,8 @@ router.get('/', auth, async (req, res) => {
           select: {
             id: true,
             email: true,
-            fullName: true,
+            firstName: true,
+              lastName: true,
             role: true
           }
         },
@@ -372,7 +373,8 @@ router.get('/:id', auth, async (req, res) => {
           select: {
             id: true,
             email: true,
-            fullName: true,
+            firstName: true,
+              lastName: true,
             role: true
           }
         },
