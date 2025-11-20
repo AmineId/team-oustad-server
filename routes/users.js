@@ -329,7 +329,7 @@ router.post('/', auth, async (req, res) => {
         lastName: user.lastName,
         fullName: getFullName(user),
         role: user.role,
-        gymName: user.gym.name,
+        gymName: user.Gym.name,
         accessType: 'gym_access',
         generatedAt: new Date().toISOString()
       });
@@ -580,7 +580,7 @@ router.get('/:id/qr', auth, async (req, res) => {
         lastName: user.lastName,
         fullName: getFullName(user),
         role: user.role,
-        gymName: user.gym.name,
+        gymName: user.Gym.name,
         accessType: 'gym_access',
         generatedAt: new Date().toISOString()
       });
@@ -969,7 +969,7 @@ router.put('/:id', auth, async (req, res) => {
           displayId: updatedUser.displayId,
           fullName: updatedUser.fullName,
           role: updatedUser.role,
-          gymName: updatedUser.gym.name,
+          gymName: updatedUser.Gym.name,
           accessType: 'gym_access',
           updatedAt: new Date().toISOString()
         });
@@ -1105,6 +1105,11 @@ router.delete('/:id', auth, async (req, res) => {
     if (!canDelete) {
       return res.status(403).json({ error: "Vous n'avez pas les permissions pour supprimer cet utilisateur" });
     }
+
+    // Supprimer les tokens de réinitialisation de mot de passe
+    await prisma.passwordResetToken.deleteMany({
+      where: { userId: id }
+    });
 
     // Supprimer d'abord les profils spécifiques
     if (targetUser.role === 'admin') {

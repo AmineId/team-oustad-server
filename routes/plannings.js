@@ -376,7 +376,7 @@ router.post('/', auth, requireCoach, async (req, res) => {
     // Vérifier que le membre existe et appartient à la même salle que le coach
     const member = await prisma.member.findUnique({
       where: { userId: memberId },
-      include: { user: true }
+      include: { User: true }
     });
 
     if (!member) {
@@ -384,14 +384,14 @@ router.post('/', auth, requireCoach, async (req, res) => {
       return notFound(res, 'Member', memberId);
     }
 
-    console.log(`✅ Membre trouvé: ${member.user.fullName} (ID: ${member.userId})`);
+    console.log(`✅ Membre trouvé: ${member.User.fullName} (ID: ${member.userId})`);
     console.log(`🔍 Recherche du coach - ID: ${req.user.sub}`);
 
     const coach = await prisma.user.findUnique({ where: { id: req.user.sub } });
     console.log(`✅ Coach trouvé: ${coach.fullName} (Salle: ${coach.gymId})`);
-    console.log(`🔍 Vérification appartenance à la même salle - Membre: ${member.user.gymId}, Coach: ${coach.gymId}`);
+    console.log(`🔍 Vérification appartenance à la même salle - Membre: ${member.User.gymId}, Coach: ${coach.gymId}`);
 
-    if (member.user.gymId !== coach.gymId) {
+    if (member.User.gymId !== coach.gymId) {
       console.log(`🚫 Coach ${coach.fullName} ne peut pas créer planning pour membre d'une autre salle`);
       return res.status(403).json({ error: 'Vous ne pouvez créer des plannings que pour les membres de votre salle' });
     }
@@ -411,7 +411,7 @@ router.post('/', auth, requireCoach, async (req, res) => {
       },
       include: {
         member: {
-          include: { user: { select: { id: true, firstName: true,
+          include: { User: { select: { id: true, firstName: true,
               lastName: true, email: true } } }
         },
         coach: { select: { id: true, firstName: true,
@@ -428,12 +428,12 @@ router.post('/', auth, requireCoach, async (req, res) => {
       }
     });
 
-    console.log(`✅ Planning créé: ${planning.title} (ID: ${planning.id}) pour ${member.user.fullName}`);
+    console.log(`✅ Planning créé: ${planning.title} (ID: ${planning.id}) pour ${member.User.fullName}`);
 
     // Envoyer notification au membre
-    if (member.user.fcmToken) {
-      console.log(`🔔 Envoi notification nouveau planning à ${member.user.fullName}`);
-      await notifyNewTrainingPlan(member.user.fcmToken, planning).catch(err =>
+    if (member.User.fcmToken) {
+      console.log(`🔔 Envoi notification nouveau planning à ${member.User.fullName}`);
+      await notifyNewTrainingPlan(member.User.fcmToken, planning).catch(err =>
         console.error('⚠️ Erreur notification FCM:', err)
       );
     }
@@ -545,7 +545,7 @@ router.get('/', auth, async (req, res) => {
       where: whereClause,
       include: {
         member: {
-          include: { user: { select: { id: true, firstName: true,
+          include: { User: { select: { id: true, firstName: true,
               lastName: true, email: true } } }
         },
         coach: { select: { id: true, firstName: true,
@@ -568,7 +568,7 @@ router.get('/', auth, async (req, res) => {
       console.log(`📊 Détails des plannings:`, plannings.map(p => ({
         id: p.id,
         title: p.title,
-        member: p.member.user.fullName,
+        member: p.member.User.fullName,
         status: p.status,
         daysCount: p.days.length
       })));
@@ -638,7 +638,7 @@ router.delete('/:planningId', auth, requireCoach, async (req, res) => {
       include: { 
         coach: true,
         member: {
-          include: { user: true }
+          include: { User: true }
         }
       }
     });
@@ -667,9 +667,9 @@ router.delete('/:planningId', auth, requireCoach, async (req, res) => {
     console.log(`✅ Planning supprimé: ${planning.title} (ID: ${planningId})`);
 
     // Envoyer notification au membre
-    if (planning.member.user.fcmToken) {
-      console.log(`🔔 Envoi notification suppression planning à ${planning.member.user.fullName}`);
-      await notifyPlanningDeleted(planning.member.user.fcmToken, planning).catch(err =>
+    if (planning.member.User.fcmToken) {
+      console.log(`🔔 Envoi notification suppression planning à ${planning.member.User.fullName}`);
+      await notifyPlanningDeleted(planning.member.User.fcmToken, planning).catch(err =>
         console.error('⚠️ Erreur notification FCM:', err)
       );
     }
@@ -874,7 +874,7 @@ router.post('/:planningId/days/:dayOfWeek/exercises', auth, requireCoach, async 
           include: {
             planning: {
               include: {
-                member: { include: { user: { select: { firstName: true, lastName: true } } } }
+                member: { include: { User: { select: { firstName: true, lastName: true } } } }
               }
             }
           }
@@ -883,7 +883,7 @@ router.post('/:planningId/days/:dayOfWeek/exercises', auth, requireCoach, async 
     });
 
     console.log(`✅ Exercice ajouté: ${exercise.name} au jour ${dayOfWeek} du planning ${planning.title}`);
-    console.log(`👤 Pour le membre: ${planningExercise.planningDay.planning.member.user.fullName}`);
+    console.log(`👤 Pour le membre: ${planningExercise.planningDay.planning.member.User.fullName}`);
 
     // Envoyer notification au membre
     const memberUser = await prisma.user.findUnique({
@@ -1189,7 +1189,7 @@ router.get('/member/:memberId', auth, async (req, res) => {
     // Vérifier que le membre existe (essayer d'abord par member.userId, puis par userId pour compatibilité frontend)
     let member = await prisma.member.findUnique({
       where: { userId: memberId },
-      include: { user: { select: { id: true, firstName: true,
+      include: { User: { select: { id: true, firstName: true,
               lastName: true, email: true, gymId: true } } }
     });
 
@@ -1198,7 +1198,7 @@ router.get('/member/:memberId', auth, async (req, res) => {
       // Peut-être que le frontend a passé l'userId au lieu du memberId. Tenter une recherche par userId.
       member = await prisma.member.findUnique({
         where: { userId: memberId },
-        include: { user: { select: { id: true, firstName: true,
+        include: { User: { select: { id: true, firstName: true,
               lastName: true, email: true, gymId: true } } }
       });
       if (member) {
@@ -1211,7 +1211,7 @@ router.get('/member/:memberId', auth, async (req, res) => {
       return notFound(res, 'Member', memberId);
     }
 
-    console.log(`✅ Membre trouvé: ${member.user.fullName} (userId: ${member.userId}, gymId: ${member.user.gymId})`);
+    console.log(`✅ Membre trouvé: ${member.User.fullName} (userId: ${member.userId}, gymId: ${member.User.gymId})`);
     console.log(`🔍 Recherche du requester - ID: ${req.user.sub}`);
 
     // Vérifier les permissions
@@ -1242,9 +1242,9 @@ router.get('/member/:memberId', auth, async (req, res) => {
     } else if (requester.role === 'admin') {
       console.log(`👨‍💼 Mode coach - Vérification appartenance salle`);
       // Un coach ne peut voir que les plannings des membres de sa salle
-      console.log(`👨‍💼 Comparaison salles: requester.gymId (${requester.gymId}) vs member.gymId (${member.user.gymId})`);
+      console.log(`👨‍💼 Comparaison salles: requester.gymId (${requester.gymId}) vs member.gymId (${member.User.gymId})`);
 
-      if (requester.gymId !== member.user.gymId) {
+      if (requester.gymId !== member.User.gymId) {
         console.log(`🚫 Coach ${requester.fullName} ne peut pas voir les plannings des membres d'une autre salle`);
         return res.status(403).json({ error: 'Vous ne pouvez voir que les plannings des membres de votre salle' });
       }
@@ -1283,7 +1283,7 @@ router.get('/member/:memberId', auth, async (req, res) => {
       orderBy: { startDate: 'desc' }
     });
 
-    console.log(`✅ ${plannings.length} planning(s) trouvé(s) pour le membre ${member.user.fullName}`);
+    console.log(`✅ ${plannings.length} planning(s) trouvé(s) pour le membre ${member.User.fullName}`);
     if (plannings.length > 0) {
       console.log(`📊 Résumé plannings:`, plannings.map(p => ({
         id: p.id,
@@ -1451,7 +1451,7 @@ router.get('/next-day/:memberId', auth, async (req, res) => {
     // Vérifier que le membre existe (essayer d'abord par member.userId, puis par userId pour compatibilité frontend)
     let member = await prisma.member.findUnique({
       where: { userId: memberId },
-      include: { user: { select: { id: true, firstName: true,
+      include: { User: { select: { id: true, firstName: true,
               lastName: true, email: true, gymId: true } } }
     });
 
@@ -1460,7 +1460,7 @@ router.get('/next-day/:memberId', auth, async (req, res) => {
       // Peut-être que le frontend a passé l'userId au lieu du memberId. Tenter une recherche par userId.
       member = await prisma.member.findUnique({
         where: { userId: memberId },
-        include: { user: { select: { id: true, firstName: true,
+        include: { User: { select: { id: true, firstName: true,
               lastName: true, email: true, gymId: true } } }
       });
       if (member) {
@@ -1473,7 +1473,7 @@ router.get('/next-day/:memberId', auth, async (req, res) => {
       return notFound(res, 'Member', memberId);
     }
 
-    console.log(`✅ Membre trouvé: ${member.user.fullName} (userId: ${member.userId}, gymId: ${member.user.gymId})`);
+    console.log(`✅ Membre trouvé: ${member.User.fullName} (userId: ${member.userId}, gymId: ${member.User.gymId})`);
     console.log(`🔍 Recherche du requester - ID: ${req.user.sub}`);
 
     // Vérifier les permissions
@@ -1502,9 +1502,9 @@ router.get('/next-day/:memberId', auth, async (req, res) => {
       console.log(`✅ Accès personnel validé`);
     } else if (requester.role === 'admin') {
       console.log(`👨‍💼 Mode coach - Vérification appartenance salle`);
-      console.log(`👨‍💼 Comparaison salles: requester.gymId (${requester.gymId}) vs member.gymId (${member.user.gymId})`);
+      console.log(`👨‍💼 Comparaison salles: requester.gymId (${requester.gymId}) vs member.gymId (${member.User.gymId})`);
 
-      if (requester.gymId !== member.user.gymId) {
+      if (requester.gymId !== member.User.gymId) {
         console.log(`🚫 Coach ${requester.fullName} ne peut pas voir le planning des membres d'une autre salle`);
         return res.status(403).json({ error: 'Vous ne pouvez voir que les plannings des membres de votre salle' });
       }
@@ -1556,7 +1556,7 @@ router.get('/next-day/:memberId', auth, async (req, res) => {
     });
 
     if (!activePlanning) {
-      console.log(`ℹ️ Aucun planning actif trouvé pour le membre ${member.user.fullName}`);
+      console.log(`ℹ️ Aucun planning actif trouvé pour le membre ${member.User.fullName}`);
       console.log(`ℹ️ Critères non remplis: planning actif couvrant la date ${today.toISOString().split('T')[0]}`);
       return res.status(204).json({
         message: 'Aucun entraînement prévu pour aujourd\'hui ou demain',
