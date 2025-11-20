@@ -1,6 +1,7 @@
 const cron = require('node-cron');
 const { PrismaClient } = require('@prisma/client');
 const { sendPushNotification } = require('../services/pushNotificationService');
+const { getFullName } = require('../utils/nameUtils');
 
 const prisma = new PrismaClient();
 
@@ -32,7 +33,8 @@ const dailyPlanningNotification = cron.schedule('0 6 * * *', async () => {
             user: {
               select: {
                 id: true,
-                fullName: true,
+                firstName: true,
+                lastName: true,
                 fcmToken: true
               }
             }
@@ -40,7 +42,8 @@ const dailyPlanningNotification = cron.schedule('0 6 * * *', async () => {
         },
         coach: {
           select: {
-            fullName: true
+            firstName: true,
+            lastName: true
           }
         },
         days: {
@@ -76,24 +79,25 @@ const dailyPlanningNotification = cron.schedule('0 6 * * *', async () => {
       const member = planning.member.user;
       const day = planning.days[0];
       const exerciseCount = day.exercises.length;
+      const memberFullName = getFullName(member);
 
-      console.log(`📤 Envoi notification à ${member.fullName} - ${exerciseCount} exercice(s)`);
+      console.log(`📤 Envoi notification à ${memberFullName} - ${exerciseCount} exercice(s)`);
 
       // Vérifier que les notifications sont activées au niveau global (User)
       if (!member.notificationsEnabled) {
-        console.log(`⚠️ ${member.fullName} a désactivé toutes les notifications`);
+        console.log(`⚠️ ${memberFullName} a désactivé toutes les notifications`);
         continue;
       }
 
       // Vérifier que le membre a activé les notifications d'entraînement spécifiques
       if (!planning.member.workoutNotificationsEnabled) {
-        console.log(`⚠️ ${member.fullName} a désactivé les notifications d'entraînement`);
+        console.log(`⚠️ ${memberFullName} a désactivé les notifications d'entraînement`);
         continue;
       }
 
       // Vérifier que le membre a un token FCM
       if (!member.fcmToken) {
-        console.log(`⚠️ ${member.fullName} n'a pas de FCM token, notification ignorée`);
+        console.log(`⚠️ ${memberFullName} n'a pas de FCM token, notification ignorée`);
         failCount++;
         continue;
       }
@@ -142,10 +146,10 @@ const dailyPlanningNotification = cron.schedule('0 6 * * *', async () => {
           }
         });
 
-        console.log(`✅ Notification envoyée à ${member.fullName}`);
+        console.log(`✅ Notification envoyée à ${memberFullName}`);
         successCount++;
       } catch (error) {
-        console.error(`❌ Erreur envoi notification à ${member.fullName}:`, error);
+        console.error(`❌ Erreur envoi notification à ${memberFullName}:`, error);
         failCount++;
       }
     }

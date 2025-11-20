@@ -524,7 +524,8 @@ async function notifyGymMembers(gymId, notification) {
       },
       select: {
         id: true,
-        fullName: true,
+        firstName: true,
+        lastName: true,
         fcmToken: true
       }
     });

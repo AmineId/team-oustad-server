@@ -43,7 +43,7 @@ async function sendPasswordResetEmail(email, resetToken, isSetup = false) {
   const mobileAppLink = process.env.MOBILE_APP_LINK || '';
   
   const mailOptions = isSetup ? {
-    from: process.env.SMTP_USER,
+    from: process.env.NO_REPLY_EMAIL,
     to: email,
     subject: 'Bienvenue sur Team Fitness - Créez votre mot de passe',
     html: `
@@ -73,7 +73,7 @@ async function sendPasswordResetEmail(email, resetToken, isSetup = false) {
       </div>
     `,
   } : {
-    from: process.env.SMTP_USER,
+    from: process.env.NO_REPLY_EMAIL,
     to: email,
     subject: 'Réinitialisation de votre mot de passe - Team Fitness',
     html: `

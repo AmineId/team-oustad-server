@@ -524,7 +524,7 @@ router.post('/scan-qr', auth, async (req, res) => {
           reason: 'no_active_subscription',
           member: {
             id: member.userId,
-            fullName: member.fullName,
+            fullName: getFullName(member),
             email: member.email
           }
         });
@@ -549,7 +549,7 @@ router.post('/scan-qr', auth, async (req, res) => {
       success: true,
       member: {
         id: member.userId,
-        fullName: member.fullName,
+        fullName: getFullName(member),
         email: member.email,
         displayId: member.displayId,
         subscription: activeSubscription ? {
@@ -671,7 +671,7 @@ router.get('/me', auth, async (req, res) => {
         id: user.id,
         displayId: user.displayId,
         email: user.email,
-        fullName: user.fullName,
+        fullName: getFullName(user),
         uniqueCode: user.uniqueCode,
         gym: user.Gym,
         type: 'admin'
@@ -718,7 +718,7 @@ router.get('/me', auth, async (req, res) => {
         id: user.id,
         displayId: user.displayId,
         email: user.email,
-        fullName: user.fullName,
+        fullName: getFullName(user),
         uniqueCode: user.uniqueCode,
         gyms: gymsWithStats,
         permissions: {
@@ -744,7 +744,7 @@ router.get('/me', auth, async (req, res) => {
         id: user.id,
         displayId: user.displayId,
         email: user.email,
-        fullName: user.fullName,
+        fullName: getFullName(user),
         uniqueCode: user.uniqueCode,
         gym: user.Gym,
         activeSubscription: activeSubscription,
@@ -1143,7 +1143,7 @@ router.post('/send-setup-email', auth, async (req, res) => {
     });
 
     // Envoyer l'email avec le nouveau service
-    await sendAccountSetupEmail(user.email, user.fullName, setupToken);
+    await sendAccountSetupEmail(user.email, getFullName(user), setupToken);
 
     console.log(`✅ Email de configuration envoyé à ${user.email}`);
     res.json({ 
@@ -1151,7 +1151,7 @@ router.post('/send-setup-email', auth, async (req, res) => {
       user: {
         id: user.id,
         email: user.email,
-        fullName: user.fullName,
+        fullName: getFullName(user),
         gym: user.Gym.name
       }
     });

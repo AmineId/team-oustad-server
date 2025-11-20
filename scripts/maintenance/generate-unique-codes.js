@@ -1,4 +1,5 @@
 const { PrismaClient } = require('@prisma/client');
+const { getFullName } = require('../../utils/nameUtils');
 const crypto = require('crypto');
 
 const prisma = new PrismaClient();
@@ -10,7 +11,7 @@ async function generateUniqueCodes() {
     // Trouver tous les membres sans uniqueCode
     const membersWithoutCode = await prisma.member.findMany({
       where: { uniqueCode: null },
-      include: { user: { select: { fullName: true, email: true } } }
+      include: { user: { select: { firstName: true, lastName: true, email: true } } }
     });
 
     console.log(`📋 ${membersWithoutCode.length} membres trouvés sans code unique`);
@@ -25,7 +26,7 @@ async function generateUniqueCodes() {
         data: { uniqueCode }
       });
 
-      console.log(`✅ ${member.user.fullName} (${member.user.email}): ${uniqueCode}`);
+      console.log(`✅ ${getFullName(member.user)} (${member.user.email}): ${uniqueCode}`);
     }
 
     console.log('🎉 Tous les codes uniques ont été générés !');

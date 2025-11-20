@@ -1,4 +1,5 @@
 const { PrismaClient } = require('@prisma/client');
+const { getFullName } = require('../../utils/nameUtils');
 
 const prisma = new PrismaClient();
 
@@ -10,7 +11,8 @@ async function checkUniqueCodes() {
       include: {
         user: {
           select: {
-            fullName: true,
+            firstName: true,
+            lastName: true,
             email: true
           }
         }
@@ -27,7 +29,7 @@ async function checkUniqueCodes() {
     members.forEach((member, index) => {
       const status = member.uniqueCode ? '✅' : '❌';
       const code = member.uniqueCode || 'MANQUANT';
-      console.log(`${index + 1}. ${status} ${member.user.fullName} (${member.user.email}): ${code}`);
+      console.log(`${index + 1}. ${status} ${getFullName(member.user)} (${member.user.email}): ${code}`);
     });
 
     // Vérifier l'unicité

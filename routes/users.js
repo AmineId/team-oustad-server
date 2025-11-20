@@ -750,7 +750,8 @@ router.put('/fcm-token', auth, async (req, res) => {
       select: {
         id: true,
         email: true,
-        fullName: true,
+        firstName: true,
+        lastName: true,
         fcmToken: true
       }
     });
@@ -946,7 +947,7 @@ router.put('/:id', auth, async (req, res) => {
 
     const updateData = {};
     if (email) updateData.email = email;
-    if (fullName) updateData.fullName = fullName;
+    // fullName is computed from firstName/lastName
     if (password) updateData.password = await bcrypt.hash(password, 10);
     if (notificationsEnabled !== undefined) updateData.notificationsEnabled = notificationsEnabled;
 
@@ -967,7 +968,7 @@ router.put('/:id', auth, async (req, res) => {
         const qrData = JSON.stringify({
           userId: updatedUser.id,
           displayId: updatedUser.displayId,
-          fullName: updatedUser.fullName,
+          fullName: getFullName(updatedUser),
           role: updatedUser.role,
           gymName: updatedUser.Gym.name,
           accessType: 'gym_access',
@@ -1361,7 +1362,7 @@ router.get('/:id/profile-image', auth, async (req, res) => {
 
     const targetUser = await prisma.user.findUnique({
       where: { id },
-      select: { id: true, fullName: true, gymId: true, role: true, profileImage: true }
+      select: { id: true, firstName: true, lastName: true, gymId: true, role: true, profileImage: true }
     });
 
     if (!targetUser) {
@@ -1390,7 +1391,7 @@ router.get('/:id/profile-image', auth, async (req, res) => {
       console.log(`❌ Photo de profil non trouvée pour ${getFullName(targetUser)} - génération avatar par défaut`);
 
       // Générer un avatar par défaut avec les initiales
-      const initials = targetUser.fullName
+      const initials = getFullName(targetUser)
         .split(' ')
         .map(word => word.charAt(0).toUpperCase())
         .slice(0, 2)
@@ -1513,7 +1514,7 @@ router.delete('/:id/profile-image', auth, async (req, res) => {
 
     const targetUser = await prisma.user.findUnique({
       where: { id },
-      select: { id: true, fullName: true, gymId: true, role: true, profileImage: true }
+      select: { id: true, firstName: true, lastName: true, gymId: true, role: true, profileImage: true }
     });
 
     if (!targetUser) {
@@ -2424,7 +2425,8 @@ router.get('/gyms/all', auth, requireOwner, async (req, res) => {
           select: {
             id: true,
             email: true,
-            fullName: true,
+            firstName: true,
+            lastName: true,
             role: true,
           }
         },

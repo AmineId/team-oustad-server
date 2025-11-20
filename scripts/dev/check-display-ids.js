@@ -3,6 +3,7 @@
  */
 
 const { PrismaClient } = require('@prisma/client');
+const { getFullName } = require('../../utils/nameUtils');
 const prisma = new PrismaClient();
 
 async function checkDisplayIds() {
@@ -12,11 +13,11 @@ async function checkDisplayIds() {
   try {
     // Vérifier les Users
     const users = await prisma.user.findMany({
-      select: { id: true, displayId: true, fullName: true, role: true },
+      select: { id: true, displayId: true, firstName: true, lastName: true, role: true },
       take: 5
     });
     console.log('👥 USERS:');
-    users.forEach(u => console.log(`   ${u.displayId} - ${u.fullName} (${u.role})`));
+    users.forEach(u => console.log(`   ${u.displayId} - ${getFullName(u)} (${u.role})`));
     console.log();
 
     // Vérifier les Gyms

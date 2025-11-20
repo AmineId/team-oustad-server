@@ -2,6 +2,7 @@
 // Utilisation: node scripts/test-image-upload.js
 
 const { PrismaClient } = require('@prisma/client');
+const { getFullName } = require('../../utils/nameUtils');
 const fs = require('fs');
 const path = require('path');
 const prisma = new PrismaClient();
@@ -13,13 +14,15 @@ async function testImageUploadSystem() {
     // 1. Test de l'avatar par défaut pour un utilisateur
     console.log('1️⃣ Test de l\'avatar par défaut utilisateur...');
 
-    const user = await prisma.user.findFirst();
+    const user = await prisma.user.findFirst({
+      select: { id: true, firstName: true, lastName: true, profileImage: true }
+    });
     if (!user) {
       console.log('❌ Aucun utilisateur trouvé. Veuillez créer un utilisateur d\'abord.');
       return;
     }
 
-    console.log(`👤 Utilisateur trouvé: ${user.fullName} (ID: ${user.id})`);
+    console.log(`👤 Utilisateur trouvé: ${getFullName(user)} (ID: ${user.id})`);
 
     // Vérifier si l'utilisateur a déjà une image de profil
     if (user.profileImage) {
@@ -81,7 +84,7 @@ async function testImageUploadSystem() {
 
     const finalUser = await prisma.user.findUnique({
       where: { id: user.id },
-      select: { id: true, fullName: true, profileImage: true }
+      select: { id: true, firstName: true, lastName: true, profileImage: true }
     });
 
     const finalGym = await prisma.gym.findUnique({
@@ -89,7 +92,7 @@ async function testImageUploadSystem() {
       select: { id: true, name: true, image: true }
     });
 
-    console.log(`👤 Utilisateur: ${finalUser.fullName}`);
+    console.log(`👤 Utilisateur: ${getFullName(finalUser)}`);
     console.log(`   Image stockée: ${finalUser.profileImage ? 'Oui (' + finalUser.profileImage.length + ' caractères)' : 'Non'}`);
 
     console.log(`🏢 Salle: ${finalGym.name}`);
