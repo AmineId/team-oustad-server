@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const auth = require('../middleware/auth');
 const { generateSubscriptionId, generatePaymentId } = require('../utils/idGenerator');
+const { getFullName } = require('../utils/nameUtils');
 const { 
   createYearlySubscriptionWithPayments,
   markPaymentAsCompleted,
@@ -126,7 +127,7 @@ router.post('/', auth, async (req, res) => {
     });
     
     if (memberUser?.fcmToken) {
-      console.log(`🔔 Envoi notifications à ${memberUser.fullName}`);
+      console.log(`🔔 Envoi notifications à ${getFullName(memberUser)}`);
       
       // Notification pour le nouvel abonnement
       const subscriptionData = {
@@ -367,7 +368,7 @@ router.post('/payments/:paymentId/acknowledge', auth, async (req, res) => {
     });
     
     if (memberUser?.fcmToken) {
-      console.log(`🔔 Envoi notification paiement confirmé à ${memberUser.fullName}`);
+      console.log(`🔔 Envoi notification paiement confirmé à ${getFullName(memberUser)}`);
       await notifyPaymentConfirmed(memberUser.fcmToken, updatedPayment).catch(err =>
         console.error('⚠️ Erreur notification FCM:', err)
       );
