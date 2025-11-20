@@ -55,7 +55,7 @@ async function main() {
       name: 'Downtown Fitness Center',
       address: '123 Main Street, New York, NY 10001',
       phone: '+1 (555) 123-4567',
-      users: {
+      User: {
         create: [
           {
             displayId: generateUserIdByRole('owner'),
@@ -105,7 +105,7 @@ async function main() {
         ],
       },
     },
-    include: { users: true },
+    include: { User: true },
   });
   console.log(`✅ Salle créée: ${gym1.name}`);
 
@@ -115,7 +115,7 @@ async function main() {
       name: 'Uptown Elite Gym',
       address: '456 Park Avenue, New York, NY 10022',
       phone: '+1 (555) 987-6543',
-      users: {
+      User: {
         create: [
           {
             displayId: generateUserIdByRole('admin'),
@@ -145,7 +145,7 @@ async function main() {
         ],
       },
     },
-    include: { users: true },
+    include: { User: true },
   });
   console.log(`✅ Salle créée: ${gym2.name}\n`);
 
@@ -204,16 +204,16 @@ async function main() {
   console.log('👥 Création des profils utilisateurs...');
   
   // GYM 1 Users
-  const ownerUser = gym1.users.find(u => u.role === 'owner');
-  const adminUser = gym1.users.find(u => u.role === 'admin');
-  const bobUser = gym1.users.find(u => u.email === 'bob@example.com');
-  const charlieUser = gym1.users.find(u => u.email === 'charlie@example.com');
-  const aliceUser = gym1.users.find(u => u.email === 'alice@example.com');
+  const ownerUser = gym1.User.find(u => u.role === 'owner');
+  const adminUser = gym1.User.find(u => u.role === 'admin');
+  const bobUser = gym1.User.find(u => u.email === 'bob@example.com');
+  const charlieUser = gym1.User.find(u => u.email === 'charlie@example.com');
+  const aliceUser = gym1.User.find(u => u.email === 'alice@example.com');
 
   // GYM 2 Users
-  const admin2User = gym2.users.find(u => u.role === 'admin');
-  const davidUser = gym2.users.find(u => u.email === 'david@example.com');
-  const emmaUser = gym2.users.find(u => u.email === 'emma@example.com');
+  const admin2User = gym2.User.find(u => u.role === 'admin');
+  const davidUser = gym2.User.find(u => u.email === 'david@example.com');
+  const emmaUser = gym2.User.find(u => u.email === 'emma@example.com');
 
   // Owner profile
   await prisma.owner.create({
@@ -1906,8 +1906,8 @@ async function main() {
   console.log(`   - Members: ${totalMembers}\n`);
   
   console.log('🏋️ Salles de sport:');
-  console.log(`   - ${gym1.name}: ${gym1.users.length} utilisateurs`);
-  console.log(`   - ${gym2.name}: ${gym2.users.length} utilisateurs\n`);
+  console.log(`   - ${gym1.name}: ${gym1.User.length} utilisateurs`);
+  console.log(`   - ${gym2.name}: ${gym2.User.length} utilisateurs\n`);
   
   console.log('🏷️  Types d\'abonnements:');
   console.log(`   - Total: ${totalSubscriptionTypes}`);
