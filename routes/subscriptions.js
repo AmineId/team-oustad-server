@@ -61,10 +61,11 @@ router.post('/', auth, async (req, res) => {
       const { PrismaClient } = require('@prisma/client');
       const prisma = new PrismaClient();
       const member = await prisma.user.findUnique({
-        where: { id: memberId }
+        where: { id: memberId },
+        select: { id: true, firstName: true, lastName: true, gymId: true }
       });
       
-      console.log(`🔍 Membre trouvé: ${member ? member.fullName : 'NON TROUVÉ'}`);
+      console.log(`🔍 Membre trouvé: ${member ? getFullName(member) : 'NON TROUVÉ'}`);
       if (member) {
         console.log(`🏢 Comparaison salles - Admin: ${requester.gymId}, Membre: ${member.gymId}`);
       }
@@ -221,10 +222,11 @@ router.get('/member/:memberId', auth, async (req, res) => {
     if (requester.role === 'admin') {
       console.log(`👨‍💼 Admin - Vérification appartenance salle membre ${memberId}`);
       const member = await prisma.user.findUnique({
-        where: { id: memberId }
+        where: { id: memberId },
+        select: { id: true, firstName: true, lastName: true, gymId: true }
       });
       
-      console.log(`🔍 Membre: ${member ? member.fullName : 'NON TROUVÉ'}`);
+      console.log(`🔍 Membre: ${member ? getFullName(member) : 'NON TROUVÉ'}`);
       if (member) {
         console.log(`🏢 Comparaison salles - Admin: ${requester.gymId}, Membre: ${member.gymId}`);
       }
@@ -309,7 +311,7 @@ router.post('/payments/:paymentId/acknowledge', auth, async (req, res) => {
       return res.status(404).json({ error: 'Paiement non trouvé' });
     }
     
-    console.log(`✅ Paiement trouvé: ${payment.amount}€ pour ${payment.Member.User.fullName}`);
+    console.log(`✅ Paiement trouvé: ${payment.amount}€ pour ${getFullName(payment.Member.User)}`);
     console.log(`📊 Statut actuel: ${payment.status}, Abonnement: ${payment.subscriptionId}`);
     
     const requester = req.user;
@@ -493,7 +495,7 @@ router.get('/payments/upcoming', auth, async (req, res) => {
       payments: upcomingPayments.map(p => ({
         id: p.id,
         memberId: p.memberId,
-        memberName: p.member.user.fullName,
+        memberName: getFullName(p.member.user),
         memberEmail: p.member.user.email,
         amount: p.amount,
         dueDate: p.dueDate,

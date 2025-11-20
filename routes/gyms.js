@@ -1,4 +1,5 @@
 const express = require('express');
+const { getFullName } = require('../utils/nameUtils');
 const { PrismaClient } = require('@prisma/client');
 
 const router = express.Router();
@@ -35,12 +36,12 @@ const requireOwner = async (req, res, next) => {
     }
 
     if (user.role !== 'owner') {
-      console.log(`🚫 Rôle insuffisant: ${user.fullName} est ${user.role}, owner requis`);
+      console.log(`🚫 Rôle insuffisant: ${getFullName(user)} est ${user.role}, owner requis`);
       return res.status(403).json({ error: 'Accès réservé aux propriétaires' });
     }
 
     req.user.ownerProfile = user.owner;
-    console.log(`✅ Accès owner autorisé pour ${user.fullName}`);
+    console.log(`✅ Accès owner autorisé pour ${getFullName(user)}`);
     next();
   } catch (error) {
     console.error('💥 Erreur middleware requireOwner:', error);
@@ -69,12 +70,12 @@ const requireAdmin = async (req, res, next) => {
     }
 
     if (user.role !== 'admin') {
-      console.log(`🚫 Rôle insuffisant: ${user.fullName} est ${user.role}, admin requis`);
+      console.log(`🚫 Rôle insuffisant: ${getFullName(user)} est ${user.role}, admin requis`);
       return res.status(403).json({ error: 'Accès réservé aux administrateurs' });
     }
 
     req.user.adminProfile = user.admin;
-    console.log(`✅ Accès admin autorisé pour ${user.fullName}`);
+    console.log(`✅ Accès admin autorisé pour ${getFullName(user)}`);
     next();
   } catch (error) {
     console.error('💥 Erreur middleware requireAdmin:', error);
@@ -225,13 +226,13 @@ router.get('/', auth, async (req, res) => {
     if (requester.role === 'admin') {
       // Admin voit seulement sa salle
       whereClause.id = requester.gymId;
-      console.log(`👨‍💼 Admin ${requester.fullName} voit seulement sa salle: ${requester.gymId}`);
+      console.log(`👨‍💼 Admin ${getFullName(requester)} voit seulement sa salle: ${requester.gymId}`);
     } else if (requester.role === 'member') {
       // Member voit seulement sa salle
       whereClause.id = requester.gymId;
-      console.log(`👤 Membre ${requester.fullName} voit seulement sa salle: ${requester.gymId}`);
+      console.log(`👤 Membre ${getFullName(requester)} voit seulement sa salle: ${requester.gymId}`);
     } else {
-      console.log(`👑 Owner ${requester.fullName} voit toutes les salles`);
+      console.log(`👑 Owner ${getFullName(requester)} voit toutes les salles`);
     }
     // Owner voit toutes les salles
 
@@ -354,14 +355,14 @@ router.get('/:id', auth, async (req, res) => {
     let hasAccess = false;
     if (requester.role === 'owner') {
       hasAccess = true;
-      console.log(`👑 Owner ${requester.fullName} accède à gym ${id}`);
+      console.log(`👑 Owner ${getFullName(requester)} accède à gym ${id}`);
     } else if (requester.role === 'admin' || requester.role === 'member') {
       hasAccess = requester.gymId === id;
-      console.log(`${requester.role === 'admin' ? '👨‍💼' : '👤'} ${requester.role} ${requester.fullName} ${hasAccess ? 'accède' : 'refuse accès'} à gym ${id} (sa salle: ${requester.gymId})`);
+      console.log(`${requester.role === 'admin' ? '👨‍💼' : '👤'} ${requester.role} ${getFullName(requester)} ${hasAccess ? 'accède' : 'refuse accès'} à gym ${id} (sa salle: ${requester.gymId})`);
     }
 
     if (!hasAccess) {
-      console.log(`🚫 Accès refusé pour ${requester.fullName} (${requester.role}) à gym ${id}`);
+      console.log(`🚫 Accès refusé pour ${getFullName(requester)} (${requester.role}) à gym ${id}`);
       return res.status(403).json({ error: 'Vous n\'avez pas accès à cette salle' });
     }
 
@@ -480,14 +481,14 @@ router.put('/:id', auth, async (req, res) => {
     let canUpdate = false;
     if (requester.role === 'owner') {
       canUpdate = true;
-      console.log(`👑 Owner ${requester.fullName} peut modifier gym ${id}`);
+      console.log(`👑 Owner ${getFullName(requester)} peut modifier gym ${id}`);
     } else if (requester.role === 'admin') {
       canUpdate = requester.gymId === id;
-      console.log(`👨‍💼 Admin ${requester.fullName} ${canUpdate ? 'peut modifier' : 'ne peut pas modifier'} gym ${id} (sa salle: ${requester.gymId})`);
+      console.log(`👨‍💼 Admin ${getFullName(requester)} ${canUpdate ? 'peut modifier' : 'ne peut pas modifier'} gym ${id} (sa salle: ${requester.gymId})`);
     }
 
     if (!canUpdate) {
-      console.log(`🚫 Permissions insuffisantes pour ${requester.fullName} (${requester.role})`);
+      console.log(`🚫 Permissions insuffisantes pour ${getFullName(requester)} (${requester.role})`);
       return res.status(403).json({ error: 'Vous n\'avez pas les permissions pour modifier cette salle' });
     }
 
@@ -677,14 +678,14 @@ router.post('/:id/opening-hours', auth, async (req, res) => {
     let canUpdate = false;
     if (requester.role === 'owner') {
       canUpdate = true;
-      console.log(`👑 Owner ${requester.fullName} peut modifier horaires gym ${id}`);
+      console.log(`👑 Owner ${getFullName(requester)} peut modifier horaires gym ${id}`);
     } else if (requester.role === 'admin') {
       canUpdate = requester.gymId === id;
-      console.log(`👨‍💼 Admin ${requester.fullName} ${canUpdate ? 'peut modifier' : 'ne peut pas modifier'} horaires gym ${id} (sa salle: ${requester.gymId})`);
+      console.log(`👨‍💼 Admin ${getFullName(requester)} ${canUpdate ? 'peut modifier' : 'ne peut pas modifier'} horaires gym ${id} (sa salle: ${requester.gymId})`);
     }
 
     if (!canUpdate) {
-      console.log(`🚫 Permissions insuffisantes pour ${requester.fullName} (${requester.role})`);
+      console.log(`🚫 Permissions insuffisantes pour ${getFullName(requester)} (${requester.role})`);
       return res.status(403).json({ error: 'Vous n\'avez pas les permissions pour modifier les horaires de cette salle' });
     }
 
@@ -788,14 +789,14 @@ router.get('/:id/opening-hours', auth, async (req, res) => {
     let hasAccess = false;
     if (requester.role === 'owner') {
       hasAccess = true;
-      console.log(`👑 Owner ${requester.fullName} accède aux horaires gym ${id}`);
+      console.log(`👑 Owner ${getFullName(requester)} accède aux horaires gym ${id}`);
     } else if (requester.role === 'admin' || requester.role === 'member') {
       hasAccess = requester.gymId === id;
-      console.log(`${requester.role === 'admin' ? '👨‍💼' : '👤'} ${requester.role} ${requester.fullName} ${hasAccess ? 'accède' : 'refuse accès'} aux horaires gym ${id} (sa salle: ${requester.gymId})`);
+      console.log(`${requester.role === 'admin' ? '👨‍💼' : '👤'} ${requester.role} ${getFullName(requester)} ${hasAccess ? 'accède' : 'refuse accès'} aux horaires gym ${id} (sa salle: ${requester.gymId})`);
     }
 
     if (!hasAccess) {
-      console.log(`🚫 Accès refusé aux horaires pour ${requester.fullName} (${requester.role})`);
+      console.log(`🚫 Accès refusé aux horaires pour ${getFullName(requester)} (${requester.role})`);
       return res.status(403).json({ error: 'Vous n\'avez pas accès aux horaires de cette salle' });
     }
 
@@ -924,17 +925,17 @@ router.put('/:id/image', auth, async (req, res) => {
     let canUpdate = false;
     if (requester.role === 'owner') {
       canUpdate = true;
-      console.log(`👑 Owner ${requester.fullName} peut modifier image salle ${id}`);
+      console.log(`👑 Owner ${getFullName(requester)} peut modifier image salle ${id}`);
     } else if (requester.role === 'admin') {
       canUpdate = targetGym.id === requester.gymId;
-      console.log(`👨‍💼 Admin ${requester.fullName} ${canUpdate ? 'peut modifier' : 'ne peut pas modifier'} image salle ${id} (sa salle: ${requester.gymId})`);
+      console.log(`👨‍💼 Admin ${getFullName(requester)} ${canUpdate ? 'peut modifier' : 'ne peut pas modifier'} image salle ${id} (sa salle: ${requester.gymId})`);
     } else if (requester.role === 'member') {
       canUpdate = false;
-      console.log(`👤 Membre ${requester.fullName} ne peut pas modifier image salle`);
+      console.log(`👤 Membre ${getFullName(requester)} ne peut pas modifier image salle`);
     }
 
     if (!canUpdate) {
-      console.log(`🚫 Permissions insuffisantes pour ${requester.fullName}`);
+      console.log(`🚫 Permissions insuffisantes pour ${getFullName(requester)}`);
       return res.status(403).json({ error: 'Vous n\'avez pas les permissions pour modifier l\'image de cette salle' });
     }
 
@@ -1054,14 +1055,14 @@ router.get('/:id/image', auth, async (req, res) => {
     let hasAccess = false;
     if (requester.role === 'owner') {
       hasAccess = true;
-      console.log(`👑 Owner ${requester.fullName} accède à image salle ${id}`);
+      console.log(`👑 Owner ${getFullName(requester)} accède à image salle ${id}`);
     } else if (requester.role === 'admin' || requester.role === 'member') {
       hasAccess = targetGym.id === requester.gymId;
-      console.log(`${requester.role === 'admin' ? '👨‍💼' : '👤'} ${requester.role} ${requester.fullName} ${hasAccess ? 'accède' : 'refuse accès'} à image salle ${id} (sa salle: ${requester.gymId})`);
+      console.log(`${requester.role === 'admin' ? '👨‍💼' : '👤'} ${requester.role} ${getFullName(requester)} ${hasAccess ? 'accède' : 'refuse accès'} à image salle ${id} (sa salle: ${requester.gymId})`);
     }
 
     if (!hasAccess) {
-      console.log(`🚫 Accès refusé à image salle pour ${requester.fullName}`);
+      console.log(`🚫 Accès refusé à image salle pour ${getFullName(requester)}`);
       return res.status(403).json({ error: 'Vous n\'avez pas accès à l\'image de cette salle' });
     }
 
@@ -1203,17 +1204,17 @@ router.delete('/:id/image', auth, async (req, res) => {
     let canDelete = false;
     if (requester.role === 'owner') {
       canDelete = true;
-      console.log(`👑 Owner ${requester.fullName} peut supprimer image salle ${id}`);
+      console.log(`👑 Owner ${getFullName(requester)} peut supprimer image salle ${id}`);
     } else if (requester.role === 'admin') {
       canDelete = targetGym.id === requester.gymId;
-      console.log(`👨‍💼 Admin ${requester.fullName} ${canDelete ? 'peut supprimer' : 'ne peut pas supprimer'} image salle ${id} (sa salle: ${requester.gymId})`);
+      console.log(`👨‍💼 Admin ${getFullName(requester)} ${canDelete ? 'peut supprimer' : 'ne peut pas supprimer'} image salle ${id} (sa salle: ${requester.gymId})`);
     } else if (requester.role === 'member') {
       canDelete = false;
-      console.log(`👤 Membre ${requester.fullName} ne peut pas supprimer image salle`);
+      console.log(`👤 Membre ${getFullName(requester)} ne peut pas supprimer image salle`);
     }
 
     if (!canDelete) {
-      console.log(`🚫 Permissions insuffisantes pour ${requester.fullName}`);
+      console.log(`🚫 Permissions insuffisantes pour ${getFullName(requester)}`);
       return res.status(403).json({ error: 'Vous n\'avez pas les permissions pour supprimer l\'image de cette salle' });
     }
 

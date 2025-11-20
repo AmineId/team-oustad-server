@@ -1,4 +1,5 @@
 const { PrismaClient } = require('@prisma/client');
+const { getFullName } = require('../../utils/nameUtils');
 const crypto = require('crypto');
 
 const prisma = new PrismaClient();
@@ -12,7 +13,8 @@ async function generateUniqueCodesForAllUsers() {
       where: { uniqueCode: null },
       select: {
         id: true,
-        fullName: true,
+        firstName: true,
+        lastName: true,
         email: true,
         role: true
       }
@@ -30,7 +32,7 @@ async function generateUniqueCodesForAllUsers() {
         data: { uniqueCode }
       });
 
-      console.log(`✅ ${user.role.toUpperCase()}: ${user.fullName} (${user.email}): ${uniqueCode}`);
+      console.log(`✅ ${user.role.toUpperCase()}: ${getFullName(user)} (${user.email}): ${uniqueCode}`);
     }
 
     console.log('\n🎉 Tous les codes uniques ont été générés !');
@@ -40,7 +42,8 @@ async function generateUniqueCodesForAllUsers() {
       select: {
         role: true,
         uniqueCode: true,
-        fullName: true
+        firstName: true,
+        lastName: true
       }
     });
 

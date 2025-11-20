@@ -5,6 +5,7 @@
 
 const { PrismaClient } = require('@prisma/client');
 const { sendPushNotification } = require('../../services/pushNotificationService');
+const { getFullName } = require('../../utils/nameUtils');
 
 const prisma = new PrismaClient();
 
@@ -34,16 +35,19 @@ async function testDailyPlanningNotification() {
             user: {
               select: {
                 id: true,
-                fullName: true,
+                firstName: true,
+                lastName: true,
                 email: true,
-                fcmToken: true
+                fcmToken: true,
+                notificationsEnabled: true
               }
             }
           }
         },
         coach: {
           select: {
-            fullName: true
+            firstName: true,
+            lastName: true
           }
         },
         days: {
@@ -86,11 +90,13 @@ async function testDailyPlanningNotification() {
       const member = planning.member.user;
       const day = planning.days[0];
       const exerciseCount = day.exercises.length;
+      const memberFullName = getFullName(member);
+      const coachFullName = getFullName(planning.coach);
 
-      console.log(`👤 ${member.fullName}`);
+      console.log(`👤 ${memberFullName}`);
       console.log(`   📧 ${member.email}`);
       console.log(`   📋 Planning: ${planning.title}`);
-      console.log(`   👨‍🏫 Coach: ${planning.coach.fullName}`);
+      console.log(`   👨‍🏫 Coach: ${coachFullName}`);
       console.log(`   💪 Exercices: ${exerciseCount}`);
       
       const exerciseNames = day.exercises
@@ -178,9 +184,9 @@ async function testDailyPlanningNotification() {
             }
           });
 
-          console.log(`✅ Notification envoyée à ${member.fullName}`);
+          console.log(`✅ Notification envoyée à ${memberFullName}`);
         } catch (error) {
-          console.error(`❌ Erreur pour ${member.fullName}:`, error.message);
+          console.error(`❌ Erreur pour ${memberFullName}:`, error.message);
         }
       }
       */

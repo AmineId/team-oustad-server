@@ -117,7 +117,7 @@ async function testUserSetupWorkflow() {
     });
 
     console.log('✅ Connexion réussie!');
-    console.log(`   User: ${newLoginResponse.data.user.fullName}`);
+    console.log(`   User: ${newLoginResponse.data.user.firstName} ${newLoginResponse.data.user.lastName}`);
     console.log(`   Role: ${newLoginResponse.data.user.role}`);
     console.log(`   Token: ${newLoginResponse.data.token.substring(0, 20)}...\n`);
 

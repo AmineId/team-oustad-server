@@ -2,6 +2,7 @@
 // Utilisation: node scripts/test-planning-system.js
 
 const { PrismaClient } = require('@prisma/client');
+const { getFullName } = require('../../utils/nameUtils');
 const prisma = new PrismaClient();
 
 // Fonction pour obtenir un token JWT d'admin
@@ -95,7 +96,7 @@ async function testPlanningSystem() {
     const planning = planningData.planning;
 
     console.log(`✅ Planning créé: ${planning.title} (ID: ${planning.id})`);
-    console.log(`   Pour membre: ${member.user.fullName}`);
+    console.log(`   Pour membre: ${getFullName(member.user)}`);
     console.log(`   Par coach: Admin TeamFitness\n`);
 
     // 3. Ajouter des exercices au planning pour différents jours
@@ -148,8 +149,8 @@ async function testPlanningSystem() {
 
     const fullPlanning = await response.json();
     console.log(`📋 Planning: ${fullPlanning.title}`);
-    console.log(`👤 Membre: ${fullPlanning.member.user.fullName}`);
-    console.log(`🏋️ Coach: ${fullPlanning.coach.fullName}`);
+    console.log(`👤 Membre: ${getFullName(fullPlanning.member.user)}`);
+    console.log(`🏋️ Coach: ${getFullName(fullPlanning.coach)}`);
     console.log(`📅 Période: ${fullPlanning.startDate} - ${fullPlanning.endDate}`);
     console.log(`📝 Exercices par jour:`);
 

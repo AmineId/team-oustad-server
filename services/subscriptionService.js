@@ -160,13 +160,13 @@ async function checkOverduePayments() {
     });
     
     console.log(`⚠️  Paiement ${payment.id} marqué en retard`);
-    console.log(`   Membre: ${payment.member.user.fullName}`);
+    console.log(`   Membre: ${getFullName(payment.member.user)}`);
     console.log(`   Montant: ${payment.amount}€`);
     console.log(`   Date due: ${payment.dueDate.toLocaleDateString()}`);
     
     // Envoyer notification de changement de statut
     if (payment.member.user.fcmToken) {
-      console.log(`🔔 Envoi notification changement statut à ${payment.member.user.fullName}`);
+      console.log(`🔔 Envoi notification changement statut à ${getFullName(payment.member.user)}`);
       await notifyPaymentStatusChange(
         payment.member.user.fcmToken,
         updatedPayment,
@@ -231,7 +231,7 @@ async function checkUpcomingPayments() {
   for (const payment of upcomingPayments) {
     const daysUntilDue = Math.ceil((payment.dueDate - now) / (1000 * 60 * 60 * 24));
     console.log(`   💰 Paiement ${payment.id} dû dans ${daysUntilDue} jour(s)`);
-    console.log(`      Membre: ${payment.member.user.fullName}`);
+    console.log(`      Membre: ${getFullName(payment.member.user)}`);
     console.log(`      Montant: ${payment.amount}€`);
   }
   
@@ -276,7 +276,7 @@ async function markPaymentAsCompleted(paymentId, paymentMethod, transactionId = 
   
   // Envoyer notification de changement de statut
   if (oldPayment?.member.user.fcmToken && oldStatus !== 'completed') {
-    console.log(`🔔 Envoi notification changement statut à ${oldPayment.member.user.fullName}`);
+    console.log(`🔔 Envoi notification changement statut à ${getFullName(oldPayment.member.user)}`);
     await notifyPaymentStatusChange(
       oldPayment.member.user.fcmToken,
       payment,
@@ -346,7 +346,7 @@ async function acknowledgePayment(paymentId, paymentMethod, transactionId = null
     throw new Error('Paiement non trouvé');
   }
 
-  console.log(`✅ Paiement trouvé - Membre: ${payment.member.user.fullName}, Montant: ${payment.amount}€`);
+  console.log(`✅ Paiement trouvé - Membre: ${getFullName(payment.member.user)}, Montant: ${payment.amount}€`);
   console.log(`   Statut actuel: ${payment.status}`);
 
   if (payment.status === 'completed') {
@@ -355,7 +355,7 @@ async function acknowledgePayment(paymentId, paymentMethod, transactionId = null
   }
 
   console.log(`💳 Acquittement du paiement ${paymentId}`);
-  console.log(`   Membre: ${payment.member.user.fullName}`);
+  console.log(`   Membre: ${getFullName(payment.member.user)}`);
   console.log(`   Montant: ${payment.amount}€`);
 
   // Mettre à jour le paiement

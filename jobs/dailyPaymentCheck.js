@@ -8,6 +8,7 @@
  */
 
 const cron = require('node-cron');
+const { getFullName } = require('../utils/nameUtils');
 const { 
   checkOverduePayments, 
   checkUpcomingPayments 
@@ -35,11 +36,12 @@ async function runDailyPaymentCheck() {
       console.log(`🔔 Envoi notifications pour ${overdueResult.overduePaymentsList.length} paiements en retard`);
       for (const payment of overdueResult.overduePaymentsList) {
         const memberUser = await prisma.user.findUnique({
-          where: { id: payment.memberId }
+          where: { id: payment.memberId },
+          select: { id: true, firstName: true, lastName: true, fcmToken: true }
         });
         if (memberUser?.fcmToken) {
           await notifyPaymentOverdue(memberUser.fcmToken, payment).catch(err =>
-            console.error(`⚠️ Erreur notification FCM pour ${memberUser.fullName}:`, err)
+            console.error(`⚠️ Erreur notification FCM pour ${getFullName(memberUser)}:`, err)
           );
         }
       }
@@ -61,11 +63,12 @@ async function runDailyPaymentCheck() {
       console.log(`🔔 Envoi notifications pour ${paymentsIn3Days.length} paiements dus dans 3 jours`);
       for (const payment of paymentsIn3Days) {
         const memberUser = await prisma.user.findUnique({
-          where: { id: payment.memberId }
+          where: { id: payment.memberId },
+          select: { id: true, firstName: true, lastName: true, fcmToken: true }
         });
         if (memberUser?.fcmToken) {
           await notifyPaymentDue(memberUser.fcmToken, payment).catch(err =>
-            console.error(`⚠️ Erreur notification FCM pour ${memberUser.fullName}:`, err)
+            console.error(`⚠️ Erreur notification FCM pour ${getFullName(memberUser)}:`, err)
           );
         }
       }

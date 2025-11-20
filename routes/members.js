@@ -202,14 +202,16 @@ router.put('/:id/profile', auth, canAccessMemberProfile, async (req, res) => {
       }
     });
 
-    console.log(`✅ Profil membre mis à jour pour ${updatedMember.user.fullName}`);
+    console.log(`✅ Profil membre mis à jour pour ${getFullName(updatedMember.user)}`);
 
     res.json({
       message: 'Profil membre mis à jour avec succès',
       member: {
         userId: updatedMember.userId,
         email: updatedMember.user.email,
-        fullName: updatedMember.user.fullName,
+        firstName: updatedMember.user.firstName,
+        lastName: updatedMember.user.lastName,
+        fullName: getFullName(updatedMember.user),
         displayId: updatedMember.user.displayId,
         birthDate: updatedMember.birthDate,
         phone: updatedMember.phone,
@@ -344,7 +346,7 @@ router.post('/:id/goals', auth, canAccessMemberProfile, async (req, res) => {
       }
     });
 
-    console.log(`✅ Objectif créé pour ${goal.member.user.fullName}: ${goal.title}`);
+    console.log(`✅ Objectif créé pour ${getFullName(goal.member.user)}: ${goal.title}`);
 
     res.status(201).json({
       message: 'Objectif créé avec succès',
@@ -546,7 +548,7 @@ router.post('/:id/measurements', auth, canAccessMemberProfile, async (req, res) 
       }
     });
 
-    console.log(`✅ Mesure créée pour ${measurement.member.user.fullName}`);
+    console.log(`✅ Mesure créée pour ${getFullName(measurement.member.user)}`);
 
     res.status(201).json({
       message: 'Mesure créée avec succès',
