@@ -27,19 +27,36 @@ async function sendPasswordResetEmail(email, resetToken, isSetup = false) {
 
   console.log(`🔗 URL générée: ${resetUrl}`);
 
+  const mobileAppLink = process.env.MOBILE_APP_LINK || '';
+  
   const mailOptions = isSetup ? {
     from: process.env.SMTP_USER,
     to: email,
     subject: 'Bienvenue sur Team Fitness - Créez votre mot de passe',
     html: `
-      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
         <h2 style="color: #333;">Bienvenue sur Team Fitness ! 🎉</h2>
-        <p>Votre compte a été créé avec succès. Pour finaliser votre inscription, veuillez créer votre mot de passe.</p>
-        <p>Votre code d'activation est : <strong style="font-size: 18px; color: #28a745;">${resetToken}</strong></p>
-        <p>Ou cliquez sur le lien ci-dessous pour créer votre mot de passe :</p>
-        <a href="${resetUrl}" style="background-color: #28a745; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; display: inline-block; margin: 10px 0;">Créer mon mot de passe</a>
-        <p><small>Ce lien expire dans 24 heures.</small></p>
-        <p>Si vous n'avez pas créé de compte, ignorez cet email.</p>
+        <p>Votre compte a été créé avec succès. Pour finaliser votre inscription, vous devez créer votre mot de passe.</p>
+        
+        <div style="background-color: #f8f9fa; border-left: 4px solid #28a745; padding: 15px; margin: 20px 0;">
+          <p style="margin: 0 0 10px 0; color: #333; font-weight: bold;">🔐 Votre code d'activation :</p>
+          <p style="margin: 0; font-size: 24px; font-weight: bold; color: #28a745; letter-spacing: 2px;">${resetToken}</p>
+        </div>
+        
+        ${mobileAppLink ? `
+        <div style="background-color: #e8f5e9; border: 2px solid #28a745; border-radius: 8px; padding: 20px; margin: 20px 0; text-align: center;">
+          <p style="margin: 0 0 15px 0; color: #2e7d32; font-size: 16px; font-weight: bold;">📱 Pour créer votre mot de passe :</p>
+          <a href="${mobileAppLink}" style="background-color: #28a745; color: white; padding: 12px 30px; text-decoration: none; border-radius: 5px; display: inline-block; font-size: 16px; font-weight: bold;">Ouvrir l'application Team Fitness</a>
+          <p style="margin: 15px 0 0 0; font-size: 13px; color: #666;">Cliquez sur le bouton ci-dessus, puis entrez votre code d'activation dans l'app</p>
+        </div>
+        ` : `
+        <div style="text-align: center; margin: 20px 0;">
+          <p style="margin: 0 0 15px 0; color: #333; font-weight: bold;">Pour créer votre mot de passe, entrez ce code dans l'application mobile Team Fitness</p>
+        </div>
+        `}
+        
+        <p style="margin-top: 25px; font-size: 13px; color: #999;">⏱️ Ce code expire dans 24 heures.</p>
+        <p style="font-size: 13px; color: #999;">Si vous n'avez pas créé de compte, ignorez cet email.</p>
       </div>
     `,
   } : {
@@ -87,8 +104,10 @@ async function sendAccountSetupEmail(email, fullName, setupToken) {
   // Utiliser API_URL pour pointer vers le backend qui sert setup-password.html
   const baseUrl = process.env.API_URL || 'http://localhost:3000';
   const setupUrl = `${baseUrl}/setup-password.html?email=${encodeURIComponent(email)}&token=${setupToken}`;
+  const mobileAppLink = process.env.MOBILE_APP_LINK || '';
 
   console.log(`🔗 URL de configuration: ${setupUrl}`);
+  console.log(`📱 Lien app mobile: ${mobileAppLink || 'Non configuré'}`);
 
   const mailOptions = {
     from: `"Team Fitness" <${process.env.SMTP_USER}>`,
@@ -131,16 +150,26 @@ async function sendAccountSetupEmail(email, fullName, setupToken) {
                       </p>
                     </div>
                     
-                    <p style="color: #666666; font-size: 16px; line-height: 1.6; margin-top: 25px;">
-                      Ou cliquez sur le bouton ci-dessous pour configurer votre compte directement :
-                    </p>
-                    
-                    <div style="text-align: center; margin: 30px 0;">
-                      <a href="${setupUrl}" 
-                         style="background-color: #667eea; color: #ffffff; padding: 15px 40px; text-decoration: none; border-radius: 5px; display: inline-block; font-size: 16px; font-weight: bold;">
-                        Configurer mon compte
+                    ${mobileAppLink ? `
+                    <div style="background-color: #e8f5e9; border: 2px solid #4caf50; border-radius: 8px; padding: 20px; margin: 25px 0; text-align: center;">
+                      <p style="margin: 0 0 15px 0; color: #2e7d32; font-size: 18px; font-weight: bold;">
+                        📱 Pour créer votre mot de passe
+                      </p>
+                      <a href="${mobileAppLink}" 
+                         style="background-color: #4caf50; color: #ffffff; padding: 15px 40px; text-decoration: none; border-radius: 5px; display: inline-block; font-size: 16px; font-weight: bold; margin: 10px 0;">
+                        🚀 Ouvrir l'application Team Fitness
                       </a>
+                      <p style="margin: 15px 0 0 0; color: #666666; font-size: 14px;">
+                        Cliquez sur le bouton ci-dessus, puis entrez votre code de configuration dans l'app
+                      </p>
                     </div>
+                    ` : `
+                    <div style="text-align: center; margin: 25px 0; padding: 20px; background-color: #f8f9fa; border-radius: 8px;">
+                      <p style="margin: 0; color: #333333; font-size: 16px; font-weight: bold;">
+                        Pour créer votre mot de passe, entrez ce code dans l'application mobile Team Fitness
+                      </p>
+                    </div>
+                    `}
                     
                     <div style="background-color: #fff3cd; border: 1px solid #ffc107; border-radius: 4px; padding: 12px; margin-top: 25px;">
                       <p style="margin: 0; color: #856404; font-size: 14px;">
