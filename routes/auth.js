@@ -524,9 +524,7 @@ router.post('/scan-qr', auth, async (req, res) => {
           reason: 'no_active_subscription',
           member: {
             id: member.userId,
-            firstName: member.firstName,
-          lastName: member.lastName,
-          fullName: getFullName(member),
+            fullName: member.fullName,
             email: member.email
           }
         });
@@ -551,9 +549,7 @@ router.post('/scan-qr', auth, async (req, res) => {
       success: true,
       member: {
         id: member.userId,
-        firstName: member.firstName,
-          lastName: member.lastName,
-          fullName: getFullName(member),
+        fullName: member.fullName,
         email: member.email,
         displayId: member.displayId,
         subscription: activeSubscription ? {
@@ -675,9 +671,7 @@ router.get('/me', auth, async (req, res) => {
         id: user.id,
         displayId: user.displayId,
         email: user.email,
-        firstName: user.firstName,
-          lastName: user.lastName,
-          fullName: getFullName(user),
+        fullName: user.fullName,
         uniqueCode: user.uniqueCode,
         gym: user.Gym,
         type: 'admin'
@@ -689,14 +683,14 @@ router.get('/me', auth, async (req, res) => {
       // Pour les owners : retourner toutes les salles avec statistiques
       const allGyms = await prisma.gym.findMany({
         include: {
-          users: {
+          User: {
             select: {
               role: true
             }
           },
           _count: {
             select: {
-              users: true
+              User: true
             }
           }
         }
@@ -713,10 +707,10 @@ router.get('/me', auth, async (req, res) => {
         createdAt: gym.createdAt,
         updatedAt: gym.updatedAt,
         stats: {
-          totalUsers: gym._count.users,
-          members: gym.users.filter(u => u.role === 'member').length,
-          admins: gym.users.filter(u => u.role === 'admin').length,
-          owners: gym.users.filter(u => u.role === 'owner').length
+          totalUsers: gym._count.User,
+          members: gym.User.filter(u => u.role === 'member').length,
+          admins: gym.User.filter(u => u.role === 'admin').length,
+          owners: gym.User.filter(u => u.role === 'owner').length
         }
       }));
 
@@ -724,9 +718,7 @@ router.get('/me', auth, async (req, res) => {
         id: user.id,
         displayId: user.displayId,
         email: user.email,
-        firstName: user.firstName,
-          lastName: user.lastName,
-          fullName: getFullName(user),
+        fullName: user.fullName,
         uniqueCode: user.uniqueCode,
         gyms: gymsWithStats,
         permissions: {
@@ -752,9 +744,7 @@ router.get('/me', auth, async (req, res) => {
         id: user.id,
         displayId: user.displayId,
         email: user.email,
-        firstName: user.firstName,
-          lastName: user.lastName,
-          fullName: getFullName(user),
+        fullName: user.fullName,
         uniqueCode: user.uniqueCode,
         gym: user.Gym,
         activeSubscription: activeSubscription,
@@ -1161,9 +1151,7 @@ router.post('/send-setup-email', auth, async (req, res) => {
       user: {
         id: user.id,
         email: user.email,
-        firstName: user.firstName,
-          lastName: user.lastName,
-          fullName: getFullName(user),
+        fullName: user.fullName,
         gym: user.Gym.name
       }
     });

@@ -2410,7 +2410,7 @@ router.get('/gyms/all', auth, requireOwner, async (req, res) => {
   try {
     const gyms = await prisma.gym.findMany({
       include: {
-        users: {
+        User: {
           select: {
             id: true,
             email: true,
@@ -2419,7 +2419,7 @@ router.get('/gyms/all', auth, requireOwner, async (req, res) => {
           }
         },
         _count: {
-          select: { users: true }
+          select: { User: true }
         }
       }
     });
