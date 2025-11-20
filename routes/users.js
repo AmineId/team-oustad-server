@@ -287,7 +287,6 @@ router.post('/', auth, async (req, res) => {
 
     // Préparer les données utilisateur (gérer fullName ou firstName/lastName)
     const { splitFullName } = require('../utils/nameUtils');
-    const crypto = require('crypto');
     let userData;
     
     if (firstName && lastName) {
