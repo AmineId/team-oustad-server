@@ -59,6 +59,7 @@ async function main() {
         create: [
           {
             displayId: generateUserIdByRole('owner'),
+            uniqueCode: crypto.randomUUID().substring(0, 8).toUpperCase(),
             email: 'owner@teamfitness.com',
             password: ownerPassword,
             fullName: 'Sarah Johnson',
@@ -67,6 +68,7 @@ async function main() {
           },
           {
             displayId: generateUserIdByRole('admin'),
+            uniqueCode: crypto.randomUUID().substring(0, 8).toUpperCase(),
             email: 'admin@teamfitness.com',
             password: hashed,
             fullName: 'Mike Anderson',
@@ -75,6 +77,7 @@ async function main() {
           },
           {
             displayId: generateUserIdByRole('member'),
+            uniqueCode: crypto.randomUUID().substring(0, 8).toUpperCase(),
             email: 'bob@example.com',
             password: memberPassword,
             fullName: 'Bob Williams',
@@ -83,6 +86,7 @@ async function main() {
           },
           {
             displayId: generateUserIdByRole('member'),
+            uniqueCode: crypto.randomUUID().substring(0, 8).toUpperCase(),
             email: 'charlie@example.com',
             password: memberPassword,
             fullName: 'Charlie Brown',
@@ -91,6 +95,7 @@ async function main() {
           },
           {
             displayId: generateUserIdByRole('member'),
+            uniqueCode: crypto.randomUUID().substring(0, 8).toUpperCase(),
             email: 'alice@example.com',
             password: memberPassword,
             fullName: 'Alice Smith',
@@ -114,6 +119,7 @@ async function main() {
         create: [
           {
             displayId: generateUserIdByRole('admin'),
+            uniqueCode: crypto.randomUUID().substring(0, 8).toUpperCase(),
             email: 'admin2@teamfitness.com',
             password: hashed,
             fullName: 'Lisa Martinez',
@@ -122,6 +128,7 @@ async function main() {
           },
           {
             displayId: generateUserIdByRole('member'),
+            uniqueCode: crypto.randomUUID().substring(0, 8).toUpperCase(),
             email: 'david@example.com',
             password: memberPassword,
             fullName: 'David Johnson',
@@ -130,6 +137,7 @@ async function main() {
           },
           {
             displayId: generateUserIdByRole('member'),
+            uniqueCode: crypto.randomUUID().substring(0, 8).toUpperCase(),
             email: 'emma@example.com',
             password: memberPassword,
             fullName: 'Emma Davis',
@@ -491,6 +499,7 @@ async function main() {
   const testMember1User = await prisma.user.create({
     data: {
       displayId: generateUserIdByRole('member'),
+      uniqueCode: crypto.randomUUID().substring(0, 8).toUpperCase(),
       email: 'frank@example.com',
       password: memberPassword,
       fullName: 'Frank Martin',
@@ -529,6 +538,7 @@ async function main() {
   const testMember2User = await prisma.user.create({
     data: {
       displayId: generateUserIdByRole('member'),
+      uniqueCode: crypto.randomUUID().substring(0, 8).toUpperCase(),
       email: 'grace@example.com',
       password: memberPassword,
       fullName: 'Grace Lee',
@@ -568,6 +578,7 @@ async function main() {
   const testMember3User = await prisma.user.create({
     data: {
       displayId: generateUserIdByRole('member'),
+      uniqueCode: crypto.randomUUID().substring(0, 8).toUpperCase(),
       email: 'henry@example.com',
       password: memberPassword,
       fullName: 'Henry Wilson',
@@ -607,6 +618,7 @@ async function main() {
   const testMember4User = await prisma.user.create({
     data: {
       displayId: generateUserIdByRole('member'),
+      uniqueCode: crypto.randomUUID().substring(0, 8).toUpperCase(),
       email: 'iris@example.com',
       password: memberPassword,
       fullName: 'Iris Thompson',
@@ -646,6 +658,7 @@ async function main() {
   const testMember5User = await prisma.user.create({
     data: {
       displayId: generateUserIdByRole('member'),
+      uniqueCode: crypto.randomUUID().substring(0, 8).toUpperCase(),
       email: 'jack@example.com',
       password: memberPassword,
       fullName: 'Jack Brown',
@@ -686,6 +699,7 @@ async function main() {
   const oliviaUser = await prisma.user.create({
     data: {
       displayId: generateUserIdByRole('member'),
+      uniqueCode: crypto.randomUUID().substring(0, 8).toUpperCase(),
       email: 'olivia@example.com',
       password: memberPassword,
       fullName: 'Olivia Martinez',
@@ -1138,6 +1152,7 @@ async function main() {
   const peterUser = await prisma.user.create({
     data: {
       displayId: generateUserIdByRole('member'),
+      uniqueCode: crypto.randomUUID().substring(0, 8).toUpperCase(),
       email: 'peter@example.com',
       password: memberPassword,
       fullName: 'Peter Parker',
@@ -1197,6 +1212,7 @@ async function main() {
   const maryUser = await prisma.user.create({
     data: {
       displayId: generateUserIdByRole('member'),
+      uniqueCode: crypto.randomUUID().substring(0, 8).toUpperCase(),
       email: 'mary@example.com',
       password: memberPassword,
       fullName: 'Mary Jane',
@@ -1257,6 +1273,7 @@ async function main() {
   const nathanUser = await prisma.user.create({
     data: {
       displayId: generateUserIdByRole('member'),
+      uniqueCode: crypto.randomUUID().substring(0, 8).toUpperCase(),
       email: 'nathan@example.com',
       password: memberPassword,
       fullName: 'Nathan Drake',
@@ -1317,6 +1334,7 @@ async function main() {
   const sarahUser = await prisma.user.create({
     data: {
       displayId: generateUserIdByRole('member'),
+      uniqueCode: crypto.randomUUID().substring(0, 8).toUpperCase(),
       email: 'sarah@example.com',
       password: memberPassword,
       fullName: 'Sarah Connor',
