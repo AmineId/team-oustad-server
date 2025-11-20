@@ -79,6 +79,18 @@ const dailyPlanningNotification = cron.schedule('0 6 * * *', async () => {
 
       console.log(`📤 Envoi notification à ${member.fullName} - ${exerciseCount} exercice(s)`);
 
+      // Vérifier que les notifications sont activées au niveau global (User)
+      if (!member.notificationsEnabled) {
+        console.log(`⚠️ ${member.fullName} a désactivé toutes les notifications`);
+        continue;
+      }
+
+      // Vérifier que le membre a activé les notifications d'entraînement spécifiques
+      if (!planning.member.workoutNotificationsEnabled) {
+        console.log(`⚠️ ${member.fullName} a désactivé les notifications d'entraînement`);
+        continue;
+      }
+
       // Vérifier que le membre a un token FCM
       if (!member.fcmToken) {
         console.log(`⚠️ ${member.fullName} n'a pas de FCM token, notification ignorée`);

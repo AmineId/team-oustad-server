@@ -104,6 +104,10 @@ const canAccessMemberProfile = async (req, res, next) => {
  *                 type: string
  *                 description: Base64 encoded profile image
  *                 example: "data:image/jpeg;base64,/9j/4AAQSkZJRg..."
+ *               workoutNotificationsEnabled:
+ *                 type: boolean
+ *                 description: Enable/disable workout session notifications
+ *                 example: true
  *     responses:
  *       200:
  *         description: Profile updated successfully
@@ -119,7 +123,7 @@ router.put('/:id/profile', auth, canAccessMemberProfile, async (req, res) => {
 
   try {
     const memberId = Number(req.params.id);
-    const { birthDate, phone, profession, fitnessLevel, profileImage } = req.body;
+    const { birthDate, phone, profession, fitnessLevel, profileImage, preferredTrainingDays, workoutNotificationsEnabled } = req.body;
 
     const updateData = {};
     
@@ -129,6 +133,15 @@ router.put('/:id/profile', auth, canAccessMemberProfile, async (req, res) => {
     if (phone !== undefined) memberUpdateData.phone = phone;
     if (profession !== undefined) memberUpdateData.profession = profession;
     if (fitnessLevel !== undefined) memberUpdateData.fitnessLevel = fitnessLevel;
+    if (preferredTrainingDays !== undefined) {
+      // Valider que c'est un tableau de nombres entre 0 et 6
+      if (Array.isArray(preferredTrainingDays) && preferredTrainingDays.every(day => typeof day === 'number' && day >= 0 && day <= 6)) {
+        memberUpdateData.preferredTrainingDays = preferredTrainingDays;
+      } else {
+        return res.status(400).json({ error: 'preferredTrainingDays doit être un tableau de nombres entre 0 (dimanche) et 6 (samedi)' });
+      }
+    }
+    if (workoutNotificationsEnabled !== undefined) memberUpdateData.workoutNotificationsEnabled = workoutNotificationsEnabled;
 
     // Mettre à jour la photo de profil dans User
     if (profileImage !== undefined) {
@@ -194,6 +207,8 @@ router.put('/:id/profile', auth, canAccessMemberProfile, async (req, res) => {
         phone: updatedMember.phone,
         profession: updatedMember.profession,
         fitnessLevel: updatedMember.fitnessLevel,
+        preferredTrainingDays: updatedMember.preferredTrainingDays,
+        workoutNotificationsEnabled: updatedMember.workoutNotificationsEnabled,
         joinedAt: updatedMember.joinedAt
       }
     });

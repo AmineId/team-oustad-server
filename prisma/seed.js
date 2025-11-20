@@ -62,35 +62,40 @@ async function main() {
             email: 'owner@teamfitness.com',
             password: ownerPassword,
             fullName: 'Sarah Johnson',
-            role: 'owner'
+            role: 'owner',
+            notificationsEnabled: true
           },
           {
             displayId: generateUserIdByRole('admin'),
             email: 'admin@teamfitness.com',
             password: hashed,
             fullName: 'Mike Anderson',
-            role: 'admin'
+            role: 'admin',
+            notificationsEnabled: true
           },
           {
             displayId: generateUserIdByRole('member'),
             email: 'bob@example.com',
             password: memberPassword,
             fullName: 'Bob Williams',
-            role: 'member'
+            role: 'member',
+            notificationsEnabled: true
           },
           {
             displayId: generateUserIdByRole('member'),
             email: 'charlie@example.com',
             password: memberPassword,
             fullName: 'Charlie Brown',
-            role: 'member'
+            role: 'member',
+            notificationsEnabled: true
           },
           {
             displayId: generateUserIdByRole('member'),
             email: 'alice@example.com',
             password: memberPassword,
             fullName: 'Alice Smith',
-            role: 'member'
+            role: 'member',
+            notificationsEnabled: true
           },
         ],
       },
@@ -112,21 +117,24 @@ async function main() {
             email: 'admin2@teamfitness.com',
             password: hashed,
             fullName: 'Lisa Martinez',
-            role: 'admin'
+            role: 'admin',
+            notificationsEnabled: true
           },
           {
             displayId: generateUserIdByRole('member'),
             email: 'david@example.com',
             password: memberPassword,
             fullName: 'David Johnson',
-            role: 'member'
+            role: 'member',
+            notificationsEnabled: true
           },
           {
             displayId: generateUserIdByRole('member'),
             email: 'emma@example.com',
             password: memberPassword,
             fullName: 'Emma Davis',
-            role: 'member'
+            role: 'member',
+            notificationsEnabled: true
           },
         ],
       },
@@ -228,7 +236,8 @@ async function main() {
   const bobMember = await prisma.member.create({
     data: {
       userId: bobUser.id,
-      uniqueCode: crypto.randomUUID().substring(0, 8).toUpperCase()
+      uniqueCode: crypto.randomUUID().substring(0, 8).toUpperCase(),
+      workoutNotificationsEnabled: true
     }
   });
   console.log(`✅ Member: ${bobUser.fullName}`);
@@ -236,7 +245,8 @@ async function main() {
   const charlieMember = await prisma.member.create({
     data: {
       userId: charlieUser.id,
-      uniqueCode: crypto.randomUUID().substring(0, 8).toUpperCase()
+      uniqueCode: crypto.randomUUID().substring(0, 8).toUpperCase(),
+      workoutNotificationsEnabled: true
     }
   });
   console.log(`✅ Member: ${charlieUser.fullName}`);
@@ -244,7 +254,8 @@ async function main() {
   const aliceMember = await prisma.member.create({
     data: {
       userId: aliceUser.id,
-      uniqueCode: crypto.randomUUID().substring(0, 8).toUpperCase()
+      uniqueCode: crypto.randomUUID().substring(0, 8).toUpperCase(),
+      workoutNotificationsEnabled: true
     }
   });
   console.log(`✅ Member: ${aliceUser.fullName}`);
@@ -252,7 +263,8 @@ async function main() {
   const davidMember = await prisma.member.create({
     data: {
       userId: davidUser.id,
-      uniqueCode: crypto.randomUUID().substring(0, 8).toUpperCase()
+      uniqueCode: crypto.randomUUID().substring(0, 8).toUpperCase(),
+      workoutNotificationsEnabled: true
     }
   });
   console.log(`✅ Member: ${davidUser.fullName}`);
@@ -260,7 +272,8 @@ async function main() {
   const emmaMember = await prisma.member.create({
     data: {
       userId: emmaUser.id,
-      uniqueCode: crypto.randomUUID().substring(0, 8).toUpperCase()
+      uniqueCode: crypto.randomUUID().substring(0, 8).toUpperCase(),
+      workoutNotificationsEnabled: false
     }
   });
   console.log(`✅ Member: ${emmaUser.fullName}\n`);
@@ -482,13 +495,15 @@ async function main() {
       password: memberPassword,
       fullName: 'Frank Martin',
       role: 'member',
-      gymId: gym1.id
+      gymId: gym1.id,
+      notificationsEnabled: true
     }
   });
   const testMember1 = await prisma.member.create({
     data: {
       userId: testMember1User.id,
-      uniqueCode: crypto.randomUUID().substring(0, 8).toUpperCase()
+      uniqueCode: crypto.randomUUID().substring(0, 8).toUpperCase(),
+      workoutNotificationsEnabled: true
     }
   });
   
@@ -518,13 +533,15 @@ async function main() {
       password: memberPassword,
       fullName: 'Grace Lee',
       role: 'member',
-      gymId: gym2.id
+      gymId: gym2.id,
+      notificationsEnabled: true
     }
   });
   const testMember2 = await prisma.member.create({
     data: {
       userId: testMember2User.id,
-      uniqueCode: crypto.randomUUID().substring(0, 8).toUpperCase()
+      uniqueCode: crypto.randomUUID().substring(0, 8).toUpperCase(),
+      workoutNotificationsEnabled: true
     }
   });
   
@@ -555,13 +572,15 @@ async function main() {
       password: memberPassword,
       fullName: 'Henry Wilson',
       role: 'member',
-      gymId: gym1.id
+      gymId: gym1.id,
+      notificationsEnabled: true
     }
   });
   const testMember3 = await prisma.member.create({
     data: {
       userId: testMember3User.id,
-      uniqueCode: crypto.randomUUID().substring(0, 8).toUpperCase()
+      uniqueCode: crypto.randomUUID().substring(0, 8).toUpperCase(),
+      workoutNotificationsEnabled: true
     }
   });
   
@@ -592,13 +611,15 @@ async function main() {
       password: memberPassword,
       fullName: 'Iris Thompson',
       role: 'member',
-      gymId: gym2.id
+      gymId: gym2.id,
+      notificationsEnabled: true
     }
   });
   const testMember4 = await prisma.member.create({
     data: {
       userId: testMember4User.id,
-      uniqueCode: crypto.randomUUID().substring(0, 8).toUpperCase()
+      uniqueCode: crypto.randomUUID().substring(0, 8).toUpperCase(),
+      workoutNotificationsEnabled: true
     }
   });
   
@@ -629,13 +650,15 @@ async function main() {
       password: memberPassword,
       fullName: 'Jack Brown',
       role: 'member',
-      gymId: gym1.id
+      gymId: gym1.id,
+      notificationsEnabled: true
     }
   });
   const testMember5 = await prisma.member.create({
     data: {
       userId: testMember5User.id,
-      uniqueCode: crypto.randomUUID().substring(0, 8).toUpperCase()
+      uniqueCode: crypto.randomUUID().substring(0, 8).toUpperCase(),
+      workoutNotificationsEnabled: true
     }
   });
   
@@ -668,12 +691,14 @@ async function main() {
       fullName: 'Olivia Martinez',
       role: 'member',
       gymId: gym1.id,
+      notificationsEnabled: true
     }
   });
   
   const oliviaMember = await prisma.member.create({
     data: {
       userId: oliviaUser.id,
+      workoutNotificationsEnabled: true
     }
   });
 
@@ -1117,13 +1142,15 @@ async function main() {
       password: memberPassword,
       fullName: 'Peter Parker',
       role: 'member',
-      gymId: gym1.id
+      gymId: gym1.id,
+      notificationsEnabled: true
     }
   });
   const peterMember = await prisma.member.create({
     data: {
       userId: peterUser.id,
-      uniqueCode: crypto.randomUUID().substring(0, 8).toUpperCase()
+      uniqueCode: crypto.randomUUID().substring(0, 8).toUpperCase(),
+      workoutNotificationsEnabled: true
     }
   });
   
@@ -1174,13 +1201,15 @@ async function main() {
       password: memberPassword,
       fullName: 'Mary Jane',
       role: 'member',
-      gymId: gym1.id
+      gymId: gym1.id,
+      notificationsEnabled: true
     }
   });
   const maryMember = await prisma.member.create({
     data: {
       userId: maryUser.id,
-      uniqueCode: crypto.randomUUID().substring(0, 8).toUpperCase()
+      uniqueCode: crypto.randomUUID().substring(0, 8).toUpperCase(),
+      workoutNotificationsEnabled: true
     }
   });
   
@@ -1232,13 +1261,15 @@ async function main() {
       password: memberPassword,
       fullName: 'Nathan Drake',
       role: 'member',
-      gymId: gym2.id
+      gymId: gym2.id,
+      notificationsEnabled: true
     }
   });
   const nathanMember = await prisma.member.create({
     data: {
       userId: nathanUser.id,
-      uniqueCode: crypto.randomUUID().substring(0, 8).toUpperCase()
+      uniqueCode: crypto.randomUUID().substring(0, 8).toUpperCase(),
+      workoutNotificationsEnabled: true
     }
   });
   
@@ -1290,13 +1321,15 @@ async function main() {
       password: memberPassword,
       fullName: 'Sarah Connor',
       role: 'member',
-      gymId: gym2.id
+      gymId: gym2.id,
+      notificationsEnabled: true
     }
   });
   const sarahMember = await prisma.member.create({
     data: {
       userId: sarahUser.id,
-      uniqueCode: crypto.randomUUID().substring(0, 8).toUpperCase()
+      uniqueCode: crypto.randomUUID().substring(0, 8).toUpperCase(),
+      workoutNotificationsEnabled: true
     }
   });
   

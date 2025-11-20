@@ -20,6 +20,7 @@ model User {
   qrCode      Bytes?   // Image QR code générée et stockée
   profileImage Bytes?  // Photo de profil de l'utilisateur
   fcmToken    String?  // Token Firebase Cloud Messaging pour les notifications push
+  notificationsEnabled Boolean @default(true) // Activer/désactiver toutes les notifications (switch général)
   lastLoginAt DateTime? // Date de la dernière connexion (null = jamais connecté)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
@@ -79,12 +80,19 @@ model Member {
   user        User     @relation(fields: [userId], references: [id])
   uniqueCode  String   @unique @default(cuid()) // Code unique pour QR code
   joinedAt    DateTime @default(now())
+  onboarding  Boolean  @default(true) // True jusqu'à ce que le membre complète l'onboarding
   
   // Nouvelles informations personnelles
   birthDate    DateTime? // Date de naissance
   phone        String?   // Numéro de téléphone
   profession   String?   // "Actif" ou "Etudiant"
   fitnessLevel String?   // debutant, intermediaire, avance, expert, athletique
+  
+  // Préférences d'entraînement
+  preferredTrainingDays Int[] @default([]) // Jours préférés pour s'entraîner (0=dimanche, 1=lundi, ..., 6=samedi)
+  
+  // Préférences de notifications
+  workoutNotificationsEnabled Boolean @default(true) // Activer/désactiver les notifications de séances à venir
   
   // Relations
   payments      Payment[]

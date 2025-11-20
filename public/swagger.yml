@@ -269,9 +269,9 @@ components:
         token:
           type: string
           example: eyJhbGciOiJIUzI1NiIs...
-        isFirstLogin:
+        onboarding:
           type: boolean
-          description: Indique si c'est la première connexion de l'utilisateur (true si lastLoginAt était null)
+          description: Indique si le membre doit compléter l'onboarding (true pour les nouveaux membres uniquement)
           example: true
         user:
           $ref: '#/components/schemas/User'

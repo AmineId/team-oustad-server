@@ -139,9 +139,9 @@ router.post('/login', async (req, res) => {
 
     console.log(`✅ Connexion réussie pour: ${user.fullName} (${user.role})`);
 
-    // Détecter si c'est la première connexion
-    const isFirstLogin = !user.lastLoginAt;
-    console.log(`🔔 Première connexion: ${isFirstLogin ? 'OUI ✨' : 'NON'}`);
+    // Récupérer le statut onboarding du membre (seulement pour les membres)
+    const onboarding = user.role === 'member' ? (user.member?.onboarding || false) : false;
+    console.log(`🔔 Onboarding requis: ${onboarding ? 'OUI ✨' : 'NON'}`);
 
     // Mettre à jour la date de dernière connexion
     await prisma.user.update({
@@ -162,8 +162,9 @@ router.post('/login', async (req, res) => {
     if (user.role === 'admin') {
       console.log(`👨‍💼 Réponse admin préparée pour: ${user.fullName}`);
       const responseData = {
+        
         token,
-        isFirstLogin,
+        onboarding,
         user: {
           id: user.id,
           displayId: user.displayId,
@@ -188,7 +189,7 @@ router.post('/login', async (req, res) => {
       console.log(`👑 Réponse owner préparée pour: ${user.fullName}`);
       const responseData = {
         token,
-        isFirstLogin,
+        onboarding,
         user: {
           id: user.id,
           displayId: user.displayId,
@@ -219,7 +220,7 @@ router.post('/login', async (req, res) => {
       console.log(`👤 Réponse membre préparée pour: ${user.fullName}`);
       const responseData = {
         token,
-        isFirstLogin,
+        onboarding,
         user: {
           id: user.id,
           displayId: user.displayId,
@@ -233,10 +234,12 @@ router.post('/login', async (req, res) => {
           createdAt: user.createdAt,
           updatedAt: user.updatedAt,
           member: {
+            onboarding: user.member?.onboarding,
             birthDate: user.member?.birthDate,
             phone: user.member?.phone,
             profession: user.member?.profession,
             fitnessLevel: user.member?.fitnessLevel,
+            preferredTrainingDays: user.member?.preferredTrainingDays,
             joinedAt: user.member?.joinedAt,
           },
           subscriptions: user.member?.subscriptions || [],
