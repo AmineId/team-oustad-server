@@ -796,6 +796,10 @@ router.delete('/fcm-token', auth, async (req, res) => {
  *                 minLength: 6
  *                 description: New password
  *                 example: "newpassword123"
+ *               notificationsEnabled:
+ *                 type: boolean
+ *                 description: Enable/disable all notifications (global switch)
+ *                 example: true
  *               permissions:
  *                 type: object
  *                 description: Updated permissions for owner role
@@ -860,7 +864,7 @@ router.put('/:id', auth, async (req, res) => {
       return res.status(400).json({ error: 'Invalid user ID' });
     }
     
-    const { email, fullName, password, permissions } = req.body;
+    const { email, fullName, password, notificationsEnabled, permissions } = req.body;
 
     const requester = await prisma.user.findUnique({ where: { id: req.user.sub } });
     if (!requester) return res.status(403).json({ error: 'Forbidden' });
@@ -889,6 +893,7 @@ router.put('/:id', auth, async (req, res) => {
     if (email) updateData.email = email;
     if (fullName) updateData.fullName = fullName;
     if (password) updateData.password = await bcrypt.hash(password, 10);
+    if (notificationsEnabled !== undefined) updateData.notificationsEnabled = notificationsEnabled;
 
     const updatedUser = await prisma.user.update({
       where: { id },
