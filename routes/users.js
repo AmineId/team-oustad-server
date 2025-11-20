@@ -316,7 +316,7 @@ router.post('/', auth, async (req, res) => {
         gymId,
       },
       include: {
-        gym: true
+        Gym: true
       }
     });
 
