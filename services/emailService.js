@@ -11,6 +11,19 @@ const transporter = nodemailer.createTransport({
   },
   tls: {
     rejectUnauthorized: false // Pour éviter les erreurs de certificat en dev
+  },
+  // Configuration additionnelle pour debug
+  debug: process.env.NODE_ENV !== 'production', // Active le debug en dev/preprod
+  logger: process.env.NODE_ENV !== 'production', // Active les logs en dev/preprod
+});
+
+// Vérifier la connexion SMTP au démarrage
+transporter.verify(function(error, success) {
+  if (error) {
+    console.error('❌ Erreur de configuration SMTP:', error);
+    console.error('   Vérifiez vos variables SMTP_HOST, SMTP_USER, SMTP_PASS');
+  } else {
+    console.log('✅ Serveur SMTP prêt à envoyer des emails');
   }
 });
 
