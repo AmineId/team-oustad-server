@@ -206,36 +206,36 @@ router.post('/login', async (req, res) => {
       user = await prisma.user.findUnique({
         where: { email: sanitizedEmail },
         include: {
-          admin: true,
-          member: {
+          Admin: true,
+          Member: {
             include: {
-              subscriptions: {
+              Subscription: {
                 include: {
-                  payments: true
+                  Payment: true
                 }
               },
-              payments: true
+              Payment: true
             }
           },
-          gym: true
+          Gym: true
         }
       });
     } else if (phoneNumber) {
       user = await prisma.user.findUnique({
         where: { phoneNumber: phoneNumber },
         include: {
-          admin: true,
-          member: {
+          Admin: true,
+          Member: {
             include: {
-              subscriptions: {
+              Subscription: {
                 include: {
-                  payments: true
+                  Payment: true
                 }
               },
-              payments: true
+              Payment: true
             }
           },
-          gym: true
+          Gym: true
         }
       });
     }
@@ -259,7 +259,7 @@ router.post('/login', async (req, res) => {
     console.log(`✅ Connexion réussie pour: ${user.fullName} (${user.role})`);
 
     // Récupérer le statut onboarding du membre (seulement pour les membres)
-    const onboarding = user.role === 'member' ? (user.member?.onboarding || false) : false;
+    const onboarding = user.role === 'member' ? (user.Member?.onboarding || false) : false;
     console.log(`🔔 Onboarding requis: ${onboarding ? 'OUI ✨' : 'NON'}`);
 
     // Mettre à jour la date de dernière connexion
@@ -293,7 +293,7 @@ router.post('/login', async (req, res) => {
           fullName: user.fullName,
           role: user.role,
           gymId: user.gymId,
-          gym: user.gym,
+          gym: user.Gym,
           fcmToken: user.fcmToken,
           lastLoginAt: user.lastLoginAt,
           createdAt: user.createdAt,
@@ -319,16 +319,16 @@ router.post('/login', async (req, res) => {
           fullName: user.fullName,
           role: user.role,
           gymId: user.gymId,
-          gym: user.gym,
+          gym: user.Gym,
           fcmToken: user.fcmToken,
           lastLoginAt: user.lastLoginAt,
           createdAt: user.createdAt,
           updatedAt: user.updatedAt,
           permissions: {
-            canManageAdmins: user.owner?.canManageAdmins || false,
-            canManageGyms: user.owner?.canManageGyms || false,
-            canViewReports: user.owner?.canViewReports || false,
-            maxGymsAllowed: user.owner?.maxGymsAllowed || 0,
+            canManageAdmins: user.Owner?.canManageAdmins || false,
+            canManageGyms: user.Owner?.canManageGyms || false,
+            canViewReports: user.Owner?.canViewReports || false,
+            maxGymsAllowed: user.Owner?.maxGymsAllowed || 0,
           },
           type: 'owner'
         }
@@ -351,22 +351,22 @@ router.post('/login', async (req, res) => {
           fullName: user.fullName,
           role: user.role,
           gymId: user.gymId,
-          gym: user.gym,
+          gym: user.Gym,
           fcmToken: user.fcmToken,
           lastLoginAt: user.lastLoginAt,
           createdAt: user.createdAt,
           updatedAt: user.updatedAt,
           member: {
-            onboarding: user.member?.onboarding,
-            birthDate: user.member?.birthDate,
-            phone: user.member?.phone,
-            profession: user.member?.profession,
-            fitnessLevel: user.member?.fitnessLevel,
-            preferredTrainingDays: user.member?.preferredTrainingDays,
-            joinedAt: user.member?.joinedAt,
+            onboarding: user.Member?.onboarding,
+            birthDate: user.Member?.birthDate,
+            phone: user.Member?.phone,
+            profession: user.Member?.profession,
+            fitnessLevel: user.Member?.fitnessLevel,
+            preferredTrainingDays: user.Member?.preferredTrainingDays,
+            joinedAt: user.Member?.joinedAt,
           },
-          subscriptions: user.member?.subscriptions || [],
-          payments: user.member?.payments || [],
+          subscriptions: user.Member?.Subscription || [],
+          payments: user.Member?.Payment || [],
           type: 'member'
         }
       };
@@ -473,12 +473,12 @@ router.post('/scan-qr', auth, async (req, res) => {
     const member = await prisma.user.findFirst({
       where: { displayId: qrCode },
       include: {
-        member: {
+        Member: {
           include: {
-            subscriptions: {
+            Subscription: {
               where: { status: 'active' },
               include: {
-                payments: {
+                Payment: {
                   orderBy: { createdAt: 'desc' },
                   take: 1 // Dernier paiement de l'abonnement
                 }
@@ -486,7 +486,7 @@ router.post('/scan-qr', auth, async (req, res) => {
             },
           }
         },
-        gym: true
+        Gym: true
       }
     });
 
@@ -508,7 +508,7 @@ router.post('/scan-qr', auth, async (req, res) => {
 
     // Vérifier l'abonnement actif pour les membres
     if (member.role === 'member') {
-      const activeSubscription = getActiveSubscription(member.member);
+      const activeSubscription = getActiveSubscription(member.Member);
 
       if (!activeSubscription) {
         console.log(`❌ Membre ${member.fullName} n'a pas d'abonnement actif`);
@@ -531,7 +531,7 @@ router.post('/scan-qr', auth, async (req, res) => {
     // Enregistrer l'accès
     await prisma.accessLog.create({
       data: {
-        memberId: member.member.userId,
+        memberId: member.Member.userId,
         adminId: req.user.sub,
         gymId: req.user.gymId,
         accessType: 'qr_scan'
@@ -627,26 +627,26 @@ router.get('/me', auth, async (req, res) => {
     const user = await prisma.user.findUnique({
       where: { id: req.user.sub },
       include: {
-        gym: true,
-        admin: true,
-        member: {
+        Gym: true,
+        Admin: true,
+        Member: {
           include: {
-            subscriptions: {
+            Subscription: {
               where: { status: 'active' },
               include: {
-                payments: {
+                Payment: {
                   orderBy: { createdAt: 'desc' },
                   take: 5 // Derniers 5 paiements liés à l'abonnement
                 }
               }
             },
-            payments: {
+            Payment: {
               orderBy: { createdAt: 'desc' },
               take: 10 // Derniers 10 paiements du membre
             }
           }
         },
-        owner: true
+        Owner: true
       }
     });
 
@@ -666,7 +666,7 @@ router.get('/me', auth, async (req, res) => {
         email: user.email,
         fullName: user.fullName,
         uniqueCode: user.uniqueCode,
-        gym: user.gym,
+        gym: user.Gym,
         type: 'admin'
       });
       console.log(`📤 Réponse /me admin:`, responseData);
@@ -715,10 +715,10 @@ router.get('/me', auth, async (req, res) => {
         uniqueCode: user.uniqueCode,
         gyms: gymsWithStats,
         permissions: {
-          canManageAdmins: user.owner?.canManageAdmins || false,
-          canManageGyms: user.owner?.canManageGyms || false,
-          canViewReports: user.owner?.canViewReports || false,
-          maxGymsAllowed: user.owner?.maxGymsAllowed || 0,
+          canManageAdmins: user.Owner?.canManageAdmins || false,
+          canManageGyms: user.Owner?.canManageGyms || false,
+          canViewReports: user.Owner?.canViewReports || false,
+          maxGymsAllowed: user.Owner?.maxGymsAllowed || 0,
         },
         type: 'owner'
       });
@@ -730,8 +730,8 @@ router.get('/me', auth, async (req, res) => {
     } else if (user.role === 'member') {
       console.log(`👤 Réponse membre pour: ${user.fullName}`);
       // Pour les membres : abonnement actif + derniers paiements
-      const activeSubscription = getActiveSubscription(user.member);
-      const subscriptionsWithStatus = getSubscriptionsWithStatus(user.member);
+      const activeSubscription = getActiveSubscription(user.Member);
+      const subscriptionsWithStatus = getSubscriptionsWithStatus(user.Member);
 
       const responseData = formatUser({
         id: user.id,
@@ -739,10 +739,10 @@ router.get('/me', auth, async (req, res) => {
         email: user.email,
         fullName: user.fullName,
         uniqueCode: user.uniqueCode,
-        gym: user.gym,
+        gym: user.Gym,
         activeSubscription: activeSubscription,
         subscriptions: subscriptionsWithStatus,
-        recentPayments: user.member?.payments || [],
+        recentPayments: user.Member?.Payment || [],
         type: 'member'
       });
       console.log(`📤 Réponse /me membre:`, {
@@ -1145,7 +1145,7 @@ router.post('/send-setup-email', auth, async (req, res) => {
         id: user.id,
         email: user.email,
         fullName: user.fullName,
-        gym: user.gym.name
+        gym: user.Gym.name
       }
     });
   } catch (e) {
