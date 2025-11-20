@@ -194,7 +194,8 @@ router.put('/:id/profile', auth, canAccessMemberProfile, async (req, res) => {
           select: {
             id: true,
             email: true,
-            fullName: true,
+            firstName: true,
+              lastName: true,
             displayId: true
           }
         }
@@ -333,7 +334,8 @@ router.post('/:id/goals', auth, canAccessMemberProfile, async (req, res) => {
             user: {
               select: {
                 id: true,
-                fullName: true,
+                firstName: true,
+              lastName: true,
                 email: true
               }
             }
@@ -536,7 +538,7 @@ router.post('/:id/measurements', auth, canAccessMemberProfile, async (req, res) 
             user: {
               select: {
                 id: true,
-                fullName: true
+                firstName: true, lastName: true
               }
             }
           }

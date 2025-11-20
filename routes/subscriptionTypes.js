@@ -252,7 +252,8 @@ router.get('/:id/subscriptions', auth, async (req, res) => {
             user: {
               select: {
                 id: true,
-                fullName: true,
+                firstName: true,
+              lastName: true,
                 email: true
               }
             }
