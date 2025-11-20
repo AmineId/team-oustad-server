@@ -314,6 +314,9 @@ router.post('/', auth, async (req, res) => {
         ...userData,
         role,
         gymId,
+      },
+      include: {
+        gym: true
       }
     });
 
@@ -361,7 +364,10 @@ router.post('/', auth, async (req, res) => {
       console.log(`✅ Profil admin créé pour ${getFullName(user)}`);
     } else if (role === 'member') {
       await prisma.member.create({
-        data: { userId: user.id }
+        data: { 
+          userId: user.id,
+          uniqueCode: user.uniqueCode
+        }
       });
       console.log(`✅ Profil member créé pour ${getFullName(user)}`);
     } else if (role === 'owner') {
