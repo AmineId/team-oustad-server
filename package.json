@@ -26,7 +26,8 @@
     "test:full": "./tests/integration/run-full-test.sh",
     "tunnel": "./bin/start-tunnel.sh",
     "check:swagger": "node scripts/maintenance/check-swagger.js",
-    "check:codes": "node scripts/maintenance/check-unique-codes.js"
+    "check:codes": "node scripts/maintenance/check-unique-codes.js",
+    "pm2:restart:preprod": "npx prisma generate && pm2 restart teamfitness-preprod"
   },
   "keywords": [],
   "author": "",
