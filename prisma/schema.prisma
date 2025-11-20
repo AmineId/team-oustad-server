@@ -25,6 +25,9 @@ model Exercise {
   updatedAt            DateTime @updatedAt
   displayId        String             @unique
   PlanningExercise PlanningExercise[]
+
+  @@index([category])
+  @@index([difficulty])
 }
 
 model Gym {
@@ -38,6 +41,8 @@ model Gym {
   displayId   String        @unique
   OpeningHour OpeningHour[]
   User        User[]
+
+  @@index([name])
 }
 
 model Member {
@@ -75,6 +80,9 @@ model MemberGoal {
   createdAt    DateTime  @default(now())
   updatedAt            DateTime @updatedAt
   Member       Member    @relation(fields: [memberId], references: [userId], onDelete: Cascade)
+
+  @@index([memberId])
+  @@index([status])
 }
 
 model MemberMeasurement {
@@ -151,6 +159,12 @@ model Payment {
   displayId      String        @unique
   Member         Member        @relation(fields: [memberId], references: [userId])
   Subscription   Subscription? @relation(fields: [subscriptionId], references: [id])
+
+  @@index([memberId])
+  @@index([subscriptionId])
+  @@index([status])
+  @@index([dueDate])
+  @@index([memberId, status])
 }
 
 model Planning {
@@ -168,6 +182,11 @@ model Planning {
   User        User          @relation(fields: [coachId], references: [id])
   Member      Member        @relation(fields: [memberId], references: [userId])
   PlanningDay PlanningDay[]
+
+  @@index([memberId])
+  @@index([coachId])
+  @@index([status])
+  @@index([startDate, endDate])
 }
 
 model PlanningDay {
@@ -212,6 +231,12 @@ model Subscription {
   Payment            Payment[]
   Member             Member           @relation(fields: [memberId], references: [userId])
   SubscriptionType   SubscriptionType @relation(fields: [subscriptionTypeId], references: [id])
+
+  @@index([memberId])
+  @@index([status])
+  @@index([subscriptionTypeId])
+  @@index([startDate, endDate])
+  @@index([memberId, status])
 }
 
 model SubscriptionType {
@@ -225,6 +250,9 @@ model SubscriptionType {
   updatedAt            DateTime @updatedAt
   displayId    String         @unique
   Subscription Subscription[]
+
+  @@index([isActive])
+  @@index([name])
 }
 
 model User {
@@ -250,4 +278,9 @@ model User {
   PasswordResetToken   PasswordResetToken[]
   Planning             Planning[]
   Gym                  Gym                  @relation(fields: [gymId], references: [id])
+
+  @@index([gymId])
+  @@index([role])
+  @@index([gymId, role])
+  @@index([lastLoginAt])
 }
