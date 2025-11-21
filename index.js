@@ -48,6 +48,12 @@ app.use('/android', androidRoutes);
 app.use('/members', membersRoutes);
 console.log('✅ Routes configurées: /gyms, /users, /auth, /plannings, /subscriptions, /subscription-types, /android, /members');
 
+// Redirection Beta Download vers Google Play Internal Testing
+app.get('/beta/download', (req, res) => {
+  console.log('🔄 Redirection /beta/download vers Google Play Internal Testing');
+  res.redirect(301, 'https://play.google.com/apps/internaltest/4700178556172561963');
+});
+
 // Health check (DB + server)
 app.get('/health', async (req, res) => {
   console.log('🏥 Health check demandé');
