@@ -120,7 +120,7 @@ async function handleDownload(req, res, channel) {
     // Pour le canal beta, rediriger vers Google Play Internal Testing
     if (channel === 'beta') {
       console.log(`🔄 Redirecting beta download to Google Play Internal Testing`);
-      return res.redirect(301, 'https://play.google.com/store/apps/details?id=team.fitness.team_fitness_app&hl=en-US&ah=97EU213tjbmnn9POyHV8HPW1_EI');
+      return res.redirect(301, 'https://play.google.com/store/apps/details?id=team.fitness.team_fitness_app');
     }
 
     const channelPath = getChannelPath(channel);
