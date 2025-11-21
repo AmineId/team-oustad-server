@@ -46,10 +46,10 @@ function formatWithUserRelations(obj) {
   
   // Formater member si présent
   if (formatted.member) {
-    if (formatted.member.user) {
-      formatted.member.user = formatUser(formatted.member.user);
-      formatted.member.userId = formatted.member.user.displayId;
-      formatted.member.memberId = formatted.member.user.displayId;
+    if (formatted.member.User) {
+      formatted.member.User = formatUser(formatted.member.User);
+      formatted.member.userId = formatted.member.User.displayId;
+      formatted.member.memberId = formatted.member.User.displayId;
     }
   }
   
@@ -93,9 +93,9 @@ function formatPlanning(planning) {
   const formatted = { ...planning };
   
   // Formater member
-  if (formatted.member?.user) {
-    formatted.member.user = formatUser(formatted.member.user);
-    formatted.memberId = formatted.member.user.displayId;
+  if (formatted.member?.User) {
+    formatted.member.User = formatUser(formatted.member.User);
+    formatted.memberId = formatted.member.User.displayId;
   }
   
   // Formater coach
@@ -118,9 +118,9 @@ function formatSubscription(subscription) {
   const formatted = { ...subscription };
   
   // Formater member
-  if (formatted.member?.user) {
-    formatted.member.user = formatUser(formatted.member.user);
-    formatted.memberId = formatted.member.user.displayId;
+  if (formatted.member?.User) {
+    formatted.member.User = formatUser(formatted.member.User);
+    formatted.memberId = formatted.member.User.displayId;
   }
   
   return formatted;
@@ -137,9 +137,9 @@ function formatPayment(payment) {
   const formatted = { ...payment };
   
   // Formater member
-  if (formatted.member?.user) {
-    formatted.member.user = formatUser(formatted.member.user);
-    formatted.memberId = formatted.member.user.displayId;
+  if (formatted.member?.User) {
+    formatted.member.User = formatUser(formatted.member.User);
+    formatted.memberId = formatted.member.User.displayId;
   }
   
   // Formater subscription si présent

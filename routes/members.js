@@ -190,7 +190,7 @@ router.put('/:id/profile', auth, canAccessMemberProfile, async (req, res) => {
     const updatedMember = await prisma.member.findUnique({
       where: { userId: memberId },
       include: {
-        user: {
+        User: {
           select: {
             id: true,
             email: true,
@@ -202,17 +202,17 @@ router.put('/:id/profile', auth, canAccessMemberProfile, async (req, res) => {
       }
     });
 
-    console.log(`✅ Profil membre mis à jour pour ${getFullName(updatedMember.user)}`);
+    console.log(`✅ Profil membre mis à jour pour ${getFullName(updatedMember.User)}`);
 
     res.json({
       message: 'Profil membre mis à jour avec succès',
       member: {
         userId: updatedMember.userId,
-        email: updatedMember.user.email,
-        firstName: updatedMember.user.firstName,
-        lastName: updatedMember.user.lastName,
-        fullName: getFullName(updatedMember.user),
-        displayId: updatedMember.user.displayId,
+        email: updatedMember.User.email,
+        firstName: updatedMember.User.firstName,
+        lastName: updatedMember.User.lastName,
+        fullName: getFullName(updatedMember.User),
+        displayId: updatedMember.User.displayId,
         birthDate: updatedMember.birthDate,
         phone: updatedMember.phone,
         profession: updatedMember.profession,
@@ -333,7 +333,7 @@ router.post('/:id/goals', auth, canAccessMemberProfile, async (req, res) => {
       include: {
         member: {
           include: {
-            user: {
+            User: {
               select: {
                 id: true,
                 firstName: true,
@@ -346,7 +346,7 @@ router.post('/:id/goals', auth, canAccessMemberProfile, async (req, res) => {
       }
     });
 
-    console.log(`✅ Objectif créé pour ${getFullName(goal.member.user)}: ${goal.title}`);
+    console.log(`✅ Objectif créé pour ${getFullName(goal.member.User)}: ${goal.title}`);
 
     res.status(201).json({
       message: 'Objectif créé avec succès',
@@ -537,7 +537,7 @@ router.post('/:id/measurements', auth, canAccessMemberProfile, async (req, res) 
       include: {
         member: {
           include: {
-            user: {
+            User: {
               select: {
                 id: true,
                 firstName: true, lastName: true
@@ -548,7 +548,7 @@ router.post('/:id/measurements', auth, canAccessMemberProfile, async (req, res) 
       }
     });
 
-    console.log(`✅ Mesure créée pour ${getFullName(measurement.member.user)}`);
+    console.log(`✅ Mesure créée pour ${getFullName(measurement.member.User)}`);
 
     res.status(201).json({
       message: 'Mesure créée avec succès',

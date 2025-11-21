@@ -25,7 +25,7 @@ async function testSubscriptionSystem() {
     console.log('1️⃣ Recherche d\'un membre de test...');
     const member = await prisma.member.findFirst({
       include: {
-        user: true
+        User: true
       }
     });
     
@@ -34,7 +34,7 @@ async function testSubscriptionSystem() {
       return;
     }
     
-    console.log(`✅ Membre trouvé: ${getFullName(member.user)} (ID: ${member.userId})\n`);
+    console.log(`✅ Membre trouvé: ${getFullName(member.User)} (ID: ${member.userId})\n`);
     
     // 2. Créer un abonnement annuel
     console.log('2️⃣ Création d\'un abonnement annuel avec 12 paiements...');

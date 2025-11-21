@@ -28,9 +28,10 @@ pids
 *.pid.lock
 
 # Coverage
-coverage
+coverage/
 *.lcov
 .nyc_output
+.jest-cache/
 
 # Build output
 dist
@@ -95,6 +96,8 @@ firebase-service-account-prod.json
 # Test data
 test-results/
 *.test.db
+tests/**/*.log
+tests/coverage/
 
 # Cache
 .cache/
