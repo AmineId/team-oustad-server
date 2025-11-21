@@ -551,10 +551,10 @@ router.get('/', auth, async (req, res) => {
         },
         User: { select: { id: true, firstName: true,
               lastName: true, email: true } },
-        days: {
+        PlanningDay: {
           include: {
-            exercises: {
-              include: { exercise: true },
+            PlanningExercise: {
+              include: { Exercise: true },
               orderBy: { order: 'asc' }
             }
           },
@@ -571,7 +571,7 @@ router.get('/', auth, async (req, res) => {
         title: p.title,
         member: getFullName(p.member.User),
         status: p.status,
-        daysCount: p.days.length
+        daysCount: p.PlanningDay.length
       })));
     }
 
@@ -1271,10 +1271,10 @@ router.get('/member/:memberId', auth, async (req, res) => {
       include: {
         User: { select: { id: true, firstName: true,
               lastName: true, email: true } },
-        days: {
+        PlanningDay: {
           include: {
-            exercises: {
-              include: { exercise: true },
+            PlanningExercise: {
+              include: { Exercise: true },
               orderBy: { order: 'asc' }
             }
           },
@@ -1291,8 +1291,8 @@ router.get('/member/:memberId', auth, async (req, res) => {
         title: p.title,
         coach: getFullName(p.User),
         status: p.status,
-        daysCount: p.days.length,
-        exercisesCount: p.days.reduce((sum, day) => sum + day.exercises.length, 0)
+        daysCount: p.PlanningDay.length,
+        exercisesCount: p.PlanningDay.reduce((sum, day) => sum + day.PlanningExercise.length, 0)
       })));
     }
 
@@ -1543,10 +1543,10 @@ router.get('/next-day/:memberId', auth, async (req, res) => {
       include: {
         User: { select: { id: true, firstName: true,
               lastName: true, email: true } },
-        days: {
+        PlanningDay: {
           include: {
-            exercises: {
-              include: { exercise: true },
+            PlanningExercise: {
+              include: { Exercise: true },
               orderBy: { order: 'asc' }
             }
           },
@@ -1569,17 +1569,17 @@ router.get('/next-day/:memberId', auth, async (req, res) => {
     }
 
     console.log(`✅ Planning actif trouvé: ${activePlanning.title} (ID: ${activePlanning.id})`);
-    console.log(`📊 Planning détails: ${activePlanning.days.length} jours définis, Coach: ${getFullName(activePlanning.User)}`);
+    console.log(`📊 Planning détails: ${activePlanning.PlanningDay.length} jours définis, Coach: ${getFullName(activePlanning.User)}`);
     
     const dayNames = ['Dimanche', 'Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi'];
     
     // Chercher d'abord les exercices pour aujourd'hui
     console.log(`🔍 Recherche exercices pour aujourd'hui (jour ${currentDayOfWeek})`);
-    const todayDay = activePlanning.days.find(day => day.dayOfWeek === currentDayOfWeek);
+    const todayDay = activePlanning.PlanningDay.find(day => day.dayOfWeek === currentDayOfWeek);
 
-    if (todayDay && todayDay.exercises.length > 0) {
-      console.log(`✅ Entraînement trouvé pour aujourd'hui: ${dayNames[todayDay.dayOfWeek]} (${today.toISOString().split('T')[0]}) - ${todayDay.exercises.length} exercice(s)`);
-      console.log(`📋 Liste exercices:`, todayDay.exercises.map(ex => `${ex.exercise.name} (${ex.sets}x${ex.reps})`));
+    if (todayDay && todayDay.PlanningExercise.length > 0) {
+      console.log(`✅ Entraînement trouvé pour aujourd'hui: ${dayNames[todayDay.dayOfWeek]} (${today.toISOString().split('T')[0]}) - ${todayDay.PlanningExercise.length} exercice(s)`);
+      console.log(`📋 Liste exercices:`, todayDay.PlanningExercise.map(ex => `${ex.Exercise.name} (${ex.sets}x${ex.reps})`));
 
       const responseData = {
         member: {
@@ -1597,8 +1597,8 @@ router.get('/next-day/:memberId', auth, async (req, res) => {
           dayName: dayNames[todayDay.dayOfWeek],
           date: today.toISOString().split('T')[0],
           isToday: true,
-          exercises: todayDay.exercises.map(ex => ({
-            exercise: ex.exercise,
+          exercises: todayDay.PlanningExercise.map(ex => ({
+            exercise: ex.Exercise,
             sets: ex.sets,
             reps: ex.reps,
             duration: ex.duration,
@@ -1616,12 +1616,12 @@ router.get('/next-day/:memberId', auth, async (req, res) => {
     console.log(`ℹ️ Aucun exercice pour aujourd'hui, recherche pour demain (jour ${tomorrowDayOfWeek})`);
     
     // Si pas d'exercices aujourd'hui, chercher pour demain
-    const tomorrowDay = activePlanning.days.find(day => day.dayOfWeek === tomorrowDayOfWeek);
+    const tomorrowDay = activePlanning.PlanningDay.find(day => day.dayOfWeek === tomorrowDayOfWeek);
 
-    if (!tomorrowDay || tomorrowDay.exercises.length === 0) {
+    if (!tomorrowDay || tomorrowDay.PlanningExercise.length === 0) {
       console.log(`ℹ️ Aucun exercices prévu pour aujourd'hui ni demain`);
       if (tomorrowDay) {
-        console.log(`ℹ️ Jour trouvé mais aucun exercice: ${tomorrowDay.exercises.length} exercices`);
+        console.log(`ℹ️ Jour trouvé mais aucun exercice: ${tomorrowDay.PlanningExercise.length} exercices`);
       } else {
         console.log(`ℹ️ Jour ${tomorrowDayOfWeek} non défini dans ce planning`);
       }
@@ -1634,8 +1634,8 @@ router.get('/next-day/:memberId', auth, async (req, res) => {
       });
     }
 
-    console.log(`✅ Entraînement trouvé pour demain: ${dayNames[tomorrowDay.dayOfWeek]} (${tomorrow.toISOString().split('T')[0]}) - ${tomorrowDay.exercises.length} exercice(s)`);
-    console.log(`📋 Liste exercices:`, tomorrowDay.exercises.map(ex => `${ex.exercise.name} (${ex.sets}x${ex.reps})`));
+    console.log(`✅ Entraînement trouvé pour demain: ${dayNames[tomorrowDay.dayOfWeek]} (${tomorrow.toISOString().split('T')[0]}) - ${tomorrowDay.PlanningExercise.length} exercice(s)`);
+    console.log(`📋 Liste exercices:`, tomorrowDay.PlanningExercise.map(ex => `${ex.Exercise.name} (${ex.sets}x${ex.reps})`));
 
     const responseData = {
       member: {
@@ -1653,8 +1653,8 @@ router.get('/next-day/:memberId', auth, async (req, res) => {
         dayName: dayNames[tomorrowDay.dayOfWeek],
         date: tomorrow.toISOString().split('T')[0],
         isToday: false,
-        exercises: tomorrowDay.exercises.map(ex => ({
-          exercise: ex.exercise,
+        exercises: tomorrowDay.PlanningExercise.map(ex => ({
+          exercise: ex.Exercise,
           sets: ex.sets,
           reps: ex.reps,
           duration: ex.duration,
