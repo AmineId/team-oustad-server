@@ -363,6 +363,7 @@ router.post('/login', async (req, res) => {
           lastLoginAt: user.lastLoginAt,
           createdAt: user.createdAt,
           updatedAt: user.updatedAt,
+          profileImage: user.profileImage ? user.profileImage.toString('base64') : null,
           member: {
             onboarding: user.Member?.onboarding,
             birthDate: user.Member?.birthDate,
