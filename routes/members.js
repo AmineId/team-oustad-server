@@ -331,7 +331,7 @@ router.post('/:id/goals', auth, canAccessMemberProfile, async (req, res) => {
         status: 'active'
       },
       include: {
-        member: {
+        Member: {
           include: {
             User: {
               select: {
@@ -346,7 +346,7 @@ router.post('/:id/goals', auth, canAccessMemberProfile, async (req, res) => {
       }
     });
 
-    console.log(`✅ Objectif créé pour ${getFullName(goal.member.User)}: ${goal.title}`);
+    console.log(`✅ Objectif créé pour ${getFullName(goal.Member.User)}: ${goal.title}`);
 
     res.status(201).json({
       message: 'Objectif créé avec succès',
