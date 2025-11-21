@@ -42,17 +42,17 @@ const requireCoach = async (req, res, next) => {
       return res.status(403).json({ error: 'Accès réservé aux coachs' });
     }
 
-    console.log(`✅ Utilisateur trouvé: ${user.fullName} (${user.role}) - ID: ${user.id}`);
+    console.log(`✅ Utilisateur trouvé: ${getFullName(user)} (${user.role}) - ID: ${user.id}`);
     console.log(`🔍 Vérification rôle admin pour coach...`);
 
     if (user.role !== 'admin') {
-      console.log(`🚫 Rôle insuffisant: ${user.fullName} est ${user.role}, coach requis`);
+      console.log(`🚫 Rôle insuffisant: ${getFullName(user)} est ${user.role}, coach requis`);
       return res.status(403).json({ error: 'Accès réservé aux coachs' });
     }
 
-    console.log(`✅ Rôle admin validé pour ${user.fullName}`);
+    console.log(`✅ Rôle admin validé pour ${getFullName(user)}`);
     req.user.coachProfile = user.Admin;
-    console.log(`✅ Accès coach autorisé pour ${user.fullName}`);
+    console.log(`✅ Accès coach autorisé pour ${getFullName(user)}`);
     next();
   } catch (error) {
     console.error('💥 Erreur middleware requireCoach:', error);
@@ -385,15 +385,15 @@ router.post('/', auth, requireCoach, async (req, res) => {
       return notFound(res, 'Member', memberId);
     }
 
-    console.log(`✅ Membre trouvé: ${member.User.fullName} (ID: ${member.userId})`);
+    console.log(`✅ Membre trouvé: ${getFullName(member.User)} (ID: ${member.userId})`);
     console.log(`🔍 Recherche du coach - ID: ${req.user.sub}`);
 
     const coach = await prisma.user.findUnique({ where: { id: req.user.sub } });
-    console.log(`✅ Coach trouvé: ${coach.fullName} (Salle: ${coach.gymId})`);
+    console.log(`✅ Coach trouvé: ${getFullName(coach)} (Salle: ${coach.gymId})`);
     console.log(`🔍 Vérification appartenance à la même salle - Membre: ${member.User.gymId}, Coach: ${coach.gymId}`);
 
     if (member.User.gymId !== coach.gymId) {
-      console.log(`🚫 Coach ${coach.fullName} ne peut pas créer planning pour membre d'une autre salle`);
+      console.log(`🚫 Coach ${getFullName(coach)} ne peut pas créer planning pour membre d'une autre salle`);
       return res.status(403).json({ error: 'Vous ne pouvez créer des plannings que pour les membres de votre salle' });
     }
 
@@ -429,11 +429,11 @@ router.post('/', auth, requireCoach, async (req, res) => {
       }
     });
 
-    console.log(`✅ Planning créé: ${planning.title} (ID: ${planning.id}) pour ${member.User.fullName}`);
+    console.log(`✅ Planning créé: ${planning.title} (ID: ${planning.id}) pour ${getFullName(member.User)}`);
 
     // Envoyer notification au membre
     if (member.User.fcmToken) {
-      console.log(`🔔 Envoi notification nouveau planning à ${member.User.fullName}`);
+      console.log(`🔔 Envoi notification nouveau planning à ${getFullName(member.User)}`);
       await notifyNewTrainingPlan(member.User.fcmToken, planning).catch(err =>
         console.error('⚠️ Erreur notification FCM:', err)
       );
@@ -506,7 +506,7 @@ router.get('/', auth, async (req, res) => {
       return res.status(403).json({ error: 'Forbidden' });
     }
 
-    console.log(`✅ Requester trouvé: ${requester.fullName} (${requester.role})`);
+    console.log(`✅ Requester trouvé: ${getFullName(requester)} (${requester.role})`);
     const { memberId, status, dayOfWeek } = req.query;
     console.log(`🔍 Analyse des filtres - memberId: ${memberId}, status: ${status}, dayOfWeek: ${dayOfWeek}`);
 
@@ -569,7 +569,7 @@ router.get('/', auth, async (req, res) => {
       console.log(`📊 Détails des plannings:`, plannings.map(p => ({
         id: p.id,
         title: p.title,
-        member: p.member.User.fullName,
+        member: getFullName(p.member.User),
         status: p.status,
         daysCount: p.days.length
       })));
@@ -1899,7 +1899,7 @@ router.post('/respond-help', auth, requireCoach, async (req, res) => {
       where: { id: req.user.sub }
     });
 
-    console.log(`✅ Coach trouvé: ${coach.fullName}`);
+    console.log(`✅ Coach trouvé: ${getFullName(coach)}`);
 
     // Récupérer le membre
     const member = await prisma.user.findUnique({
@@ -1911,7 +1911,7 @@ router.post('/respond-help', auth, requireCoach, async (req, res) => {
       return res.status(404).json({ error: 'Member not found' });
     }
 
-    console.log(`✅ Membre trouvé: ${member.fullName}`);
+    console.log(`✅ Membre trouvé: ${getFullName(member)}`);
 
     // Vérifier que le membre et le coach sont dans la même salle
     if (member.gymId !== coach.gymId) {
@@ -1921,13 +1921,13 @@ router.post('/respond-help', auth, requireCoach, async (req, res) => {
 
     // Envoyer notification au membre
     if (member.fcmToken) {
-      console.log(`🔔 Envoi notification au membre ${member.fullName}`);
+      console.log(`🔔 Envoi notification au membre ${getFullName(member)}`);
       
       const { sendPushNotification } = require('../services/pushNotificationService');
       
       const responseMessages = {
-        coming: `${coach.fullName} arrive pour vous aider${exerciseName ? ` avec "${exerciseName}"` : ''} 👍`,
-        busy: `${coach.fullName} est occupé pour le moment${exerciseName ? ` pour "${exerciseName}"` : ''} ⏰`
+        coming: `${getFullName(coach)} arrive pour vous aider${exerciseName ? ` avec "${exerciseName}"` : ''} 👍`,
+        busy: `${getFullName(coach)} est occupé pour le moment${exerciseName ? ` pour "${exerciseName}"` : ''} ⏰`
       };
 
       const responseEmojis = {
@@ -1941,7 +1941,7 @@ router.post('/respond-help', auth, requireCoach, async (req, res) => {
         data: {
           type: 'help_response',
           coachId: coach.id.toString(),
-          coachName: coach.fullName,
+          coachName: getFullName(coach),
           response: response,
           exerciseName: exerciseName || ''
         },
@@ -1964,7 +1964,7 @@ router.post('/respond-help', auth, requireCoach, async (req, res) => {
 
       console.log(`✅ Notification envoyée au membre`);
     } else {
-      console.log(`⚠️ Membre ${member.fullName} n'a pas de FCM token`);
+      console.log(`⚠️ Membre ${getFullName(member)} n'a pas de FCM token`);
     }
 
     console.log(`✅ Réponse à la demande d'aide traitée avec succès`);
@@ -1973,7 +1973,7 @@ router.post('/respond-help', auth, requireCoach, async (req, res) => {
       message: `Response "${response}" sent to member`,
       member: {
         id: member.id,
-        name: member.fullName
+        name: getFullName(member)
       }
     });
   } catch (e) {
