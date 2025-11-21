@@ -27,10 +27,10 @@ const canAccessMemberProfile = async (req, res, next) => {
 
     const memberUser = await prisma.user.findUnique({
       where: { id: memberId },
-      include: { member: true }
+      include: { Member: true }
     });
 
-    if (!memberUser || !memberUser.member) {
+    if (!memberUser || !memberUser.Member) {
       return notFound(res, 'Member', memberId);
     }
 

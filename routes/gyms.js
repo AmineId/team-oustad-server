@@ -27,7 +27,7 @@ const requireOwner = async (req, res, next) => {
   try {
     const user = await prisma.user.findUnique({
       where: { id: req.user.sub },
-      include: { owner: true }
+      include: { Owner: true }
     });
 
     if (!user) {
@@ -40,7 +40,7 @@ const requireOwner = async (req, res, next) => {
       return res.status(403).json({ error: 'Accès réservé aux propriétaires' });
     }
 
-    req.user.ownerProfile = user.owner;
+    req.user.ownerProfile = user.Owner;
     console.log(`✅ Accès owner autorisé pour ${getFullName(user)}`);
     next();
   } catch (error) {
@@ -61,7 +61,7 @@ const requireAdmin = async (req, res, next) => {
   try {
     const user = await prisma.user.findUnique({
       where: { id: req.user.sub },
-      include: { admin: true }
+      include: { Admin: true }
     });
 
     if (!user) {
@@ -74,7 +74,7 @@ const requireAdmin = async (req, res, next) => {
       return res.status(403).json({ error: 'Accès réservé aux administrateurs' });
     }
 
-    req.user.adminProfile = user.admin;
+    req.user.adminProfile = user.Admin;
     console.log(`✅ Accès admin autorisé pour ${getFullName(user)}`);
     next();
   } catch (error) {
