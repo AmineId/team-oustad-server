@@ -74,10 +74,10 @@ async function handleCheckUpdate(req, res, channel) {
     const updateAvailable = latestVersion.version_code > currentVersion;
     const forceUpdate = currentVersion < latestVersion.min_supported_version;
 
-    // Pour le canal beta, utiliser le lien Google Play Internal Testing
-    const downloadUrl = channel === 'beta' 
-      ? 'https://play.google.com/store/apps/details?id=team.fitness.team_fitness_app&hl=en-US&ah=97EU213tjbmnn9POyHV8HPW1_EI'
-      : latestVersion.download_url;
+    // Pour le canal beta, utiliser le lien Google Play Internal Testing et forcer la mise à jour
+    const downloadUrl = latestVersion.download_url;
+    
+    const shouldForceUpdate = channel === 'beta' ? true : forceUpdate;
 
     const response = {
       update_available: updateAvailable,
@@ -88,7 +88,7 @@ async function handleCheckUpdate(req, res, channel) {
         version_name: latestVersion.version_name,
         download_url: downloadUrl,
         changelog: latestVersion.changelog,
-        force_update: forceUpdate,
+        force_update: shouldForceUpdate,
         file_size: latestVersion.file_size,
         checksum: latestVersion.checksum,
         release_date: latestVersion.release_date,
