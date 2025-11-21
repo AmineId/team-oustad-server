@@ -32,7 +32,7 @@ async function quickAPITest() {
       return;
     }
     
-    console.log(`✅ Membre trouvé: ${member.fullName} (ID: ${member.id})`);
+    console.log(`✅ Membre trouvé: ${getFullName(member)} (ID: ${member.id})`);
     
     // 4. Créer un abonnement
     console.log('\n4️⃣ Création d\'un abonnement annuel...');

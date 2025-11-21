@@ -43,7 +43,7 @@ async function testAcknowledgePayment() {
     }
 
     const testMember = members[0];
-    log('👤', `Membre sélectionné: ${testMember.fullName} (ID: ${testMember.id})`);
+    log('👤', `Membre sélectionné: ${getFullName(testMember)} (ID: ${testMember.id})`);
 
     // Récupérer les types d'abonnement disponibles
     const typesResponse = await axios.get(`${BASE_URL}/subscription-types`, config);
@@ -78,6 +78,7 @@ async function testAcknowledgePayment() {
 
     // 4. Modifier le statut de l'abonnement à "pending" pour le test
     const { PrismaClient } = require('@prisma/client');
+const { getFullName } = require("../../utils/nameUtils");
     const prisma = new PrismaClient();
     
     await prisma.subscription.update({
