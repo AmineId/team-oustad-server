@@ -29,7 +29,7 @@ async function testAcknowledgeOlivia() {
       return;
     }
 
-    console.log(`✅ Olivia trouvée: ${olivia.fullName} (ID: ${olivia.id})`);
+    console.log(`✅ Olivia trouvée: ${getFullName(olivia)} (ID: ${olivia.id})`);
 
     // 3. Récupérer ses abonnements
     const subsResponse = await axios.get(

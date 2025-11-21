@@ -8,6 +8,7 @@
  */
 
 const { PrismaClient } = require('@prisma/client');
+const { getFullName } = require("../../utils/nameUtils");
 const prisma = new PrismaClient();
 const { 
   createYearlySubscriptionWithPayments,
@@ -33,7 +34,7 @@ async function testSubscriptionSystem() {
       return;
     }
     
-    console.log(`✅ Membre trouvé: ${member.user.fullName} (ID: ${member.userId})\n`);
+    console.log(`✅ Membre trouvé: ${getFullName(member.user)} (ID: ${member.userId})\n`);
     
     // 2. Créer un abonnement annuel
     console.log('2️⃣ Création d\'un abonnement annuel avec 12 paiements...');
