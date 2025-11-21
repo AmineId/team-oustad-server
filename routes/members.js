@@ -331,7 +331,7 @@ router.post('/:id/goals', auth, canAccessMemberProfile, async (req, res) => {
         status: 'active'
       },
       include: {
-        member: {
+        Member: {
           include: {
             User: {
               select: {
