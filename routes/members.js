@@ -331,13 +331,13 @@ router.post('/:id/goals', auth, canAccessMemberProfile, async (req, res) => {
         status: 'active'
       },
       include: {
-        Member: {
+        member: {
           include: {
             User: {
               select: {
                 id: true,
                 firstName: true,
-              lastName: true,
+                lastName: true,
                 email: true
               }
             }
@@ -535,12 +535,13 @@ router.post('/:id/measurements', auth, canAccessMemberProfile, async (req, res) 
         measuredAt: measuredAt ? new Date(measuredAt) : new Date()
       },
       include: {
-        member: {
+        Member: {
           include: {
             User: {
               select: {
                 id: true,
-                firstName: true, lastName: true
+                firstName: true,
+                lastName: true
               }
             }
           }
@@ -548,7 +549,7 @@ router.post('/:id/measurements', auth, canAccessMemberProfile, async (req, res) 
       }
     });
 
-    console.log(`✅ Mesure créée pour ${getFullName(measurement.member.User)}`);
+    console.log(`✅ Mesure créée pour ${getFullName(measurement.Member.User)}`);
 
     res.status(201).json({
       message: 'Mesure créée avec succès',
