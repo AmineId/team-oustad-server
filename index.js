@@ -51,7 +51,7 @@ console.log('✅ Routes configurées: /gyms, /users, /auth, /plannings, /subscri
 // Redirection Beta Download vers Google Play Internal Testing
 app.get('/beta/download', (req, res) => {
   console.log('🔄 Redirection /beta/download vers Google Play Internal Testing');
-  res.redirect(301, 'https://play.google.com/apps/internaltest/4700178556172561963');
+  res.redirect(301, 'https://play.google.com/store/apps/details?id=team.fitness.team_fitness_app&hl=en-US&ah=97EU213tjbmnn9POyHV8HPW1_EI');
 });
 
 // Health check (DB + server)

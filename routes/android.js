@@ -76,7 +76,7 @@ async function handleCheckUpdate(req, res, channel) {
 
     // Pour le canal beta, utiliser le lien Google Play Internal Testing
     const downloadUrl = channel === 'beta' 
-      ? 'https://play.google.com/apps/internaltest/4700178556172561963'
+      ? 'https://play.google.com/store/apps/details?id=team.fitness.team_fitness_app&hl=en-US&ah=97EU213tjbmnn9POyHV8HPW1_EI'
       : latestVersion.download_url;
 
     const response = {
@@ -120,7 +120,7 @@ async function handleDownload(req, res, channel) {
     // Pour le canal beta, rediriger vers Google Play Internal Testing
     if (channel === 'beta') {
       console.log(`🔄 Redirecting beta download to Google Play Internal Testing`);
-      return res.redirect(301, 'https://play.google.com/apps/internaltest/4700178556172561963');
+      return res.redirect(301, 'https://play.google.com/store/apps/details?id=team.fitness.team_fitness_app&hl=en-US&ah=97EU213tjbmnn9POyHV8HPW1_EI');
     }
 
     const channelPath = getChannelPath(channel);
