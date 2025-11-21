@@ -130,19 +130,33 @@ async function handleDownload(req, res, channel) {
       });
     }
 
+    // Get file stats for Content-Length header
+    const stats = await fs.stat(apkPath);
+    
     res.setHeader('Content-Type', 'application/vnd.android.package-archive');
     res.setHeader('Content-Disposition', `attachment; filename=${apkFileName}`);
+    res.setHeader('Content-Length', stats.size);
+    res.setHeader('Accept-Ranges', 'bytes');
+    
+    // Increase timeout for large file downloads
+    req.setTimeout(10 * 60 * 1000); // 10 minutes
+    res.setTimeout(10 * 60 * 1000); // 10 minutes
 
-    console.log(`✅ Sending APK file...`);
+    console.log(`✅ Sending APK file (${Math.round(stats.size / 1024 / 1024)}MB)...`);
 
     res.sendFile(apkPath, (err) => {
       if (err) {
-        console.error('❌ Error sending APK:', err);
-        if (!res.headersSent) {
-          res.status(500).json({ error: 'Error sending file' });
+        // Client abort is expected if connection drops - don't treat as error
+        if (err.code === 'ECONNABORTED' || err.code === 'ECONNRESET') {
+          console.log(`⚠️  Client connection closed during download (${channel})`);
+        } else {
+          console.error('❌ Error sending APK:', err);
+          if (!res.headersSent) {
+            res.status(500).json({ error: 'Error sending file' });
+          }
         }
       } else {
-        console.log(`✅ APK sent successfully`);
+        console.log(`✅ APK sent successfully (${channel})`);
       }
     });
   } catch (error) {
