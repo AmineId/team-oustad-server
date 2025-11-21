@@ -667,15 +667,27 @@ router.get('/me', auth, async (req, res) => {
     if (user.role === 'admin') {
       console.log(`👨‍💼 Réponse admin pour: ${getFullName(user)}`);
       // Pour les admins : retourner leur salle
-      const responseData = formatUser({
+      const responseData = {
         id: user.id,
         displayId: user.displayId,
         email: user.email,
+        phoneNumber: user.phoneNumber,
+        firstName: user.firstName,
+        lastName: user.lastName,
         fullName: getFullName(user),
         uniqueCode: user.uniqueCode,
+        role: user.role,
+        gymId: user.gymId,
         gym: user.Gym,
+        fcmToken: user.fcmToken,
+        profileImage: user.profileImage ? user.profileImage.toString('base64') : null,
+        qrCode: user.qrCode ? user.qrCode.toString('base64') : null,
+        lastLoginAt: user.lastLoginAt,
+        notificationsEnabled: user.notificationsEnabled,
+        createdAt: user.createdAt,
+        updatedAt: user.updatedAt,
         type: 'admin'
-      });
+      };
       console.log(`📤 Réponse /me admin:`, responseData);
       res.json(responseData);
     } else if (user.role === 'owner') {
@@ -714,13 +726,26 @@ router.get('/me', auth, async (req, res) => {
         }
       }));
 
-      const responseData = formatUser({
+      const responseData = {
         id: user.id,
         displayId: user.displayId,
         email: user.email,
+        phoneNumber: user.phoneNumber,
+        firstName: user.firstName,
+        lastName: user.lastName,
         fullName: getFullName(user),
         uniqueCode: user.uniqueCode,
+        role: user.role,
+        gymId: user.gymId,
+        gym: user.Gym,
         gyms: gymsWithStats,
+        fcmToken: user.fcmToken,
+        profileImage: user.profileImage ? user.profileImage.toString('base64') : null,
+        qrCode: user.qrCode ? user.qrCode.toString('base64') : null,
+        lastLoginAt: user.lastLoginAt,
+        notificationsEnabled: user.notificationsEnabled,
+        createdAt: user.createdAt,
+        updatedAt: user.updatedAt,
         permissions: {
           canManageAdmins: user.Owner?.canManageAdmins || false,
           canManageGyms: user.Owner?.canManageGyms || false,
@@ -728,7 +753,7 @@ router.get('/me', auth, async (req, res) => {
           maxGymsAllowed: user.Owner?.maxGymsAllowed || 0,
         },
         type: 'owner'
-      });
+      };
       console.log(`📤 Réponse /me owner:`, {
         ...responseData,
         gyms: `${gymsWithStats.length} salles trouvées`
@@ -740,18 +765,39 @@ router.get('/me', auth, async (req, res) => {
       const activeSubscription = getActiveSubscription(user.Member);
       const subscriptionsWithStatus = getSubscriptionsWithStatus(user.Member);
 
-      const responseData = formatUser({
+      const responseData = {
         id: user.id,
         displayId: user.displayId,
         email: user.email,
+        phoneNumber: user.phoneNumber,
+        firstName: user.firstName,
+        lastName: user.lastName,
         fullName: getFullName(user),
         uniqueCode: user.uniqueCode,
+        role: user.role,
+        gymId: user.gymId,
         gym: user.Gym,
+        fcmToken: user.fcmToken,
+        profileImage: user.profileImage ? user.profileImage.toString('base64') : null,
+        qrCode: user.qrCode ? user.qrCode.toString('base64') : null,
+        lastLoginAt: user.lastLoginAt,
+        notificationsEnabled: user.notificationsEnabled,
+        createdAt: user.createdAt,
+        updatedAt: user.updatedAt,
+        member: {
+          onboarding: user.Member?.onboarding,
+          birthDate: user.Member?.birthDate,
+          profession: user.Member?.profession,
+          fitnessLevel: user.Member?.fitnessLevel,
+          preferredTrainingDays: user.Member?.preferredTrainingDays,
+          workoutNotificationsEnabled: user.Member?.workoutNotificationsEnabled,
+          joinedAt: user.Member?.joinedAt,
+        },
         activeSubscription: activeSubscription,
         subscriptions: subscriptionsWithStatus,
         recentPayments: user.Member?.Payment || [],
         type: 'member'
-      });
+      };
       console.log(`📤 Réponse /me membre:`, {
         ...responseData,
         recentPayments: `${responseData.recentPayments.length} paiements récents`,
