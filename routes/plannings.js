@@ -415,7 +415,7 @@ router.post('/', auth, requireCoach, async (req, res) => {
           include: { User: { select: { id: true, firstName: true,
               lastName: true, email: true } } }
         },
-        coach: { select: { id: true, firstName: true,
+        User: { select: { id: true, firstName: true,
               lastName: true, email: true } },
         days: {
           include: {
@@ -549,7 +549,7 @@ router.get('/', auth, async (req, res) => {
           include: { User: { select: { id: true, firstName: true,
               lastName: true, email: true } } }
         },
-        coach: { select: { id: true, firstName: true,
+        User: { select: { id: true, firstName: true,
               lastName: true, email: true } },
         days: {
           include: {
@@ -637,7 +637,7 @@ router.delete('/:planningId', auth, requireCoach, async (req, res) => {
     const planning = await prisma.planning.findUnique({
       where: { id: planningId },
       include: { 
-        coach: true,
+        User: true,
         member: {
           include: { User: true }
         }
@@ -649,7 +649,7 @@ router.delete('/:planningId', auth, requireCoach, async (req, res) => {
       return notFound(res, 'Planning', planningId);
     }
 
-    console.log(`✅ Planning trouvé: ${planning.title} (Coach: ${getFullName(planning.coach)})`);
+    console.log(`✅ Planning trouvé: ${planning.title} (Coach: ${getFullName(planning.User)})`);
     console.log(`🔍 Vérification propriété du planning - Coach ID: ${req.user.sub} vs Planning coachId: ${planning.coachId}`);
 
     if (planning.coachId !== req.user.sub) {
@@ -802,7 +802,7 @@ router.post('/:planningId/days/:dayOfWeek/exercises', auth, requireCoach, async 
     // Vérifier que le planning existe et appartient au coach
     const planning = await prisma.planning.findUnique({
       where: { id: planningId },
-      include: { coach: true }
+      include: { User: true }
     });
 
     if (!planning) {
@@ -810,7 +810,7 @@ router.post('/:planningId/days/:dayOfWeek/exercises', auth, requireCoach, async 
       return notFound(res, 'Planning', planningId);
     }
 
-    console.log(`✅ Planning trouvé: ${planning.title} (Coach: ${getFullName(planning.coach)})`);
+    console.log(`✅ Planning trouvé: ${planning.title} (Coach: ${getFullName(planning.User)})`);
     console.log(`🔍 Vérification propriété du planning - Coach ID: ${req.user.sub} vs Planning coachId: ${planning.coachId}`);
 
     if (planning.coachId !== req.user.sub) {
@@ -977,7 +977,7 @@ router.delete('/:planningId/days/:dayOfWeek/exercises/:exerciseId', auth, requir
     // Vérifier que le planning existe et appartient au coach
     const planning = await prisma.planning.findUnique({
       where: { id: planningId },
-      include: { coach: true }
+      include: { User: true }
     });
 
     if (!planning) {
@@ -985,7 +985,7 @@ router.delete('/:planningId/days/:dayOfWeek/exercises/:exerciseId', auth, requir
       return notFound(res, 'Planning', planningId);
     }
 
-    console.log(`✅ Planning trouvé: ${planning.title} (Coach: ${getFullName(planning.coach)})`);
+    console.log(`✅ Planning trouvé: ${planning.title} (Coach: ${getFullName(planning.User)})`);
     console.log(`🔍 Vérification propriété du planning - Coach ID: ${req.user.sub} vs Planning coachId: ${planning.coachId}`);
 
     if (planning.coachId !== req.user.sub) {
@@ -1269,7 +1269,7 @@ router.get('/member/:memberId', auth, async (req, res) => {
     const plannings = await prisma.planning.findMany({
       where: whereClause,
       include: {
-        coach: { select: { id: true, firstName: true,
+        User: { select: { id: true, firstName: true,
               lastName: true, email: true } },
         days: {
           include: {
@@ -1289,7 +1289,7 @@ router.get('/member/:memberId', auth, async (req, res) => {
       console.log(`📊 Résumé plannings:`, plannings.map(p => ({
         id: p.id,
         title: p.title,
-        coach: getFullName(p.coach),
+        coach: getFullName(p.User),
         status: p.status,
         daysCount: p.days.length,
         exercisesCount: p.days.reduce((sum, day) => sum + day.exercises.length, 0)
@@ -1299,7 +1299,7 @@ router.get('/member/:memberId', auth, async (req, res) => {
     const responseData = {
       member: {
         id: member.userId,
-        user: member.user
+        user: member.User
       },
       plannings
     };
@@ -1541,7 +1541,7 @@ router.get('/next-day/:memberId', auth, async (req, res) => {
         endDate: { gte: today }
       },
       include: {
-        coach: { select: { id: true, firstName: true,
+        User: { select: { id: true, firstName: true,
               lastName: true, email: true } },
         days: {
           include: {
@@ -1563,13 +1563,13 @@ router.get('/next-day/:memberId', auth, async (req, res) => {
         message: 'Aucun entraînement prévu pour aujourd\'hui ou demain',
         member: {
           id: member.userId,
-          user: member.user
+          user: member.User
         }
       });
     }
 
     console.log(`✅ Planning actif trouvé: ${activePlanning.title} (ID: ${activePlanning.id})`);
-    console.log(`📊 Planning détails: ${activePlanning.days.length} jours définis, Coach: ${getFullName(activePlanning.coach)}`);
+    console.log(`📊 Planning détails: ${activePlanning.days.length} jours définis, Coach: ${getFullName(activePlanning.User)}`);
     
     const dayNames = ['Dimanche', 'Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi'];
     
@@ -1584,7 +1584,7 @@ router.get('/next-day/:memberId', auth, async (req, res) => {
       const responseData = {
         member: {
           id: member.userId,
-          user: member.user
+          user: member.User
         },
         planning: {
           id: activePlanning.id,
@@ -1629,7 +1629,7 @@ router.get('/next-day/:memberId', auth, async (req, res) => {
         message: 'Aucun entraînement prévu pour aujourd\'hui ou demain',
         member: {
           id: member.userId,
-          user: member.user
+          user: member.User
         }
       });
     }
@@ -1640,7 +1640,7 @@ router.get('/next-day/:memberId', auth, async (req, res) => {
     const responseData = {
       member: {
         id: member.userId,
-        user: member.user
+        user: member.User
       },
       planning: {
         id: activePlanning.id,
@@ -1756,7 +1756,7 @@ router.post('/request-help', auth, async (req, res) => {
         endDate: { gte: new Date() }
       },
       include: {
-        coach: true
+        User: true
       }
     });
 
@@ -1765,11 +1765,11 @@ router.post('/request-help', auth, async (req, res) => {
       return res.status(403).json({ error: 'No active planning found' });
     }
 
-    console.log(`✅ Planning actif trouvé - Coach: ${getFullName(activePlanning.coach)}`);
+    console.log(`✅ Planning actif trouvé - Coach: ${getFullName(activePlanning.User)}`);
 
     // Envoyer une notification au coach
-    if (activePlanning.coach.fcmToken) {
-      console.log(`🔔 Envoi notification au coach ${getFullName(activePlanning.coach)}`);
+    if (activePlanning.User.fcmToken) {
+      console.log(`🔔 Envoi notification au coach ${getFullName(activePlanning.User)}`);
       
       const { sendPushNotification } = require('../services/pushNotificationService');
       
@@ -1777,7 +1777,7 @@ router.post('/request-help', auth, async (req, res) => {
         ? `${getFullName(user)} demande de l'aide pour "${exerciseName}": ${notes}`
         : `${getFullName(user)} demande de l'aide pour "${exerciseName}"`;
 
-      await sendPushNotification(activePlanning.coach.fcmToken, {
+      await sendPushNotification(activePlanning.User.fcmToken, {
         title: '🆘 Demande d\'aide',
         body: helpMessage,
         data: {
@@ -1817,7 +1817,7 @@ router.post('/request-help', auth, async (req, res) => {
 
       console.log(`✅ Notification envoyée au coach`);
     } else {
-      console.log(`⚠️ Coach ${getFullName(activePlanning.coach)} n'a pas de FCM token`);
+      console.log(`⚠️ Coach ${getFullName(activePlanning.User)} n'a pas de FCM token`);
     }
 
     console.log(`✅ Demande d'aide traitée avec succès`);
@@ -1825,8 +1825,8 @@ router.post('/request-help', auth, async (req, res) => {
       success: true, 
       message: 'Help request sent to coach',
       coach: {
-        id: activePlanning.coach.id,
-        name: getFullName(activePlanning.coach)
+        id: activePlanning.User.id,
+        name: getFullName(activePlanning.User)
       }
     });
   } catch (e) {

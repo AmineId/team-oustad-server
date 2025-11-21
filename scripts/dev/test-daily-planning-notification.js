@@ -32,7 +32,7 @@ async function testDailyPlanningNotification() {
       include: {
         member: {
           include: {
-            user: {
+            User: {
               select: {
                 id: true,
                 firstName: true,
@@ -87,7 +87,7 @@ async function testDailyPlanningNotification() {
     let membersWithoutToken = 0;
 
     for (const planning of planningsWithExercisesToday) {
-      const member = planning.member.user;
+      const member = planning.member.User;
       const day = planning.days[0];
       const exerciseCount = day.exercises.length;
       const memberFullName = getFullName(member);
@@ -136,7 +136,7 @@ async function testDailyPlanningNotification() {
       const dayNames = ['Dimanche', 'Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi'];
       
       for (const planning of planningsWithExercisesToday) {
-        const member = planning.member.user;
+        const member = planning.member.User;
         
         if (!member.fcmToken) continue;
         

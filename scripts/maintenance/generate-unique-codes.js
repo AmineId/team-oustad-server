@@ -11,7 +11,7 @@ async function generateUniqueCodes() {
     // Trouver tous les membres sans uniqueCode
     const membersWithoutCode = await prisma.member.findMany({
       where: { uniqueCode: null },
-      include: { user: { select: { firstName: true, lastName: true, email: true } } }
+      include: { User: { select: { firstName: true, lastName: true, email: true } } }
     });
 
     console.log(`📋 ${membersWithoutCode.length} membres trouvés sans code unique`);
@@ -26,7 +26,7 @@ async function generateUniqueCodes() {
         data: { uniqueCode }
       });
 
-      console.log(`✅ ${getFullName(member.user)} (${member.user.email}): ${uniqueCode}`);
+      console.log(`✅ ${getFullName(member.User)} (${member.User.email}): ${uniqueCode}`);
     }
 
     console.log('🎉 Tous les codes uniques ont été générés !');

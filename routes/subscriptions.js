@@ -182,7 +182,7 @@ router.get('/:id', auth, async (req, res) => {
       return res.status(403).json({ error: 'Accès refusé' });
     }
     
-    if (requester.role === 'admin' && status.subscription.member.user.gymId !== requester.gymId) {
+    if (requester.role === 'admin' && status.subscription.member.User.gymId !== requester.gymId) {
       console.log(`🚫 Admin ${requester.email} tente d'accéder à abonnement d'autre salle`);
       return res.status(403).json({ error: 'Accès refusé' });
     }
@@ -322,7 +322,7 @@ router.post('/payments/:paymentId/acknowledge', auth, async (req, res) => {
       return res.status(403).json({ error: 'Accès refusé' });
     }
     
-    if (requester.role === 'admin' && payment.member.user.gymId !== requester.gymId) {
+    if (requester.role === 'admin' && payment.Member.User.gymId !== requester.gymId) {
       console.log(`🚫 Admin ${requester.email} tente d'acquitter paiement d'autre salle`);
       return res.status(403).json({ error: 'Accès refusé' });
     }
@@ -420,7 +420,7 @@ router.post('/payments/:paymentId/complete', auth, async (req, res) => {
       return res.status(403).json({ error: 'Accès refusé' });
     }
     
-    if (requester.role === 'admin' && payment.member.user.gymId !== requester.gymId) {
+    if (requester.role === 'admin' && payment.Member.User.gymId !== requester.gymId) {
       return res.status(403).json({ error: 'Accès refusé' });
     }
     
@@ -495,8 +495,8 @@ router.get('/payments/upcoming', auth, async (req, res) => {
       payments: upcomingPayments.map(p => ({
         id: p.id,
         memberId: p.memberId,
-        memberName: getFullName(p.member.user),
-        memberEmail: p.member.user.email,
+        memberName: getFullName(p.Member.User),
+        memberEmail: p.Member.User.email,
         amount: p.amount,
         dueDate: p.dueDate,
         monthNumber: p.monthNumber,

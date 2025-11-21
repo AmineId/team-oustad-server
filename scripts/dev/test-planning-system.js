@@ -63,7 +63,7 @@ async function testPlanningSystem() {
 
     // Récupérer un membre existant
     const member = await prisma.member.findFirst({
-      include: { user: true }
+      include: { User: true }
     });
 
     if (!member) {
@@ -149,7 +149,7 @@ async function testPlanningSystem() {
 
     const fullPlanning = await response.json();
     console.log(`📋 Planning: ${fullPlanning.title}`);
-    console.log(`👤 Membre: ${getFullName(fullPlanning.member.user)}`);
+    console.log(`👤 Membre: ${getFullName(fullPlanning.member.User)}`);
     console.log(`🏋️ Coach: ${getFullName(fullPlanning.coach)}`);
     console.log(`📅 Période: ${fullPlanning.startDate} - ${fullPlanning.endDate}`);
     console.log(`📝 Exercices par jour:`);

@@ -30,7 +30,7 @@ const dailyPlanningNotification = cron.schedule('0 6 * * *', async () => {
       include: {
         member: {
           include: {
-            user: {
+            User: {
               select: {
                 id: true,
                 firstName: true,
@@ -76,7 +76,7 @@ const dailyPlanningNotification = cron.schedule('0 6 * * *', async () => {
 
     // Envoyer une notification à chaque membre
     for (const planning of planningsWithExercisesToday) {
-      const member = planning.member.user;
+      const member = planning.member.User;
       const day = planning.days[0];
       const exerciseCount = day.exercises.length;
       const memberFullName = getFullName(member);
