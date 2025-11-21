@@ -51,7 +51,7 @@ const requireOwner = async (req, res, next) => {
       return res.status(403).json({ error: 'Accès réservé aux propriétaires' });
     }
 
-    req.user.ownerProfile = user.Owner;
+    req.user.ownerProfile = user.owner;
     console.log(`✅ Accès owner autorisé pour ${getFullName(user)}`);
     next();
   } catch (error) {
@@ -85,7 +85,7 @@ const requireAdmin = async (req, res, next) => {
       return res.status(403).json({ error: 'Accès réservé aux administrateurs' });
     }
 
-    req.user.adminProfile = user.Admin;
+    req.user.adminProfile = user.admin;
     console.log(`✅ Accès admin autorisé pour ${getFullName(user)}`);
     next();
   } catch (error) {
@@ -947,7 +947,11 @@ router.put('/:id', auth, async (req, res) => {
 
     const updateData = {};
     if (email) updateData.email = email;
-    if (fullName) updateData.fullName = fullName;
+    if (fullName) {
+      const { firstName, lastName } = require('../utils/nameUtils').splitFullName(fullName);
+      updateData.firstName = firstName;
+      updateData.lastName = lastName;
+    }
     if (password) updateData.password = await bcrypt.hash(password, 10);
     if (notificationsEnabled !== undefined) updateData.notificationsEnabled = notificationsEnabled;
 
@@ -1391,7 +1395,8 @@ router.get('/:id/profile-image', auth, async (req, res) => {
       console.log(`❌ Photo de profil non trouvée pour ${getFullName(targetUser)} - génération avatar par défaut`);
 
       // Générer un avatar par défaut avec les initiales
-      const initials = targetUser.fullName
+      const fullName = getFullName(targetUser);
+      const initials = fullName
         .split(' ')
         .map(word => word.charAt(0).toUpperCase())
         .slice(0, 2)
@@ -1721,17 +1726,17 @@ router.get('/:id', auth, async (req, res) => {
       gym: user.gym
     };
 
-    if (user.role === 'member' && user.Member) {
-      response.activeSubscription = user.Member.subscriptions.find(sub => sub.status === 'active') || null;
-      response.recentPayments = user.Member.payments || [];
+    if (user.role === 'member' && user.member) {
+      response.activeSubscription = user.member.subscriptions.find(sub => sub.status === 'active') || null;
+      response.recentPayments = user.member.payments || [];
     }
 
-    if (user.role === 'owner' && user.Owner) {
+    if (user.role === 'owner' && user.owner) {
       response.permissions = {
-        canManageAdmins: user.Owner.canManageAdmins,
-        canManageGyms: user.Owner.canManageGyms,
-        canViewReports: user.Owner.canViewReports,
-        maxGymsAllowed: user.Owner.maxGymsAllowed,
+        canManageAdmins: user.owner.canManageAdmins,
+        canManageGyms: user.owner.canManageGyms,
+        canViewReports: user.owner.canViewReports,
+        maxGymsAllowed: user.owner.maxGymsAllowed,
       };
     }
 
@@ -2305,7 +2310,7 @@ router.get('/gym/:gymId/members', auth, async (req, res) => {
     
     // Formater la réponse en masquant les mots de passe et en ajoutant les infos pertinentes
     const formattedMembers = members.map(user => {
-      const activeSubscription = user.Member?.subscriptions?.find(sub => sub.status === 'active') || null;
+      const activeSubscription = user.member?.subscriptions?.find(sub => sub.status === 'active') || null;
       
       return {
         id: user.id,
@@ -2323,7 +2328,7 @@ router.get('/gym/:gymId/members', auth, async (req, res) => {
           endDate: activeSubscription.endDate,
           lastPayment: activeSubscription.payments[0] || null
         } : null,
-        recentPayments: user.Member?.payments || []
+        recentPayments: user.member?.payments || []
       };
     });
 
