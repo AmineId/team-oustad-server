@@ -74,6 +74,11 @@ async function handleCheckUpdate(req, res, channel) {
     const updateAvailable = latestVersion.version_code > currentVersion;
     const forceUpdate = currentVersion < latestVersion.min_supported_version;
 
+    // Pour le canal beta, utiliser le lien Google Play Internal Testing
+    const downloadUrl = channel === 'beta' 
+      ? 'https://play.google.com/apps/internaltest/4700178556172561963'
+      : latestVersion.download_url;
+
     const response = {
       update_available: updateAvailable,
       current_version: currentVersion,
@@ -81,7 +86,7 @@ async function handleCheckUpdate(req, res, channel) {
       latest_version: updateAvailable ? {
         version_code: latestVersion.version_code,
         version_name: latestVersion.version_name,
-        download_url: latestVersion.download_url,
+        download_url: downloadUrl,
         changelog: latestVersion.changelog,
         force_update: forceUpdate,
         file_size: latestVersion.file_size,
@@ -112,6 +117,12 @@ async function handleCheckUpdate(req, res, channel) {
 // Generic handler for download endpoint
 async function handleDownload(req, res, channel) {
   try {
+    // Pour le canal beta, rediriger vers Google Play Internal Testing
+    if (channel === 'beta') {
+      console.log(`🔄 Redirecting beta download to Google Play Internal Testing`);
+      return res.redirect(301, 'https://play.google.com/apps/internaltest/4700178556172561963');
+    }
+
     const channelPath = getChannelPath(channel);
     const apkFileName = getApkFileName(channel);
     const apkPath = path.join(channelPath, apkFileName);
