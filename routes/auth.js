@@ -367,7 +367,6 @@ router.post('/login', async (req, res) => {
           member: {
             onboarding: user.Member?.onboarding,
             birthDate: user.Member?.birthDate,
-            phone: user.Member?.phone,
             profession: user.Member?.profession,
             fitnessLevel: user.Member?.fitnessLevel,
             preferredTrainingDays: user.Member?.preferredTrainingDays,
