@@ -1,12 +1,13 @@
 const express = require('express');
-const { PrismaClient } = require('@prisma/client');
+const prisma = require('../utils/prismaClient');
 const QRCode = require('qrcode');
 const bcrypt = require('bcryptjs');
 const crypto = require('crypto');
 const { sendPasswordResetEmail } = require('../services/emailService');
+const logger = require('../utils/logger');
+const { apiLimiter } = require('../middleware/rateLimiter');
 
 const router = express.Router();
-const prisma = new PrismaClient();
 const auth = require('../middleware/auth');
 const { generateUserIdByRole } = require('../utils/idGenerator');
 const { getFullName } = require('../utils/nameUtils');
@@ -28,10 +29,10 @@ const sanitizeEmail = (email) => {
 
 // Middleware pour vérifier que c'est un owner
 const requireOwner = async (req, res, next) => {
-  console.log(`👑 Vérification rôle Owner - User: ${req.user?.email} (${req.user?.type})`);
+  logger.info(`👑 Vérification rôle Owner - User: ${req.user?.email} (${req.user?.type})`);
 
   if (!req.user) {
-    console.log('❌ req.user est undefined - Le middleware auth n\'a pas été appliqué');
+    logger.warn('❌ req.user est undefined - Le middleware auth n\'a pas été appliqué');
     return res.status(401).json({ error: 'Authentification requise' });
   }
 
@@ -42,30 +43,30 @@ const requireOwner = async (req, res, next) => {
     });
 
     if (!user) {
-      console.log(`❌ Utilisateur non trouvé: ID ${req.user.sub}`);
+      logger.warn(`❌ Utilisateur non trouvé: ID ${req.user.sub}`);
       return res.status(403).json({ error: 'Accès réservé aux propriétaires' });
     }
 
     if (user.role !== 'owner') {
-      console.log(`🚫 Rôle insuffisant: ${getFullName(user)} est ${user.role}, owner requis`);
+      logger.warn(`🚫 Rôle insuffisant: ${getFullName(user)} est ${user.role}, owner requis`);
       return res.status(403).json({ error: 'Accès réservé aux propriétaires' });
     }
 
     req.user.ownerProfile = user.owner;
-    console.log(`✅ Accès owner autorisé pour ${getFullName(user)}`);
+    logger.info(`✅ Accès owner autorisé pour ${getFullName(user)}`);
     next();
   } catch (error) {
-    console.error('💥 Erreur middleware requireOwner:', error);
+    logger.error('💥 Erreur middleware requireOwner:', error);
     res.status(500).json({ error: error.message });
   }
 };
 
 // Middleware pour vérifier que c'est un admin
 const requireAdmin = async (req, res, next) => {
-  console.log(`👨‍💼 Vérification rôle Admin - User: ${req.user?.email} (${req.user?.type})`);
+  logger.info(`👨‍💼 Vérification rôle Admin - User: ${req.user?.email} (${req.user?.type})`);
 
   if (!req.user) {
-    console.log('❌ req.user est undefined - Le middleware auth n\'a pas été appliqué');
+    logger.warn('❌ req.user est undefined - Le middleware auth n\'a pas été appliqué');
     return res.status(401).json({ error: 'Authentification requise' });
   }
 
@@ -76,20 +77,20 @@ const requireAdmin = async (req, res, next) => {
     });
 
     if (!user) {
-      console.log(`❌ Utilisateur non trouvé: ID ${req.user.sub}`);
+      logger.warn(`❌ Utilisateur non trouvé: ID ${req.user.sub}`);
       return res.status(403).json({ error: 'Accès réservé aux administrateurs' });
     }
 
     if (user.role !== 'admin') {
-      console.log(`🚫 Rôle insuffisant: ${getFullName(user)} est ${user.role}, admin requis`);
+      logger.warn(`🚫 Rôle insuffisant: ${getFullName(user)} est ${user.role}, admin requis`);
       return res.status(403).json({ error: 'Accès réservé aux administrateurs' });
     }
 
     req.user.adminProfile = user.admin;
-    console.log(`✅ Accès admin autorisé pour ${getFullName(user)}`);
+    logger.info(`✅ Accès admin autorisé pour ${getFullName(user)}`);
     next();
   } catch (error) {
-    console.error('💥 Erreur middleware requireAdmin:', error);
+    logger.error('💥 Erreur middleware requireAdmin:', error);
     res.status(500).json({ error: error.message });
   }
 };
@@ -207,23 +208,23 @@ const requireAdmin = async (req, res, next) => {
  *                 error:
  *                   type: string
  */
-router.post('/', auth, async (req, res) => {
+router.post('/', auth, apiLimiter, async (req, res) => {
   try {
     const { email, phoneNumber, password, fullName, firstName, lastName, role, gymId, permissions, sendSetupEmail = true } = req.body;
-    console.log(`👤 Création utilisateur - Email: ${email}, PhoneNumber: ${phoneNumber}, Role: ${role}, Gym: ${gymId}`);
+    logger.info(`👤 Création utilisateur - Email: ${email}, PhoneNumber: ${phoneNumber}, Role: ${role}, Gym: ${gymId}`);
 
     // Au moins email ou phoneNumber doit être fourni
     // Accepter soit fullName (pour rétrocompat) soit firstName+lastName
     const hasName = fullName || (firstName && lastName);
     if ((!email && !phoneNumber) || !hasName || !role || !gymId) {
-      console.log(`❌ Champs manquants pour création utilisateur`);
+      logger.warn(`❌ Champs manquants pour création utilisateur`);
       return res.status(400).json({ error: 'Email ou phoneNumber, (fullName ou firstName+lastName), role et gymId requis' });
     }
 
     // Vérifier les permissions selon le rôle du créateur
     const requester = await prisma.user.findUnique({ where: { id: req.user.sub } });
     if (!requester) {
-      console.log(`❌ Requester non trouvé: ID ${req.user.sub}`);
+      logger.warn(`❌ Requester non trouvé: ID ${req.user.sub}`);
       return res.status(403).json({ error: 'Forbidden' });
     }
 
@@ -240,7 +241,7 @@ router.post('/', auth, async (req, res) => {
     }
 
     if (!canCreate) {
-      console.log(`🚫 Permissions insuffisantes - ${requester.role} ne peut pas créer ${role}`);
+      logger.warn(`🚫 Permissions insuffisantes - ${requester.role} ne peut pas créer ${role}`);
       return res.status(403).json({ error: 'Vous n\'avez pas les permissions pour créer cet utilisateur' });
     }
 
@@ -251,7 +252,7 @@ router.post('/', auth, async (req, res) => {
     if (sanitizedEmail) {
       const existingUserByEmail = await prisma.user.findUnique({ where: { email: sanitizedEmail } });
       if (existingUserByEmail) {
-        console.log(`❌ Email déjà utilisé: ${email}`);
+        logger.warn(`❌ Email déjà utilisé: ${email}`);
         return res.status(400).json({ error: 'Cet email est déjà utilisé' });
       }
     }
@@ -259,7 +260,7 @@ router.post('/', auth, async (req, res) => {
     if (phoneNumber) {
       const existingUserByPhone = await prisma.user.findUnique({ where: { phoneNumber } });
       if (existingUserByPhone) {
-        console.log(`❌ Numéro de téléphone déjà utilisé: ${phoneNumber}`);
+        logger.warn(`❌ Numéro de téléphone déjà utilisé: ${phoneNumber}`);
         return res.status(400).json({ error: 'Ce numéro de téléphone est déjà utilisé' });
       }
     }
@@ -271,18 +272,18 @@ router.post('/', auth, async (req, res) => {
     
     if (password) {
       hashedPassword = await bcrypt.hash(password, 10);
-      console.log(`🔐 Mot de passe fourni et hashé`);
+      logger.info(`🔐 Mot de passe fourni et hashé`);
     } else {
       // Si phoneNumber sans mot de passe: erreur car on ne peut pas envoyer d'email
       if (phoneNumber && !email) {
-        console.log(`❌ Mot de passe requis pour création avec phoneNumber uniquement`);
+        logger.warn(`❌ Mot de passe requis pour création avec phoneNumber uniquement`);
         return res.status(400).json({ error: 'Le mot de passe est requis pour les utilisateurs créés avec un numéro de téléphone uniquement' });
       }
       // Générer un mot de passe temporaire aléatoire
       const tempPassword = crypto.randomBytes(32).toString('hex');
       hashedPassword = await bcrypt.hash(tempPassword, 10);
       shouldSendSetupEmail = sendSetupEmail !== false && !!email; // Envoyer uniquement si email fourni
-      console.log(`🔐 Mot de passe temporaire généré, email sera envoyé: ${shouldSendSetupEmail}`);
+      logger.info(`🔐 Mot de passe temporaire généré, email sera envoyé: ${shouldSendSetupEmail}`);
     }
 
     // Préparer les données utilisateur (gérer fullName ou firstName/lastName)
@@ -350,9 +351,9 @@ router.post('/', auth, async (req, res) => {
         data: { qrCode: qrCodeBuffer }
       });
 
-      console.log(`✅ QR code généré et stocké pour ${getFullName(user)} (${qrCodeBuffer.length} bytes)`);
+      logger.info(`✅ QR code généré et stocké pour ${getFullName(user)} (${qrCodeBuffer.length} bytes)`);
     } catch (qrError) {
-      console.error(`⚠️ Erreur génération QR code pour ${getFullName(user)}:`, qrError);
+      logger.error(`⚠️ Erreur génération QR code pour ${getFullName(user)}:`, qrError);
       // Ne pas échouer la création utilisateur si le QR code échoue
     }
 
@@ -361,7 +362,7 @@ router.post('/', auth, async (req, res) => {
       await prisma.admin.create({
         data: { userId: user.id }
       });
-      console.log(`✅ Profil admin créé pour ${getFullName(user)}`);
+      logger.info(`✅ Profil admin créé pour ${getFullName(user)}`);
     } else if (role === 'member') {
       await prisma.member.create({
         data: { 
@@ -369,7 +370,7 @@ router.post('/', auth, async (req, res) => {
           uniqueCode: user.uniqueCode
         }
       });
-      console.log(`✅ Profil member créé pour ${getFullName(user)}`);
+      logger.info(`✅ Profil member créé pour ${getFullName(user)}`);
     } else if (role === 'owner') {
       await prisma.owner.create({
         data: {
@@ -380,7 +381,7 @@ router.post('/', auth, async (req, res) => {
           maxGymsAllowed: permissions?.maxGymsAllowed ?? 5,
         }
       });
-      console.log(`✅ Profil owner créé pour ${getFullName(user)}`);
+      logger.info(`✅ Profil owner créé pour ${getFullName(user)}`);
     }
 
     // Si pas de mot de passe fourni et email disponible, envoyer l'email d'activation
@@ -402,13 +403,13 @@ router.post('/', auth, async (req, res) => {
         // Envoyer l'email avec le token
         await sendPasswordResetEmail(email, setupToken, true); // true = setup mode
 
-        console.log(`📧 Email d'activation envoyé à ${email}`);
+        logger.info(`📧 Email d'activation envoyé à ${email}`);
       } catch (emailError) {
-        console.error(`⚠️ Erreur envoi email d'activation:`, emailError);
+        logger.error(`⚠️ Erreur envoi email d'activation:`, emailError);
         // Ne pas échouer la création si l'email échoue
       }
     } else if (phoneNumber && !email) {
-      console.log(`📱 Utilisateur créé avec phoneNumber uniquement - Pas d'email de bienvenue envoyé`);
+      logger.info(`📱 Utilisateur créé avec phoneNumber uniquement - Pas d'email de bienvenue envoyé`);
     }
 
     // Retourner l'utilisateur sans le mot de passe
@@ -424,7 +425,7 @@ router.post('/', auth, async (req, res) => {
     });
 
   } catch (e) {
-    console.error('💥 Erreur création utilisateur:', e);
+    logger.error('💥 Erreur création utilisateur:', e);
     handleError(res, e);
   }
 });
@@ -506,12 +507,12 @@ router.get('/', auth, async (req, res) => {
     res.json({ users: safeUsers });
 
   } catch (e) {
-    console.error('Erreur list utilisateurs:', e);
+    logger.error('Erreur list utilisateurs:', e);
     handleError(res, e, 500);
   }
 });
 router.get('/:id/qr', auth, async (req, res) => {
-  console.log(`🎨 Génération QR - User ID: ${req.user?.sub}, Email: ${req.user?.email}, Target User ID: ${req.params.id}`);
+  logger.info(`🎨 Génération QR - User ID: ${req.user?.sub}, Email: ${req.user?.email}, Target User ID: ${req.params.id}`);
 
   try {
     const id = Number(req.params.id);
@@ -526,51 +527,51 @@ router.get('/:id/qr', auth, async (req, res) => {
     });
 
     if (!user) {
-      console.log(`❌ Utilisateur non trouvé: ID ${id}`);
+      logger.warn(`❌ Utilisateur non trouvé: ID ${id}`);
       return notFound(res, 'User', id);
     }
 
-    console.log(`✅ Utilisateur trouvé: ${getFullName(user)} (${user.role}) - displayId: ${user.displayId}`);
+    logger.info(`✅ Utilisateur trouvé: ${getFullName(user)} (${user.role}) - displayId: ${user.displayId}`);
 
     // Check permissions: user can access their own QR, admin can access QR of users in their gym, owner can access all
     const requester = await prisma.user.findUnique({ where: { id: req.user.sub } });
     if (!requester) {
-      console.log(`❌ Requester non trouvé: ID ${req.user.sub}`);
+      logger.warn(`❌ Requester non trouvé: ID ${req.user.sub}`);
       return res.status(403).json({ error: 'Forbidden' });
     }
 
-    console.log(`👤 Requester: ${getFullName(requester)} (${requester.role})`);
+    logger.info(`👤 Requester: ${getFullName(requester)} (${requester.role})`);
 
     let hasAccess = false;
 
     if (requester.role === 'owner') {
       hasAccess = true; // Owner can access all QR codes
-      console.log(`👑 Owner ${getFullName(requester)} a accès à tous les QR codes`);
+      logger.info(`👑 Owner ${getFullName(requester)} a accès à tous les QR codes`);
     } else if (requester.role === 'admin') {
       // Admin can access their own QR code OR QR codes of users in their gym
       if (req.user.sub === id) {
         hasAccess = true; // Admin accessing their own QR code
-        console.log(`✅ Admin ${getFullName(requester)} accède à son propre QR code`);
+        logger.info(`✅ Admin ${getFullName(requester)} accède à son propre QR code`);
       } else {
         // Check if admin and target user are in the same gym
         const admin = await prisma.admin.findUnique({ where: { userId: req.user.sub } });
         hasAccess = admin && user.gymId === admin.gymId;
-        console.log(`👨‍💼 Admin ${getFullName(requester)} - Accès: ${hasAccess} (admin.gymId: ${admin?.gymId}, user.gymId: ${user.gymId})`);
+        logger.info(`👨‍💼 Admin ${getFullName(requester)} - Accès: ${hasAccess} (admin.gymId: ${admin?.gymId}, user.gymId: ${user.gymId})`);
       }
     } else if (requester.role === 'member') {
       // Member can only access their own QR code
       hasAccess = req.user.sub === id;
-      console.log(`👤 Membre ${getFullName(requester)} - Accès: ${hasAccess} (own QR: ${req.user.sub === id})`);
+      logger.info(`👤 Membre ${getFullName(requester)} - Accès: ${hasAccess} (own QR: ${req.user.sub === id})`);
     }
 
     if (!hasAccess) {
-      console.log(`❌ Accès refusé pour ${getFullName(requester)} vers QR de ${getFullName(user)}`);
+      logger.warn(`❌ Accès refusé pour ${getFullName(requester)} vers QR de ${getFullName(user)}`);
       return res.status(403).json({ error: 'Forbidden: You cannot access this QR code' });
     }
 
     // Récupérer le QR code stocké en base
     if (!user.qrCode) {
-      console.log(`⚠️ QR code non trouvé pour ${getFullName(user)}, régénération...`);
+      logger.warn(`⚠️ QR code non trouvé pour ${getFullName(user)}, régénération...`);
       
       // Fallback: régénérer le QR code si non stocké
       const qrData = JSON.stringify({
@@ -601,7 +602,7 @@ router.get('/:id/qr', auth, async (req, res) => {
         data: { qrCode: qrCodeBuffer }
       });
 
-      console.log(`✅ QR code régénéré et stocké pour ${getFullName(user)} (${qrCodeBuffer.length} bytes)`);
+      logger.info(`✅ QR code régénéré et stocké pour ${getFullName(user)} (${qrCodeBuffer.length} bytes)`);
 
       // Set response headers for PNG image
       res.setHeader('Content-Type', 'image/png');
@@ -610,7 +611,7 @@ router.get('/:id/qr', auth, async (req, res) => {
       return res.send(qrCodeBuffer);
     }
 
-    console.log(`✅ QR code récupéré depuis base pour ${getFullName(user)} (${user.qrCode.length} bytes)`);
+    logger.info(`✅ QR code récupéré depuis base pour ${getFullName(user)} (${user.qrCode.length} bytes)`);
 
     // Set response headers for PNG image
     res.setHeader('Content-Type', 'image/png');
@@ -621,7 +622,7 @@ router.get('/:id/qr', auth, async (req, res) => {
     res.send(user.qrCode);
 
   } catch (e) {
-    console.error(`💥 Erreur dans génération QR:`, e);
+    logger.error(`💥 Erreur dans génération QR:`, e);
     handleError(res, e, 500);
   }
 });
@@ -734,13 +735,13 @@ router.get('/:id/qr', auth, async (req, res) => {
  *         description: Server error
  */
 router.put('/fcm-token', auth, async (req, res) => {
-  console.log(`🔔 Mise à jour FCM token - User: ${req.user?.email}`);
+  logger.info(`🔔 Mise à jour FCM token - User: ${req.user?.email}`);
   
   try {
     const { fcmToken } = req.body;
 
     if (!fcmToken || typeof fcmToken !== 'string') {
-      console.log(`❌ FCM token invalide`);
+      logger.warn(`❌ FCM token invalide`);
       return res.status(400).json({ error: 'FCM token requis et doit être une chaîne de caractères' });
     }
 
@@ -756,14 +757,14 @@ router.put('/fcm-token', auth, async (req, res) => {
       }
     });
 
-    console.log(`✅ FCM token mis à jour pour ${getFullName(updatedUser)}`);
+    logger.info(`✅ FCM token mis à jour pour ${getFullName(updatedUser)}`);
     
     res.json({
       message: 'FCM token mis à jour avec succès',
       user: updatedUser
     });
   } catch (error) {
-    console.error('💥 Erreur mise à jour FCM token:', error);
+    logger.error('💥 Erreur mise à jour FCM token:', error);
     res.status(500).json({ error: error.message });
   }
 });
@@ -794,7 +795,7 @@ router.put('/fcm-token', auth, async (req, res) => {
  *         description: Server error
  */
 router.delete('/fcm-token', auth, async (req, res) => {
-  console.log(`🔕 Suppression FCM token - User: ${req.user?.email}`);
+  logger.info(`🔕 Suppression FCM token - User: ${req.user?.email}`);
   
   try {
     await prisma.user.update({
@@ -802,13 +803,13 @@ router.delete('/fcm-token', auth, async (req, res) => {
       data: { fcmToken: null }
     });
 
-    console.log(`✅ FCM token supprimé pour user ID ${req.user.sub}`);
+    logger.info(`✅ FCM token supprimé pour user ID ${req.user.sub}`);
     
     res.json({
       message: 'FCM token supprimé avec succès'
     });
   } catch (error) {
-    console.error('💥 Erreur suppression FCM token:', error);
+    logger.error('💥 Erreur suppression FCM token:', error);
     res.status(500).json({ error: error.message });
   }
 });
@@ -911,7 +912,7 @@ router.delete('/fcm-token', auth, async (req, res) => {
  *                 error:
  *                   type: string
  */
-router.put('/:id', auth, async (req, res) => {
+router.put('/:id', auth, apiLimiter, async (req, res) => {
   try {
     const id = Number(req.params.id);
     
@@ -991,9 +992,9 @@ router.put('/:id', auth, async (req, res) => {
           data: { qrCode: qrCodeBuffer }
         });
 
-        console.log(`🔄 QR code régénéré pour ${getFullName(updatedUser)} après mise à jour`);
+        logger.info(`🔄 QR code régénéré pour ${getFullName(updatedUser)} après mise à jour`);
       } catch (qrError) {
-        console.error(`⚠️ Erreur régénération QR code pour ${getFullName(updatedUser)}:`, qrError);
+        logger.error(`⚠️ Erreur régénération QR code pour ${getFullName(updatedUser)}:`, qrError);
       }
     }
 
@@ -1018,7 +1019,7 @@ router.put('/:id', auth, async (req, res) => {
 
   } catch (e) {
     if (e.code === 'P2025') return notFound(res, 'User', req.params.id);
-    console.error('Erreur update utilisateur:', e);
+    logger.error('Erreur update utilisateur:', e);
     handleError(res, e);
   }
 });
@@ -1085,7 +1086,7 @@ router.put('/:id', auth, async (req, res) => {
  *                 error:
  *                   type: string
  */
-router.delete('/:id', auth, async (req, res) => {
+router.delete('/:id', auth, apiLimiter, async (req, res) => {
   try {
     const id = Number(req.params.id);
 
@@ -1128,11 +1129,12 @@ router.delete('/:id', auth, async (req, res) => {
     // Supprimer l'utilisateur
     await prisma.user.delete({ where: { id } });
 
+    logger.info(`🗑️ Utilisateur supprimé: ${getFullName(targetUser)} (ID: ${id}) par ${getFullName(requester)}`);
     res.json({ message: 'Utilisateur supprimé avec succès', deletedId: id });
 
   } catch (e) {
     if (e.code === 'P2025') return notFound(res, 'User', req.params.id);
-    console.error('Erreur delete utilisateur:', e);
+    logger.error('Erreur delete utilisateur:', e);
     handleError(res, e);
   }
 });
@@ -1220,44 +1222,44 @@ router.delete('/:id', auth, async (req, res) => {
  *                   type: string
  */
 router.put('/:id/profile-image', auth, async (req, res) => {
-  console.log(`🖼️ Upload photo profil - User ID: ${req.params.id}, Requester: ${req.user?.email}`);
+  logger.info(`🖼️ Upload photo profil - User ID: ${req.params.id}, Requester: ${req.user?.email}`);
 
   try {
     const id = Number(req.params.id);
     const { imageData } = req.body;
 
     if (!imageData) {
-      console.log(`❌ Données image manquantes pour user ${id}`);
+      logger.warn(`❌ Données image manquantes pour user ${id}`);
       return res.status(400).json({ error: 'Données d\'image requises' });
     }
 
     // Vérifier les permissions
     const requester = await prisma.user.findUnique({ where: { id: req.user.sub } });
     if (!requester) {
-      console.log(`❌ Requester non trouvé: ID ${req.user.sub}`);
+      logger.warn(`❌ Requester non trouvé: ID ${req.user.sub}`);
       return res.status(403).json({ error: 'Forbidden' });
     }
 
     const targetUser = await prisma.user.findUnique({ where: { id } });
     if (!targetUser) {
-      console.log(`❌ Utilisateur non trouvé: ID ${id}`);
+      logger.warn(`❌ Utilisateur non trouvé: ID ${id}`);
       return notFound(res, 'User', id);
     }
 
     let canUpdate = false;
     if (requester.role === 'owner') {
       canUpdate = true;
-      console.log(`👑 Owner ${getFullName(requester)} peut modifier photo profil user ${id}`);
+      logger.info(`👑 Owner ${getFullName(requester)} peut modifier photo profil user ${id}`);
     } else if (requester.role === 'admin') {
       canUpdate = targetUser.gymId === requester.gymId;
-      console.log(`👨‍💼 Admin ${getFullName(requester)} ${canUpdate ? 'peut modifier' : 'ne peut pas modifier'} photo profil user ${id}`);
+      logger.info(`👨‍💼 Admin ${getFullName(requester)} ${canUpdate ? 'peut modifier' : 'ne peut pas modifier'} photo profil user ${id}`);
     } else if (requester.role === 'member') {
       canUpdate = id === req.user.sub;
-      console.log(`👤 Membre ${getFullName(requester)} ${canUpdate ? 'peut modifier' : 'ne peut pas modifier'} sa propre photo profil`);
+      logger.info(`👤 Membre ${getFullName(requester)} ${canUpdate ? 'peut modifier' : 'ne peut pas modifier'} sa propre photo profil`);
     }
 
     if (!canUpdate) {
-      console.log(`🚫 Permissions insuffisantes pour ${getFullName(requester)}`);
+      logger.warn(`🚫 Permissions insuffisantes pour ${getFullName(requester)}`);
       return res.status(403).json({ error: 'Vous n\'avez pas les permissions pour modifier cette photo de profil' });
     }
 
@@ -1272,9 +1274,9 @@ router.put('/:id/profile-image', auth, async (req, res) => {
         // Supposer que c'est déjà du base64 pur
         imageBuffer = Buffer.from(imageData, 'base64');
       }
-      console.log(`✅ Image décodée: ${imageBuffer.length} bytes`);
+      logger.info(`✅ Image décodée: ${imageBuffer.length} bytes`);
     } catch (error) {
-      console.log(`❌ Erreur décodage image: ${error.message}`);
+      logger.warn(`❌ Erreur décodage image: ${error.message}`);
       return res.status(400).json({ error: 'Données d\'image invalides' });
     }
 
@@ -1284,12 +1286,12 @@ router.put('/:id/profile-image', auth, async (req, res) => {
       data: { profileImage: imageBuffer }
     });
 
-    console.log(`✅ Photo de profil mise à jour pour ${getFullName(targetUser)}`);
-    console.log(`📤 Réponse upload photo profil: succès`);
+    logger.info(`✅ Photo de profil mise à jour pour ${getFullName(targetUser)}`);
+    logger.info(`📤 Réponse upload photo profil: succès`);
     res.json({ message: 'Photo de profil mise à jour avec succès' });
 
   } catch (e) {
-    console.error('💥 Erreur upload photo profil:', e);
+    logger.error('💥 Erreur upload photo profil:', e);
     handleError(res, e, 500);
   }
 });
@@ -1352,7 +1354,7 @@ router.put('/:id/profile-image', auth, async (req, res) => {
  *                   type: string
  */
 router.get('/:id/profile-image', auth, async (req, res) => {
-  console.log(`🖼️ Récupération photo profil - User ID: ${req.params.id}, Requester: ${req.user?.email}`);
+  logger.info(`🖼️ Récupération photo profil - User ID: ${req.params.id}, Requester: ${req.user?.email}`);
 
   try {
     const id = Number(req.params.id);
@@ -1360,7 +1362,7 @@ router.get('/:id/profile-image', auth, async (req, res) => {
     // Vérifier les permissions
     const requester = await prisma.user.findUnique({ where: { id: req.user.sub } });
     if (!requester) {
-      console.log(`❌ Requester non trouvé: ID ${req.user.sub}`);
+      logger.warn(`❌ Requester non trouvé: ID ${req.user.sub}`);
       return res.status(403).json({ error: 'Forbidden' });
     }
 
@@ -1370,29 +1372,29 @@ router.get('/:id/profile-image', auth, async (req, res) => {
     });
 
     if (!targetUser) {
-      console.log(`❌ Utilisateur non trouvé: ID ${id}`);
+      logger.warn(`❌ Utilisateur non trouvé: ID ${id}`);
       return notFound(res, 'User', id);
     }
 
     let hasAccess = false;
     if (requester.role === 'owner') {
       hasAccess = true;
-      console.log(`👑 Owner ${getFullName(requester)} accède à photo profil user ${id}`);
+      logger.info(`👑 Owner ${getFullName(requester)} accède à photo profil user ${id}`);
     } else if (requester.role === 'admin') {
       hasAccess = targetUser.gymId === requester.gymId;
-      console.log(`👨‍💼 Admin ${getFullName(requester)} ${hasAccess ? 'accède' : 'refuse accès'} à photo profil user ${id}`);
+      logger.info(`👨‍💼 Admin ${getFullName(requester)} ${hasAccess ? 'accède' : 'refuse accès'} à photo profil user ${id}`);
     } else if (requester.role === 'member') {
       hasAccess = id === req.user.sub;
-      console.log(`👤 Membre ${getFullName(requester)} ${hasAccess ? 'accède' : 'refuse accès'} à sa propre photo profil`);
+      logger.info(`👤 Membre ${getFullName(requester)} ${hasAccess ? 'accède' : 'refuse accès'} à sa propre photo profil`);
     }
 
     if (!hasAccess) {
-      console.log(`🚫 Accès refusé à photo profil pour ${getFullName(requester)}`);
+      logger.warn(`🚫 Accès refusé à photo profil pour ${getFullName(requester)}`);
       return res.status(403).json({ error: 'Vous n\'avez pas accès à cette photo de profil' });
     }
 
     if (!targetUser.profileImage) {
-      console.log(`❌ Photo de profil non trouvée pour ${getFullName(targetUser)} - génération avatar par défaut`);
+      logger.info(`❌ Photo de profil non trouvée pour ${getFullName(targetUser)} - génération avatar par défaut`);
 
       // Générer un avatar par défaut avec les initiales
       const fullName = getFullName(targetUser);
@@ -1413,11 +1415,11 @@ router.get('/:id/profile-image', auth, async (req, res) => {
       res.setHeader('Content-Length', svgBuffer.length);
       res.setHeader('Cache-Control', 'private, max-age=3600');
 
-      console.log(`📤 Avatar par défaut généré pour ${getFullName(targetUser)}: ${initials}`);
+      logger.info(`📤 Avatar par défaut généré pour ${getFullName(targetUser)}: ${initials}`);
       return res.send(svgBuffer);
     }
 
-    console.log(`✅ Photo de profil récupérée pour ${getFullName(targetUser)} (${targetUser.profileImage.length} bytes)`);
+    logger.info(`✅ Photo de profil récupérée pour ${getFullName(targetUser)} (${targetUser.profileImage.length} bytes)`);
 
     // Déterminer le type MIME (par défaut JPEG si on ne peut pas le déterminer)
     let mimeType = 'image/jpeg';
@@ -1436,11 +1438,11 @@ router.get('/:id/profile-image', auth, async (req, res) => {
     res.setHeader('Content-Length', targetUser.profileImage.length);
     res.setHeader('Cache-Control', 'private, max-age=3600'); // Cache 1 heure
 
-    console.log(`📤 Réponse photo profil: ${mimeType}, ${targetUser.profileImage.length} bytes`);
+    logger.info(`📤 Réponse photo profil: ${mimeType}, ${targetUser.profileImage.length} bytes`);
     res.send(targetUser.profileImage);
 
   } catch (e) {
-    console.error('💥 Erreur récupération photo profil:', e);
+    logger.error('💥 Erreur récupération photo profil:', e);
     handleError(res, e, 500);
   }
 });
@@ -1505,7 +1507,7 @@ router.get('/:id/profile-image', auth, async (req, res) => {
  *                   type: string
  */
 router.delete('/:id/profile-image', auth, async (req, res) => {
-  console.log(`🗑️ Suppression photo profil - User ID: ${req.params.id}, Requester: ${req.user?.email}`);
+  logger.info(`🗑️ Suppression photo profil - User ID: ${req.params.id}, Requester: ${req.user?.email}`);
 
   try {
     const id = Number(req.params.id);
@@ -1513,7 +1515,7 @@ router.delete('/:id/profile-image', auth, async (req, res) => {
     // Vérifier les permissions
     const requester = await prisma.user.findUnique({ where: { id: req.user.sub } });
     if (!requester) {
-      console.log(`❌ Requester non trouvé: ID ${req.user.sub}`);
+      logger.warn(`❌ Requester non trouvé: ID ${req.user.sub}`);
       return res.status(403).json({ error: 'Forbidden' });
     }
 
@@ -1523,24 +1525,24 @@ router.delete('/:id/profile-image', auth, async (req, res) => {
     });
 
     if (!targetUser) {
-      console.log(`❌ Utilisateur non trouvé: ID ${id}`);
+      logger.warn(`❌ Utilisateur non trouvé: ID ${id}`);
       return notFound(res, 'User', id);
     }
 
     let canDelete = false;
     if (requester.role === 'owner') {
       canDelete = true;
-      console.log(`👑 Owner ${getFullName(requester)} peut supprimer photo profil user ${id}`);
+      logger.info(`👑 Owner ${getFullName(requester)} peut supprimer photo profil user ${id}`);
     } else if (requester.role === 'admin') {
       canDelete = targetUser.gymId === requester.gymId;
-      console.log(`👨‍💼 Admin ${getFullName(requester)} ${canDelete ? 'peut supprimer' : 'ne peut pas supprimer'} photo profil user ${id}`);
+      logger.info(`👨‍💼 Admin ${getFullName(requester)} ${canDelete ? 'peut supprimer' : 'ne peut pas supprimer'} photo profil user ${id}`);
     } else if (requester.role === 'member') {
       canDelete = id === req.user.sub;
-      console.log(`👤 Membre ${getFullName(requester)} ${canDelete ? 'peut supprimer' : 'ne peut pas supprimer'} sa propre photo profil`);
+      logger.info(`👤 Membre ${getFullName(requester)} ${canDelete ? 'peut supprimer' : 'ne peut pas supprimer'} sa propre photo profil`);
     }
 
     if (!canDelete) {
-      console.log(`🚫 Permissions insuffisantes pour ${getFullName(requester)}`);
+      logger.warn(`🚫 Permissions insuffisantes pour ${getFullName(requester)}`);
       return res.status(403).json({ error: 'Vous n\'avez pas les permissions pour supprimer cette photo de profil' });
     }
 
@@ -1550,12 +1552,12 @@ router.delete('/:id/profile-image', auth, async (req, res) => {
       data: { profileImage: null }
     });
 
-    console.log(`✅ Photo de profil supprimée pour ${getFullName(targetUser)}`);
-    console.log(`📤 Réponse suppression photo profil: succès`);
+    logger.info(`✅ Photo de profil supprimée pour ${getFullName(targetUser)}`);
+    logger.info(`📤 Réponse suppression photo profil: succès`);
     res.json({ message: 'Photo de profil supprimée avec succès' });
 
   } catch (e) {
-    console.error('💥 Erreur suppression photo profil:', e);
+    logger.error('💥 Erreur suppression photo profil:', e);
     handleError(res, e, 500);
   }
 });
@@ -1678,40 +1680,40 @@ router.get('/:id', auth, async (req, res) => {
     if (!user) return notFound(res, 'User', id);
 
     // Check permissions
-    console.log(`🔍 Vérification permissions GET /users/${id} - Requester: ${req.user?.email} (sub: ${req.user?.sub})`);
+    logger.info(`🔍 Vérification permissions GET /users/${id} - Requester: ${req.user?.email} (sub: ${req.user?.sub})`);
     
     const requester = await prisma.user.findUnique({ where: { id: req.user.sub } });
     if (!requester) {
-      console.log(`❌ Requester non trouvé dans la DB: ID ${req.user.sub}`);
+      logger.warn(`❌ Requester non trouvé dans la DB: ID ${req.user.sub}`);
       return res.status(403).json({ error: 'Forbidden' });
     }
 
-    console.log(`✅ Requester trouvé: ${getFullName(requester)} (role: ${requester.role}, gymId: ${requester.gymId})`);
-    console.log(`🎯 Target user: ${getFullName(user)} (role: ${user.role}, gymId: ${user.gymId})`);
+    logger.info(`✅ Requester trouvé: ${getFullName(requester)} (role: ${requester.role}, gymId: ${requester.gymId})`);
+    logger.info(`🎯 Target user: ${getFullName(user)} (role: ${user.role}, gymId: ${user.gymId})`);
 
     let hasAccess = false;
 
     if (requester.role === 'owner') {
       hasAccess = true;
-      console.log(`👑 Owner ${getFullName(requester)} a accès à tous les profils utilisateur`);
+      logger.info(`👑 Owner ${getFullName(requester)} a accès à tous les profils utilisateur`);
     } else if (requester.role === 'admin') {
       const admin = await prisma.admin.findUnique({ where: { userId: req.user.sub } });
-      console.log(`👨‍💼 Admin profile trouvé: ${admin ? 'oui' : 'non'}${admin ? ` (gymId: ${admin.gymId})` : ''}`);
+      logger.info(`👨‍💼 Admin profile trouvé: ${admin ? 'oui' : 'non'}${admin ? ` (gymId: ${admin.gymId})` : ''}`);
       hasAccess = admin && user.gymId === requester.gymId;
-      console.log(`🔍 Comparaison gymIds - Admin: ${requester.gymId}, User: ${user.gymId}, Match: ${hasAccess}`);
-      console.log(`👨‍💼 Admin ${getFullName(requester)} ${hasAccess ? 'a accès' : 'n\'a PAS accès'} au profil de ${getFullName(user)}`);
+      logger.info(`🔍 Comparaison gymIds - Admin: ${requester.gymId}, User: ${user.gymId}, Match: ${hasAccess}`);
+      logger.info(`👨‍💼 Admin ${getFullName(requester)} ${hasAccess ? 'a accès' : 'n\'a PAS accès'} au profil de ${getFullName(user)}`);
     } else if (requester.role === 'member') {
       hasAccess = req.user.sub === id;
-      console.log(`👤 Membre ${getFullName(requester)} ${hasAccess ? 'accède à son propre profil' : 'tente d\'accéder au profil d\'un autre utilisateur'}`);
+      logger.info(`👤 Membre ${getFullName(requester)} ${hasAccess ? 'accède à son propre profil' : 'tente d\'accéder au profil d\'un autre utilisateur'}`);
     }
 
     if (!hasAccess) {
-      console.log(`🚫 ACCÈS REFUSÉ - ${getFullName(requester)} (${requester.role}) ne peut pas accéder au profil de ${getFullName(user)} (${user.role})`);
-      console.log(`📊 Détails refus: requester.gymId=${requester.gymId}, user.gymId=${user.gymId}, requester.id=${requester.id}, target.id=${id}`);
+      logger.warn(`🚫 ACCÈS REFUSÉ - ${getFullName(requester)} (${requester.role}) ne peut pas accéder au profil de ${getFullName(user)} (${user.role})`);
+      logger.warn(`📊 Détails refus: requester.gymId=${requester.gymId}, user.gymId=${user.gymId}, requester.id=${requester.id}, target.id=${id}`);
       return res.status(403).json({ error: 'Forbidden: You cannot access this user profile' });
     }
 
-    console.log(`✅ ACCÈS AUTORISÉ - ${getFullName(requester)} peut accéder au profil de ${getFullName(user)}`);
+    logger.info(`✅ ACCÈS AUTORISÉ - ${getFullName(requester)} peut accéder au profil de ${getFullName(user)}`);
 
 
     // Return user data based on role
@@ -1740,14 +1742,14 @@ router.get('/:id', auth, async (req, res) => {
       };
     }
 
-    console.log(`📤 Réponse user profile pour ${getFullName(user)}:`, {
+    logger.info(`📤 Réponse user profile pour ${getFullName(user)}:`, {
       ...response,
       recentPayments: response.recentPayments ? `${response.recentPayments.length} paiements` : 'aucun'
     });
     res.json(response);
 
   } catch (e) {
-    console.error('Error fetching user:', e);
+    logger.error('Error fetching user:', e);
     handleError(res, e, 500);
   }
 });
@@ -1870,10 +1872,12 @@ router.get('/:id', auth, async (req, res) => {
  *                   type: string
  *                   example: "Erreur lors de la création du propriétaire"
  */
-router.post('/create-owner', auth, requireOwner, async (req, res) => {
+router.post('/create-owner', auth, requireOwner, apiLimiter, async (req, res) => {
   const { email, password, fullName, gymId, permissions } = req.body;
+  logger.info(`👑 Création owner - Email: ${email}, Gym ID: ${gymId}, Requester: ${req.user?.email}`);
 
   if (!email || !password || !fullName || !gymId) {
+    logger.warn(`❌ Champs manquants pour création owner`);
     return res.status(400).json({ error: 'Email, password, fullName et gymId requis' });
   }
 
@@ -1883,6 +1887,7 @@ router.post('/create-owner', auth, requireOwner, async (req, res) => {
     // Vérifier que l'email n'existe pas déjà
     const existingUser = await prisma.user.findUnique({ where: { email: sanitizedEmail } });
     if (existingUser) {
+      logger.warn(`❌ Email déjà utilisé: ${email}`);
       return res.status(400).json({ error: 'Cet email est déjà utilisé' });
     }
 
@@ -1907,6 +1912,8 @@ router.post('/create-owner', auth, requireOwner, async (req, res) => {
         maxGymsAllowed: permissions?.maxGymsAllowed ?? 5,
       }
     });
+
+    logger.info(`✅ Owner créé: ${getFullName(user)} (ID: ${user.id})`);
 
     // Générer et stocker le QR code
     try {
@@ -1935,9 +1942,9 @@ router.post('/create-owner', auth, requireOwner, async (req, res) => {
         data: { qrCode: qrCodeBuffer }
       });
 
-      console.log(`✅ QR code généré et stocké pour owner ${getFullName(user)}`);
+      logger.info(`✅ QR code généré et stocké pour owner ${getFullName(user)}`);
     } catch (qrError) {
-      console.error(`⚠️ Erreur génération QR code pour owner ${getFullName(user)}:`, qrError);
+      logger.error(`⚠️ Erreur génération QR code pour owner ${getFullName(user)}:`, qrError);
     }
 
     res.status(201).json({
@@ -1957,7 +1964,7 @@ router.post('/create-owner', auth, requireOwner, async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('Erreur création owner:', error);
+    logger.error('💥 Erreur création owner:', error);
     res.status(500).json({ error: 'Erreur lors de la création du propriétaire' });
   }
 });
@@ -2012,13 +2019,13 @@ router.post('/create-owner', auth, requireOwner, async (req, res) => {
  *               properties:
  *                 message:
  *                   type: string
- *                   example: "Admin créé avec succès"
+ *                   example: "Administrateur créé avec succès"
  *                 admin:
  *                   type: object
  *                   properties:
  *                     id:
  *                       type: integer
- *                       example: 2
+ *                       example: 1
  *                     email:
  *                       type: string
  *                       format: email
@@ -2026,6 +2033,9 @@ router.post('/create-owner', auth, requireOwner, async (req, res) => {
  *                     fullName:
  *                       type: string
  *                       example: "Jane Admin"
+ *                     gymId:
+ *                       type: integer
+ *                       example: 1
  *       400:
  *         description: Invalid input or email already exists
  *         content:
@@ -2051,12 +2061,14 @@ router.post('/create-owner', auth, requireOwner, async (req, res) => {
  *               properties:
  *                 error:
  *                   type: string
- *                   example: "Erreur lors de la création de l'admin"
+ *                   example: "Erreur lors de la création de l'administrateur"
  */
-router.post('/create-admin', auth, requireOwner, async (req, res) => {
+router.post('/create-admin', auth, requireOwner, apiLimiter, async (req, res) => {
   const { email, password, fullName, gymId } = req.body;
+  logger.info(`👨‍💼 Création admin - Email: ${email}, Gym ID: ${gymId}, Requester: ${req.user?.email}`);
 
   if (!email || !password || !fullName || !gymId) {
+    logger.warn(`❌ Champs manquants pour création admin`);
     return res.status(400).json({ error: 'Email, password, fullName et gymId requis' });
   }
 
@@ -2066,6 +2078,7 @@ router.post('/create-admin', auth, requireOwner, async (req, res) => {
     // Vérifier que l'email n'existe pas déjà
     const existingUser = await prisma.user.findUnique({ where: { email: sanitizedEmail } });
     if (existingUser) {
+      logger.warn(`❌ Email déjà utilisé: ${email}`);
       return res.status(400).json({ error: 'Cet email est déjà utilisé' });
     }
 
@@ -2082,8 +2095,13 @@ router.post('/create-admin', auth, requireOwner, async (req, res) => {
     });
 
     await prisma.admin.create({
-      data: { userId: user.id }
+      data: {
+        userId: user.id,
+        gymId
+      }
     });
+
+    logger.info(`✅ Admin créé: ${getFullName(user)} (ID: ${user.id})`);
 
     // Générer et stocker le QR code
     try {
@@ -2112,24 +2130,25 @@ router.post('/create-admin', auth, requireOwner, async (req, res) => {
         data: { qrCode: qrCodeBuffer }
       });
 
-      console.log(`✅ QR code généré et stocké pour admin ${getFullName(user)}`);
+      logger.info(`✅ QR code généré et stocké pour admin ${getFullName(user)}`);
     } catch (qrError) {
-      console.error(`⚠️ Erreur génération QR code pour admin ${getFullName(user)}:`, qrError);
+      logger.error(`⚠️ Erreur génération QR code pour admin ${getFullName(user)}:`, qrError);
     }
 
     res.status(201).json({
-      message: 'Admin créé avec succès',
+      message: 'Administrateur créé avec succès',
       admin: {
         id: user.id,
         email: user.email,
         firstName: user.firstName,
         lastName: user.lastName,
         fullName: getFullName(user),
+        gymId
       }
     });
   } catch (error) {
-    console.error('Erreur création admin:', error);
-    res.status(500).json({ error: 'Erreur lors de la création de l\'admin' });
+    logger.error('💥 Erreur création admin:', error);
+    res.status(500).json({ error: 'Erreur lors de la création de l\'administrateur' });
   }
 });
 
@@ -2225,57 +2244,57 @@ router.post('/create-admin', auth, requireOwner, async (req, res) => {
  *                   type: string
  */
 router.get('/gym/:gymId/members', auth, async (req, res) => {
-  console.log(`📋 Liste membres par gym - User: ${req.user?.email}, Gym ID: ${req.params.gymId}`);
+  logger.debug(`📋 Liste membres par gym - User: ${req.user?.email}, Gym ID: ${req.params.gymId}`);
 
   try {
     const gymId = Number(req.params.gymId);
-    console.log(`🔍 Conversion gymId: ${req.params.gymId} → ${gymId}`);
+    logger.debug(`🔍 Conversion gymId: ${req.params.gymId} → ${gymId}`);
 
     // Vérifier que la salle existe
-    console.log(`🔍 Recherche gym ${gymId}...`);
+    logger.debug(`🔍 Recherche gym ${gymId}...`);
     const gym = await prisma.gym.findUnique({
       where: { id: gymId },
       select: { id: true, name: true, address: true }
     });
 
     if (!gym) {
-      console.log(`❌ Gym non trouvé: ID ${gymId}`);
+      logger.warn(`❌ Gym non trouvé: ID ${gymId}`);
       return res.status(404).json({ error: `Gym with id ${gymId} not found` });
     }
 
-    console.log(`✅ Gym trouvé: ${gym.name} (${gymId})`);
+    logger.debug(`✅ Gym trouvé: ${gym.name} (${gymId})`);
 
     // Vérifier les permissions
-    console.log(`🔍 Recherche requester - ID: ${req.user.sub}`);
+    logger.debug(`🔍 Recherche requester - ID: ${req.user.sub}`);
     const requester = await prisma.user.findUnique({ where: { id: req.user.sub } });
     if (!requester) {
-      console.log(`❌ Requester non trouvé: ID ${req.user.sub}`);
+      logger.warn(`❌ Requester non trouvé: ID ${req.user.sub}`);
       return res.status(403).json({ error: 'Forbidden' });
     }
 
-    console.log(`✅ Requester trouvé: ${getFullName(requester)} (${requester.role})`);
-    console.log(`🔍 Vérification permissions selon rôle: ${requester.role}`);
+    logger.debug(`✅ Requester trouvé: ${getFullName(requester)} (${requester.role})`);
+    logger.debug(`🔍 Vérification permissions selon rôle: ${requester.role}`);
 
     let hasAccess = false;
     
     if (requester.role === 'owner') {
       hasAccess = true;
-      console.log(`👑 Owner ${getFullName(requester)} a accès à tous les membres de toutes les salles`);
+      logger.debug(`👑 Owner ${getFullName(requester)} a accès à tous les membres de toutes les salles`);
     } else if (requester.role === 'admin') {
       hasAccess = requester.gymId === gymId;
-      console.log(`👨‍💼 Admin ${getFullName(requester)} ${hasAccess ? 'a accès' : 'n\'a pas accès'} aux membres de gym ${gymId} (sa salle: ${requester.gymId})`);
+      logger.debug(`👨‍💼 Admin ${getFullName(requester)} ${hasAccess ? 'a accès' : 'n\'a pas accès'} aux membres de gym ${gymId} (sa salle: ${requester.gymId})`);
     } else {
-      console.log(`🚫 Membre ${getFullName(requester)} ne peut pas lister les membres`);
+      logger.warn(`🚫 Membre ${getFullName(requester)} ne peut pas lister les membres`);
       hasAccess = false;
     }
 
     if (!hasAccess) {
-      console.log(`🚫 Accès refusé pour ${getFullName(requester)} aux membres de gym ${gymId}`);
+      logger.warn(`🚫 Accès refusé pour ${getFullName(requester)} aux membres de gym ${gymId}`);
       return res.status(403).json({ error: 'Vous n\'avez pas accès aux membres de cette salle' });
     }
 
-    console.log(`✅ Permissions validées`);
-    console.log(`🔍 Recherche membres de gym ${gymId}...`);
+    logger.debug(`✅ Permissions validées`);
+    logger.debug(`🔍 Recherche membres de gym ${gymId}...`);
 
     // Récupérer tous les membres de la salle
     const members = await prisma.user.findMany({
@@ -2306,7 +2325,7 @@ router.get('/gym/:gymId/members', auth, async (req, res) => {
       orderBy: { createdAt: 'desc' }
     });
 
-    console.log(`✅ ${members.length} membre(s) trouvé(s) pour gym ${gym.name}`);
+    logger.info(`✅ ${members.length} membre(s) trouvé(s) pour gym ${gym.name}`);
     
     // Formater la réponse en masquant les mots de passe et en ajoutant les infos pertinentes
     const formattedMembers = members.map(user => {
@@ -2332,10 +2351,10 @@ router.get('/gym/:gymId/members', auth, async (req, res) => {
       };
     });
 
-    console.log(`📊 Statistiques membres:`);
-    console.log(`   - Total: ${formattedMembers.length}`);
-    console.log(`   - Avec abonnement actif: ${formattedMembers.filter(m => m.activeSubscription).length}`);
-    console.log(`   - Sans abonnement: ${formattedMembers.filter(m => !m.activeSubscription).length}`);
+    logger.debug(`📊 Statistiques membres:`);
+    logger.debug(`   - Total: ${formattedMembers.length}`);
+    logger.debug(`   - Avec abonnement actif: ${formattedMembers.filter(m => m.activeSubscription).length}`);
+    logger.debug(`   - Sans abonnement: ${formattedMembers.filter(m => !m.activeSubscription).length}`);
 
     const responseData = {
       gym: {
@@ -2347,11 +2366,11 @@ router.get('/gym/:gymId/members', auth, async (req, res) => {
       count: formattedMembers.length
     };
 
-    console.log(`📤 Réponse membres gym ${gymId}: ${formattedMembers.length} résultat(s)`);
+    logger.debug(`📤 Réponse membres gym ${gymId}: ${formattedMembers.length} résultat(s)`);
     res.json(responseData);
 
   } catch (e) {
-    console.error('💥 Erreur liste membres par gym:', e);
+    logger.error('💥 Erreur liste membres par gym:', e);
     res.status(500).json({ error: e.message });
   }
 });
@@ -2423,6 +2442,7 @@ router.get('/gym/:gymId/members', auth, async (req, res) => {
  *                   type: string
  */
 router.get('/gyms/all', auth, requireOwner, async (req, res) => {
+  logger.debug(`📋 Liste tous les gyms (Owner) - User: ${req.user?.email}`);
   try {
     const gyms = await prisma.gym.findMany({
       include: {
@@ -2441,8 +2461,10 @@ router.get('/gyms/all', auth, requireOwner, async (req, res) => {
       }
     });
 
+    logger.info(`✅ ${gyms.length} gyms trouvés`);
     res.json({ gyms });
   } catch (error) {
+    logger.error('💥 Erreur liste tous les gyms:', error);
     res.status(500).json({ error: error.message });
   }
 });
@@ -2509,6 +2531,7 @@ router.get('/gyms/all', auth, requireOwner, async (req, res) => {
  *                   type: string
  */
 router.get('/stats', auth, requireOwner, async (req, res) => {
+  logger.debug(`📊 Statistiques globales - User: ${req.user?.email}`);
   try {
     const [
       totalGyms,
@@ -2531,18 +2554,20 @@ router.get('/stats', auth, requireOwner, async (req, res) => {
       })
     ]);
 
-    res.json({
-      stats: {
-        totalGyms,
-        totalUsers,
-        totalAdmins,
-        totalMembers,
-        totalOwners,
-        totalPayments,
-        totalRevenue: totalRevenue._sum.amount || 0
-      }
-    });
+    const stats = {
+      totalGyms,
+      totalUsers,
+      totalAdmins,
+      totalMembers,
+      totalOwners,
+      totalPayments,
+      totalRevenue: totalRevenue._sum.amount || 0
+    };
+
+    logger.info(`✅ Statistiques récupérées:`, stats);
+    res.json({ stats });
   } catch (error) {
+    logger.error('💥 Erreur statistiques globales:', error);
     res.status(500).json({ error: error.message });
   }
 });

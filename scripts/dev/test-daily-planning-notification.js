@@ -3,11 +3,9 @@
  * Usage: node scripts/dev/test-daily-planning-notification.js
  */
 
-const { PrismaClient } = require('@prisma/client');
+const prisma = require('../../utils/prismaClient');
 const { sendPushNotification } = require('../../services/pushNotificationService');
 const { getFullName } = require('../../utils/nameUtils');
-
-const prisma = new PrismaClient();
 
 async function testDailyPlanningNotification() {
   console.log('🧪 TEST - Notification quotidienne de planning\n');
@@ -198,7 +196,7 @@ async function testDailyPlanningNotification() {
     console.error('❌ Erreur:', error);
     throw error;
   } finally {
-    await prisma.$disconnect();
+    // await prisma.$disconnect();
   }
 }
 

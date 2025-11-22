@@ -1,9 +1,10 @@
 const express = require('express');
 const { getFullName } = require('../utils/nameUtils');
-const { PrismaClient } = require('@prisma/client');
+const prisma = require('../utils/prismaClient');
+const logger = require('../utils/logger');
+const { apiLimiter } = require('../middleware/rateLimiter');
 
 const router = express.Router();
-const prisma = new PrismaClient();
 const auth = require('../middleware/auth');
 const { generateGymId } = require('../utils/idGenerator');
 
@@ -17,10 +18,10 @@ function notFound(res, entity, id) {
 
 // Middleware pour vérifier que c'est un owner
 const requireOwner = async (req, res, next) => {
-  console.log(`👑 Vérification rôle Owner - User: ${req.user?.email} (${req.user?.type})`);
+  logger.debug(`👑 Vérification rôle Owner - User: ${req.user?.email} (${req.user?.type})`);
 
   if (!req.user) {
-    console.log('❌ req.user est undefined - Le middleware auth n\'a pas été appliqué');
+    logger.warn('❌ req.user est undefined - Le middleware auth n\'a pas été appliqué');
     return res.status(401).json({ error: 'Authentification requise' });
   }
 
@@ -31,30 +32,30 @@ const requireOwner = async (req, res, next) => {
     });
 
     if (!user) {
-      console.log(`❌ Utilisateur non trouvé: ID ${req.user.sub}`);
+      logger.warn(`❌ Utilisateur non trouvé: ID ${req.user.sub}`);
       return res.status(403).json({ error: 'Accès réservé aux propriétaires' });
     }
 
     if (user.role !== 'owner') {
-      console.log(`🚫 Rôle insuffisant: ${getFullName(user)} est ${user.role}, owner requis`);
+      logger.warn(`🚫 Rôle insuffisant: ${getFullName(user)} est ${user.role}, owner requis`);
       return res.status(403).json({ error: 'Accès réservé aux propriétaires' });
     }
 
     req.user.ownerProfile = user.Owner;
-    console.log(`✅ Accès owner autorisé pour ${getFullName(user)}`);
+    logger.debug(`✅ Accès owner autorisé pour ${getFullName(user)}`);
     next();
   } catch (error) {
-    console.error('💥 Erreur middleware requireOwner:', error);
+    logger.error('💥 Erreur middleware requireOwner:', error);
     res.status(500).json({ error: error.message });
   }
 };
 
 // Middleware pour vérifier que c'est un admin
 const requireAdmin = async (req, res, next) => {
-  console.log(`👨‍💼 Vérification rôle Admin - User: ${req.user?.email} (${req.user?.type})`);
+  logger.debug(`👨‍💼 Vérification rôle Admin - User: ${req.user?.email} (${req.user?.type})`);
 
   if (!req.user) {
-    console.log('❌ req.user est undefined - Le middleware auth n\'a pas été appliqué');
+    logger.warn('❌ req.user est undefined - Le middleware auth n\'a pas été appliqué');
     return res.status(401).json({ error: 'Authentification requise' });
   }
 
@@ -65,20 +66,20 @@ const requireAdmin = async (req, res, next) => {
     });
 
     if (!user) {
-      console.log(`❌ Utilisateur non trouvé: ID ${req.user.sub}`);
+      logger.warn(`❌ Utilisateur non trouvé: ID ${req.user.sub}`);
       return res.status(403).json({ error: 'Accès réservé aux administrateurs' });
     }
 
     if (user.role !== 'admin') {
-      console.log(`🚫 Rôle insuffisant: ${getFullName(user)} est ${user.role}, admin requis`);
+      logger.warn(`🚫 Rôle insuffisant: ${getFullName(user)} est ${user.role}, admin requis`);
       return res.status(403).json({ error: 'Accès réservé aux administrateurs' });
     }
 
     req.user.adminProfile = user.Admin;
-    console.log(`✅ Accès admin autorisé pour ${getFullName(user)}`);
+    logger.debug(`✅ Accès admin autorisé pour ${getFullName(user)}`);
     next();
   } catch (error) {
-    console.error('💥 Erreur middleware requireAdmin:', error);
+    logger.error('💥 Erreur middleware requireAdmin:', error);
     res.status(500).json({ error: error.message });
   }
 };
@@ -143,8 +144,8 @@ const requireAdmin = async (req, res, next) => {
  *       500:
  *         description: Server error
  */
-router.post('/', auth, requireOwner, async (req, res) => {
-  console.log(`🏢 Création salle de sport - Owner: ${req.user?.email}, Données:`, {
+router.post('/', auth, requireOwner, apiLimiter, async (req, res) => {
+  logger.info(`🏢 Création salle de sport - Owner: ${req.user?.email}, Données:`, {
     name: req.body.name,
     address: req.body.address,
     phone: req.body.phone
@@ -154,11 +155,11 @@ router.post('/', auth, requireOwner, async (req, res) => {
     const { name, address, phone } = req.body;
 
     if (!name || !address) {
-      console.log(`❌ Création gym échouée - Champs manquants: name=${!!name}, address=${!!address}`);
+      logger.warn(`❌ Création gym échouée - Champs manquants: name=${!!name}, address=${!!address}`);
       return res.status(400).json({ error: 'Nom et adresse requis' });
     }
 
-    console.log(`✅ Données validées pour gym: ${name}`);
+    logger.debug(`✅ Données validées pour gym: ${name}`);
 
     const gym = await prisma.gym.create({
       data: {
@@ -169,17 +170,17 @@ router.post('/', auth, requireOwner, async (req, res) => {
       }
     });
 
-    console.log(`✅ Gym créé en base: ${gym.name} (ID: ${gym.id})`);
+    logger.info(`✅ Gym créé en base: ${gym.name} (ID: ${gym.id})`);
 
     const responseData = {
       message: 'Salle de sport créée avec succès',
       gym
     };
 
-    console.log(`📤 Réponse création gym:`, responseData);
+    logger.debug(`📤 Réponse création gym:`, responseData);
     res.status(201).json(responseData);
   } catch (e) {
-    console.error('💥 Erreur création gym:', e);
+    logger.error('💥 Erreur création gym:', e);
     handleError(res, e);
   }
 });
@@ -212,12 +213,12 @@ router.post('/', auth, requireOwner, async (req, res) => {
  *         description: Server error
  */
 router.get('/', auth, async (req, res) => {
-  console.log(`📋 Liste des gyms - User: ${req.user?.email} (${req.user?.type})`);
+  logger.debug(`📋 Liste des gyms - User: ${req.user?.email} (${req.user?.type})`);
 
   try {
     const requester = await prisma.user.findUnique({ where: { id: req.user.sub } });
     if (!requester) {
-      console.log(`❌ Requester non trouvé: ID ${req.user.sub}`);
+      logger.warn(`❌ Requester non trouvé: ID ${req.user.sub}`);
       return res.status(403).json({ error: 'Forbidden' });
     }
 
@@ -226,13 +227,13 @@ router.get('/', auth, async (req, res) => {
     if (requester.role === 'admin') {
       // Admin voit seulement sa salle
       whereClause.id = requester.gymId;
-      console.log(`👨‍💼 Admin ${getFullName(requester)} voit seulement sa salle: ${requester.gymId}`);
+      logger.debug(`👨‍💼 Admin ${getFullName(requester)} voit seulement sa salle: ${requester.gymId}`);
     } else if (requester.role === 'member') {
       // Member voit seulement sa salle
       whereClause.id = requester.gymId;
-      console.log(`👤 Membre ${getFullName(requester)} voit seulement sa salle: ${requester.gymId}`);
+      logger.debug(`👤 Membre ${getFullName(requester)} voit seulement sa salle: ${requester.gymId}`);
     } else {
-      console.log(`👑 Owner ${getFullName(requester)} voit toutes les salles`);
+      logger.debug(`👑 Owner ${getFullName(requester)} voit toutes les salles`);
     }
     // Owner voit toutes les salles
 
@@ -256,13 +257,13 @@ router.get('/', auth, async (req, res) => {
       orderBy: { createdAt: 'desc' }
     });
 
-    console.log(`✅ ${gyms.length} gym(s) trouvé(s)`);
+    logger.info(`✅ ${gyms.length} gym(s) trouvé(s)`);
 
     const responseData = { gyms };
-    console.log(`📤 Réponse liste gyms: ${gyms.length} résultat(s)`);
+    logger.debug(`📤 Réponse liste gyms: ${gyms.length} résultat(s)`);
     res.json(responseData);
   } catch (e) {
-    console.error('💥 Erreur list gyms:', e);
+    logger.error('💥 Erreur list gyms:', e);
     handleError(res, e, 500);
   }
 });
@@ -339,15 +340,15 @@ router.get('/', auth, async (req, res) => {
  *         description: Server error
  */
 router.get('/:id', auth, async (req, res) => {
-  console.log(`🔍 Détails gym - ID: ${req.params.id}, User: ${req.user?.email} (${req.user?.type})`);
+  logger.debug(`🔍 Détails gym - ID: ${req.params.id}, User: ${req.user?.email} (${req.user?.type})`);
 
   try {
     const id = Number(req.params.id);
-    console.log(`🔢 Conversion ID: ${req.params.id} → ${id}`);
+    logger.debug(`🔢 Conversion ID: ${req.params.id} → ${id}`);
 
     const requester = await prisma.user.findUnique({ where: { id: req.user.sub } });
     if (!requester) {
-      console.log(`❌ Requester non trouvé: ID ${req.user.sub}`);
+      logger.warn(`❌ Requester non trouvé: ID ${req.user.sub}`);
       return res.status(403).json({ error: 'Forbidden' });
     }
 
@@ -355,18 +356,18 @@ router.get('/:id', auth, async (req, res) => {
     let hasAccess = false;
     if (requester.role === 'owner') {
       hasAccess = true;
-      console.log(`👑 Owner ${getFullName(requester)} accède à gym ${id}`);
+      logger.debug(`👑 Owner ${getFullName(requester)} accède à gym ${id}`);
     } else if (requester.role === 'admin' || requester.role === 'member') {
       hasAccess = requester.gymId === id;
-      console.log(`${requester.role === 'admin' ? '👨‍💼' : '👤'} ${requester.role} ${getFullName(requester)} ${hasAccess ? 'accède' : 'refuse accès'} à gym ${id} (sa salle: ${requester.gymId})`);
+      logger.debug(`${requester.role === 'admin' ? '👨‍💼' : '👤'} ${requester.role} ${getFullName(requester)} ${hasAccess ? 'accède' : 'refuse accès'} à gym ${id} (sa salle: ${requester.gymId})`);
     }
 
     if (!hasAccess) {
-      console.log(`🚫 Accès refusé pour ${getFullName(requester)} (${requester.role}) à gym ${id}`);
+      logger.warn(`🚫 Accès refusé pour ${getFullName(requester)} (${requester.role}) à gym ${id}`);
       return res.status(403).json({ error: 'Vous n\'avez pas accès à cette salle' });
     }
 
-    console.log(`🔍 Recherche gym ${id} en base...`);
+    logger.debug(`🔍 Recherche gym ${id} en base...`);
     const gym = await prisma.gym.findUnique({
       where: { id },
       include: {
@@ -389,15 +390,15 @@ router.get('/:id', auth, async (req, res) => {
     });
 
     if (!gym) {
-      console.log(`❌ Gym non trouvé: ID ${id}`);
+      logger.warn(`❌ Gym non trouvé: ID ${id}`);
       return notFound(res, 'Gym', id);
     }
 
-    console.log(`✅ Gym trouvé: ${gym.name} (${id}) - ${gym.users.length} utilisateurs, ${gym.openingHours.length} horaires`);
-    console.log(`📤 Réponse détails gym: ${gym.name}`);
+    logger.info(`✅ Gym trouvé: ${gym.name} (${id}) - ${gym.users.length} utilisateurs, ${gym.openingHours.length} horaires`);
+    logger.debug(`📤 Réponse détails gym: ${gym.name}`);
     res.json({ gym });
   } catch (e) {
-    console.error('💥 Erreur get gym details:', e);
+    logger.error('💥 Erreur get gym details:', e);
     handleError(res, e, 500);
   }
 });
@@ -459,9 +460,9 @@ router.get('/:id', auth, async (req, res) => {
  *       500:
  *         description: Server error
  */
-router.put('/:id', auth, async (req, res) => {
-  console.log(`✏️ Mise à jour gym - ID: ${req.params.id}, User: ${req.user?.email} (${req.user?.type})`);
-  console.log(`📝 Données reçues:`, {
+router.put('/:id', auth, apiLimiter, async (req, res) => {
+  logger.info(`✏️ Mise à jour gym - ID: ${req.params.id}, User: ${req.user?.email} (${req.user?.type})`);
+  logger.debug(`📝 Données reçues:`, {
     name: req.body.name,
     address: req.body.address,
     phone: req.body.phone
@@ -473,7 +474,7 @@ router.put('/:id', auth, async (req, res) => {
 
     const requester = await prisma.user.findUnique({ where: { id: req.user.sub } });
     if (!requester) {
-      console.log(`❌ Requester non trouvé: ID ${req.user.sub}`);
+      logger.warn(`❌ Requester non trouvé: ID ${req.user.sub}`);
       return res.status(403).json({ error: 'Forbidden' });
     }
 
@@ -481,14 +482,14 @@ router.put('/:id', auth, async (req, res) => {
     let canUpdate = false;
     if (requester.role === 'owner') {
       canUpdate = true;
-      console.log(`👑 Owner ${getFullName(requester)} peut modifier gym ${id}`);
+      logger.debug(`👑 Owner ${getFullName(requester)} peut modifier gym ${id}`);
     } else if (requester.role === 'admin') {
       canUpdate = requester.gymId === id;
-      console.log(`👨‍💼 Admin ${getFullName(requester)} ${canUpdate ? 'peut modifier' : 'ne peut pas modifier'} gym ${id} (sa salle: ${requester.gymId})`);
+      logger.debug(`👨‍💼 Admin ${getFullName(requester)} ${canUpdate ? 'peut modifier' : 'ne peut pas modifier'} gym ${id} (sa salle: ${requester.gymId})`);
     }
 
     if (!canUpdate) {
-      console.log(`🚫 Permissions insuffisantes pour ${getFullName(requester)} (${requester.role})`);
+      logger.warn(`🚫 Permissions insuffisantes pour ${getFullName(requester)} (${requester.role})`);
       return res.status(403).json({ error: 'Vous n\'avez pas les permissions pour modifier cette salle' });
     }
 
@@ -497,7 +498,7 @@ router.put('/:id', auth, async (req, res) => {
     if (address !== undefined) updateData.address = address;
     if (phone !== undefined) updateData.phone = phone;
 
-    console.log(`🔄 Mise à jour gym ${id} avec:`, updateData);
+    logger.debug(`🔄 Mise à jour gym ${id} avec:`, updateData);
 
     const gym = await prisma.gym.update({
       where: { id },
@@ -508,18 +509,18 @@ router.put('/:id', auth, async (req, res) => {
       }
     });
 
-    console.log(`✅ Gym mis à jour: ${gym.name} (${id})`);
-    console.log(`📤 Réponse mise à jour gym: ${gym.name}`);
+    logger.info(`✅ Gym mis à jour: ${gym.name} (${id})`);
+    logger.debug(`📤 Réponse mise à jour gym: ${gym.name}`);
     res.json({
       message: 'Salle de sport mise à jour avec succès',
       gym
     });
   } catch (e) {
     if (e.code === 'P2025') {
-      console.log(`❌ Gym non trouvé pour mise à jour: ID ${req.params.id}`);
+      logger.warn(`❌ Gym non trouvé pour mise à jour: ID ${req.params.id}`);
       return notFound(res, 'Gym', req.params.id);
     }
-    console.error('💥 Erreur update gym:', e);
+    logger.error('💥 Erreur update gym:', e);
     handleError(res, e);
   }
 });
@@ -563,38 +564,38 @@ router.put('/:id', auth, async (req, res) => {
  *       500:
  *         description: Server error
  */
-router.delete('/:id', auth, requireOwner, async (req, res) => {
-  console.log(`🗑️ Suppression gym - ID: ${req.params.id}, Owner: ${req.user?.email}`);
+router.delete('/:id', auth, requireOwner, apiLimiter, async (req, res) => {
+  logger.info(`🗑️ Suppression gym - ID: ${req.params.id}, Owner: ${req.user?.email}`);
 
   try {
     const id = Number(req.params.id);
-    console.log(`🔢 Conversion ID: ${req.params.id} → ${id}`);
+    logger.debug(`🔢 Conversion ID: ${req.params.id} → ${id}`);
 
-    console.log(`🔍 Vérification existence gym ${id}...`);
+    logger.debug(`🔍 Vérification existence gym ${id}...`);
     const gym = await prisma.gym.findUnique({ where: { id } });
     if (!gym) {
-      console.log(`❌ Gym non trouvé: ID ${id}`);
+      logger.warn(`❌ Gym non trouvé: ID ${id}`);
       return notFound(res, 'Gym', id);
     }
 
-    console.log(`✅ Gym trouvé: ${gym.name} (${id}) - prêt pour suppression`);
+    logger.debug(`✅ Gym trouvé: ${gym.name} (${id}) - prêt pour suppression`);
 
     // Supprimer la salle (les heures d'ouverture seront supprimées automatiquement grâce à onDelete: Cascade)
-    console.log(`🗑️ Suppression gym ${gym.name} (${id})...`);
+    logger.info(`🗑️ Suppression gym ${gym.name} (${id})...`);
     await prisma.gym.delete({ where: { id } });
 
-    console.log(`✅ Gym supprimé avec succès: ${gym.name} (${id})`);
-    console.log(`📤 Réponse suppression gym: ID ${id}`);
+    logger.info(`✅ Gym supprimé avec succès: ${gym.name} (${id})`);
+    logger.debug(`📤 Réponse suppression gym: ID ${id}`);
     res.json({
       message: 'Salle de sport supprimée avec succès',
       deletedId: id
     });
   } catch (e) {
     if (e.code === 'P2025') {
-      console.log(`❌ Gym non trouvé pour suppression: ID ${req.params.id}`);
+      logger.warn(`❌ Gym non trouvé pour suppression: ID ${req.params.id}`);
       return notFound(res, 'Gym', req.params.id);
     }
-    console.error('💥 Erreur delete gym:', e);
+    logger.error('💥 Erreur delete gym:', e);
     handleError(res, e);
   }
 });
@@ -653,24 +654,24 @@ router.delete('/:id', auth, requireOwner, async (req, res) => {
  *       500:
  *         description: Server error
  */
-router.post('/:id/opening-hours', auth, async (req, res) => {
-  console.log(`🕐 Mise à jour horaires - Gym ID: ${req.params.id}, User: ${req.user?.email} (${req.user?.type})`);
-  console.log(`📝 Données horaires reçues:`, req.body);
+router.post('/:id/opening-hours', auth, apiLimiter, async (req, res) => {
+  logger.info(`🕐 Mise à jour horaires - Gym ID: ${req.params.id}, User: ${req.user?.email} (${req.user?.type})`);
+  logger.debug(`📝 Données horaires reçues:`, req.body);
 
   try {
     const id = Number(req.params.id);
     const openingHoursData = req.body; // Array of opening hours
 
     if (!Array.isArray(openingHoursData)) {
-      console.log(`❌ Données invalides - attendu tableau, reçu: ${typeof openingHoursData}`);
+      logger.warn(`❌ Données invalides - attendu tableau, reçu: ${typeof openingHoursData}`);
       return res.status(400).json({ error: 'Les données doivent être un tableau d\'horaires d\'ouverture' });
     }
 
-    console.log(`✅ ${openingHoursData.length} horaires reçus pour gym ${id}`);
+    logger.debug(`✅ ${openingHoursData.length} horaires reçus pour gym ${id}`);
 
     const requester = await prisma.user.findUnique({ where: { id: req.user.sub } });
     if (!requester) {
-      console.log(`❌ Requester non trouvé: ID ${req.user.sub}`);
+      logger.warn(`❌ Requester non trouvé: ID ${req.user.sub}`);
       return res.status(403).json({ error: 'Forbidden' });
     }
 
@@ -678,36 +679,36 @@ router.post('/:id/opening-hours', auth, async (req, res) => {
     let canUpdate = false;
     if (requester.role === 'owner') {
       canUpdate = true;
-      console.log(`👑 Owner ${getFullName(requester)} peut modifier horaires gym ${id}`);
+      logger.debug(`👑 Owner ${getFullName(requester)} peut modifier horaires gym ${id}`);
     } else if (requester.role === 'admin') {
       canUpdate = requester.gymId === id;
-      console.log(`👨‍💼 Admin ${getFullName(requester)} ${canUpdate ? 'peut modifier' : 'ne peut pas modifier'} horaires gym ${id} (sa salle: ${requester.gymId})`);
+      logger.debug(`👨‍💼 Admin ${getFullName(requester)} ${canUpdate ? 'peut modifier' : 'ne peut pas modifier'} horaires gym ${id} (sa salle: ${requester.gymId})`);
     }
 
     if (!canUpdate) {
-      console.log(`🚫 Permissions insuffisantes pour ${getFullName(requester)} (${requester.role})`);
+      logger.warn(`🚫 Permissions insuffisantes pour ${getFullName(requester)} (${requester.role})`);
       return res.status(403).json({ error: 'Vous n\'avez pas les permissions pour modifier les horaires de cette salle' });
     }
 
-    console.log(`🔍 Vérification existence gym ${id}...`);
+    logger.debug(`🔍 Vérification existence gym ${id}...`);
     const gym = await prisma.gym.findUnique({ where: { id } });
     if (!gym) {
-      console.log(`❌ Gym non trouvé: ID ${id}`);
+      logger.warn(`❌ Gym non trouvé: ID ${id}`);
       return notFound(res, 'Gym', id);
     }
 
     // Supprimer les anciens horaires
-    console.log(`🗑️ Suppression anciens horaires pour gym ${gym.name}...`);
+    logger.debug(`🗑️ Suppression anciens horaires pour gym ${gym.name}...`);
     await prisma.openingHour.deleteMany({ where: { gymId: id } });
 
     // Créer les nouveaux horaires
-    console.log(`➕ Création nouveaux horaires...`);
+    logger.debug(`➕ Création nouveaux horaires...`);
     const openingHours = [];
     for (const hourData of openingHoursData) {
       const { dayOfWeek, openTime, closeTime, isClosed = false } = hourData;
 
       if (dayOfWeek === undefined || dayOfWeek < 0 || dayOfWeek > 6) {
-        console.log(`⚠️ Jour invalide ignoré: ${dayOfWeek}`);
+        logger.warn(`⚠️ Jour invalide ignoré: ${dayOfWeek}`);
         continue; // Skip invalid days
       }
 
@@ -721,17 +722,17 @@ router.post('/:id/opening-hours', auth, async (req, res) => {
         }
       });
       openingHours.push(hour);
-      console.log(`✅ Horaire créé: Jour ${dayOfWeek} - ${isClosed ? 'Fermé' : `${hour.openTime}-${hour.closeTime}`}`);
+      logger.debug(`✅ Horaire créé: Jour ${dayOfWeek} - ${isClosed ? 'Fermé' : `${hour.openTime}-${hour.closeTime}`}`);
     }
 
-    console.log(`✅ ${openingHours.length} horaires créés pour gym ${gym.name}`);
-    console.log(`📤 Réponse mise à jour horaires: ${openingHours.length} horaires`);
+    logger.info(`✅ ${openingHours.length} horaires créés pour gym ${gym.name}`);
+    logger.debug(`📤 Réponse mise à jour horaires: ${openingHours.length} horaires`);
     res.json({
       message: 'Horaires d\'ouverture mis à jour avec succès',
       openingHours
     });
   } catch (e) {
-    console.error('💥 Erreur update opening hours:', e);
+    logger.error('💥 Erreur update opening hours:', e);
     handleError(res, e, 500);
   }
 });
@@ -774,14 +775,14 @@ router.post('/:id/opening-hours', auth, async (req, res) => {
  *         description: Server error
  */
 router.get('/:id/opening-hours', auth, async (req, res) => {
-  console.log(`🕐 Récupération horaires - Gym ID: ${req.params.id}, User: ${req.user?.email} (${req.user?.type})`);
+  logger.debug(`🕐 Récupération horaires - Gym ID: ${req.params.id}, User: ${req.user?.email} (${req.user?.type})`);
 
   try {
     const id = Number(req.params.id);
 
     const requester = await prisma.user.findUnique({ where: { id: req.user.sub } });
     if (!requester) {
-      console.log(`❌ Requester non trouvé: ID ${req.user.sub}`);
+      logger.warn(`❌ Requester non trouvé: ID ${req.user.sub}`);
       return res.status(403).json({ error: 'Forbidden' });
     }
 
@@ -789,28 +790,28 @@ router.get('/:id/opening-hours', auth, async (req, res) => {
     let hasAccess = false;
     if (requester.role === 'owner') {
       hasAccess = true;
-      console.log(`👑 Owner ${getFullName(requester)} accède aux horaires gym ${id}`);
+      logger.debug(`👑 Owner ${getFullName(requester)} accède aux horaires gym ${id}`);
     } else if (requester.role === 'admin' || requester.role === 'member') {
       hasAccess = requester.gymId === id;
-      console.log(`${requester.role === 'admin' ? '👨‍💼' : '👤'} ${requester.role} ${getFullName(requester)} ${hasAccess ? 'accède' : 'refuse accès'} aux horaires gym ${id} (sa salle: ${requester.gymId})`);
+      logger.debug(`${requester.role === 'admin' ? '👨‍💼' : '👤'} ${requester.role} ${getFullName(requester)} ${hasAccess ? 'accède' : 'refuse accès'} aux horaires gym ${id} (sa salle: ${requester.gymId})`);
     }
 
     if (!hasAccess) {
-      console.log(`🚫 Accès refusé aux horaires pour ${getFullName(requester)} (${requester.role})`);
+      logger.warn(`🚫 Accès refusé aux horaires pour ${getFullName(requester)} (${requester.role})`);
       return res.status(403).json({ error: 'Vous n\'avez pas accès aux horaires de cette salle' });
     }
 
-    console.log(`🔍 Recherche horaires pour gym ${id}...`);
+    logger.debug(`🔍 Recherche horaires pour gym ${id}...`);
     const openingHours = await prisma.openingHour.findMany({
       where: { gymId: id },
       orderBy: { dayOfWeek: 'asc' }
     });
 
-    console.log(`✅ ${openingHours.length} horaires trouvés pour gym ${id}`);
-    console.log(`📤 Réponse horaires: ${openingHours.length} résultat(s)`);
+    logger.info(`✅ ${openingHours.length} horaires trouvés pour gym ${id}`);
+    logger.debug(`📤 Réponse horaires: ${openingHours.length} résultat(s)`);
     res.json({ openingHours });
   } catch (e) {
-    console.error('💥 Erreur get opening hours:', e);
+    logger.error('💥 Erreur get opening hours:', e);
     handleError(res, e, 500);
   }
 });
@@ -897,45 +898,45 @@ router.get('/:id/opening-hours', auth, async (req, res) => {
  *                 error:
  *                   type: string
  */
-router.put('/:id/image', auth, async (req, res) => {
-  console.log(`🏢 Upload image salle - Gym ID: ${req.params.id}, Requester: ${req.user?.email}`);
+router.put('/:id/image', auth, apiLimiter, async (req, res) => {
+  logger.info(`🏢 Upload image salle - Gym ID: ${req.params.id}, Requester: ${req.user?.email}`);
 
   try {
     const id = Number(req.params.id);
     const { imageData } = req.body;
 
     if (!imageData) {
-      console.log(`❌ Données image manquantes pour gym ${id}`);
+      logger.warn(`❌ Données image manquantes pour gym ${id}`);
       return res.status(400).json({ error: 'Données d\'image requises' });
     }
 
     // Vérifier les permissions
     const requester = await prisma.user.findUnique({ where: { id: req.user.sub } });
     if (!requester) {
-      console.log(`❌ Requester non trouvé: ID ${req.user.sub}`);
+      logger.warn(`❌ Requester non trouvé: ID ${req.user.sub}`);
       return res.status(403).json({ error: 'Forbidden' });
     }
 
     const targetGym = await prisma.gym.findUnique({ where: { id } });
     if (!targetGym) {
-      console.log(`❌ Salle non trouvée: ID ${id}`);
+      logger.warn(`❌ Salle non trouvée: ID ${id}`);
       return notFound(res, 'Gym', id);
     }
 
     let canUpdate = false;
     if (requester.role === 'owner') {
       canUpdate = true;
-      console.log(`👑 Owner ${getFullName(requester)} peut modifier image salle ${id}`);
+      logger.debug(`👑 Owner ${getFullName(requester)} peut modifier image salle ${id}`);
     } else if (requester.role === 'admin') {
       canUpdate = targetGym.id === requester.gymId;
-      console.log(`👨‍💼 Admin ${getFullName(requester)} ${canUpdate ? 'peut modifier' : 'ne peut pas modifier'} image salle ${id} (sa salle: ${requester.gymId})`);
+      logger.debug(`👨‍💼 Admin ${getFullName(requester)} ${canUpdate ? 'peut modifier' : 'ne peut pas modifier'} image salle ${id} (sa salle: ${requester.gymId})`);
     } else if (requester.role === 'member') {
       canUpdate = false;
-      console.log(`👤 Membre ${getFullName(requester)} ne peut pas modifier image salle`);
+      logger.debug(`👤 Membre ${getFullName(requester)} ne peut pas modifier image salle`);
     }
 
     if (!canUpdate) {
-      console.log(`🚫 Permissions insuffisantes pour ${getFullName(requester)}`);
+      logger.warn(`🚫 Permissions insuffisantes pour ${getFullName(requester)}`);
       return res.status(403).json({ error: 'Vous n\'avez pas les permissions pour modifier l\'image de cette salle' });
     }
 
@@ -950,9 +951,9 @@ router.put('/:id/image', auth, async (req, res) => {
         // Supposer que c'est déjà du base64 pur
         imageBuffer = Buffer.from(imageData, 'base64');
       }
-      console.log(`✅ Image décodée: ${imageBuffer.length} bytes`);
+      logger.debug(`✅ Image décodée: ${imageBuffer.length} bytes`);
     } catch (error) {
-      console.log(`❌ Erreur décodage image: ${error.message}`);
+      logger.warn(`❌ Erreur décodage image: ${error.message}`);
       return res.status(400).json({ error: 'Données d\'image invalides' });
     }
 
@@ -962,12 +963,12 @@ router.put('/:id/image', auth, async (req, res) => {
       data: { image: imageBuffer }
     });
 
-    console.log(`✅ Image de salle mise à jour pour ${targetGym.name}`);
-    console.log(`📤 Réponse upload image salle: succès`);
+    logger.info(`✅ Image de salle mise à jour pour ${targetGym.name}`);
+    logger.debug(`📤 Réponse upload image salle: succès`);
     res.json({ message: 'Image de salle mise à jour avec succès' });
 
   } catch (e) {
-    console.error('💥 Erreur upload image salle:', e);
+    logger.error('💥 Erreur upload image salle:', e);
     handleError(res, e, 500);
   }
 });
@@ -1030,7 +1031,7 @@ router.put('/:id/image', auth, async (req, res) => {
  *                   type: string
  */
 router.get('/:id/image', auth, async (req, res) => {
-  console.log(`🏢 Récupération image salle - Gym ID: ${req.params.id}, Requester: ${req.user?.email}`);
+  logger.debug(`🏢 Récupération image salle - Gym ID: ${req.params.id}, Requester: ${req.user?.email}`);
 
   try {
     const id = Number(req.params.id);
@@ -1038,7 +1039,7 @@ router.get('/:id/image', auth, async (req, res) => {
     // Vérifier les permissions
     const requester = await prisma.user.findUnique({ where: { id: req.user.sub } });
     if (!requester) {
-      console.log(`❌ Requester non trouvé: ID ${req.user.sub}`);
+      logger.warn(`❌ Requester non trouvé: ID ${req.user.sub}`);
       return res.status(403).json({ error: 'Forbidden' });
     }
 
@@ -1048,26 +1049,26 @@ router.get('/:id/image', auth, async (req, res) => {
     });
 
     if (!targetGym) {
-      console.log(`❌ Salle non trouvée: ID ${id}`);
+      logger.warn(`❌ Salle non trouvée: ID ${id}`);
       return notFound(res, 'Gym', id);
     }
 
     let hasAccess = false;
     if (requester.role === 'owner') {
       hasAccess = true;
-      console.log(`👑 Owner ${getFullName(requester)} accède à image salle ${id}`);
+      logger.debug(`👑 Owner ${getFullName(requester)} accède à image salle ${id}`);
     } else if (requester.role === 'admin' || requester.role === 'member') {
       hasAccess = targetGym.id === requester.gymId;
-      console.log(`${requester.role === 'admin' ? '👨‍💼' : '👤'} ${requester.role} ${getFullName(requester)} ${hasAccess ? 'accède' : 'refuse accès'} à image salle ${id} (sa salle: ${requester.gymId})`);
+      logger.debug(`${requester.role === 'admin' ? '👨‍💼' : '👤'} ${requester.role} ${getFullName(requester)} ${hasAccess ? 'accède' : 'refuse accès'} à image salle ${id} (sa salle: ${requester.gymId})`);
     }
 
     if (!hasAccess) {
-      console.log(`🚫 Accès refusé à image salle pour ${getFullName(requester)}`);
+      logger.warn(`🚫 Accès refusé à image salle pour ${getFullName(requester)}`);
       return res.status(403).json({ error: 'Vous n\'avez pas accès à l\'image de cette salle' });
     }
 
     if (!targetGym.image) {
-      console.log(`❌ Image de salle non trouvée pour ${targetGym.name} - génération image par défaut`);
+      logger.debug(`❌ Image de salle non trouvée pour ${targetGym.name} - génération image par défaut`);
 
       // Générer une image par défaut avec les initiales du nom de la salle
       const initials = targetGym.name
@@ -1087,11 +1088,11 @@ router.get('/:id/image', auth, async (req, res) => {
       res.setHeader('Content-Length', svgBuffer.length);
       res.setHeader('Cache-Control', 'private, max-age=3600');
 
-      console.log(`📤 Image par défaut générée pour ${targetGym.name}: ${initials}`);
+      logger.debug(`📤 Image par défaut générée pour ${targetGym.name}: ${initials}`);
       return res.send(svgBuffer);
     }
 
-    console.log(`✅ Image de salle récupérée pour ${targetGym.name} (${targetGym.image.length} bytes)`);
+    logger.debug(`✅ Image de salle récupérée pour ${targetGym.name} (${targetGym.image.length} bytes)`);
 
     // Déterminer le type MIME (par défaut JPEG si on ne peut pas le déterminer)
     let mimeType = 'image/jpeg';
@@ -1110,11 +1111,11 @@ router.get('/:id/image', auth, async (req, res) => {
     res.setHeader('Content-Length', targetGym.image.length);
     res.setHeader('Cache-Control', 'private, max-age=3600'); // Cache 1 heure
 
-    console.log(`📤 Réponse image salle: ${mimeType}, ${targetGym.image.length} bytes`);
+    logger.debug(`📤 Réponse image salle: ${mimeType}, ${targetGym.image.length} bytes`);
     res.send(targetGym.image);
 
   } catch (e) {
-    console.error('💥 Erreur récupération image salle:', e);
+    logger.error('💥 Erreur récupération image salle:', e);
     handleError(res, e, 500);
   }
 });
@@ -1178,8 +1179,8 @@ router.get('/:id/image', auth, async (req, res) => {
  *                 error:
  *                   type: string
  */
-router.delete('/:id/image', auth, async (req, res) => {
-  console.log(`🗑️ Suppression image salle - Gym ID: ${req.params.id}, Requester: ${req.user?.email}`);
+router.delete('/:id/image', auth, apiLimiter, async (req, res) => {
+  logger.info(`🗑️ Suppression image salle - Gym ID: ${req.params.id}, Requester: ${req.user?.email}`);
 
   try {
     const id = Number(req.params.id);
@@ -1187,7 +1188,7 @@ router.delete('/:id/image', auth, async (req, res) => {
     // Vérifier les permissions
     const requester = await prisma.user.findUnique({ where: { id: req.user.sub } });
     if (!requester) {
-      console.log(`❌ Requester non trouvé: ID ${req.user.sub}`);
+      logger.warn(`❌ Requester non trouvé: ID ${req.user.sub}`);
       return res.status(403).json({ error: 'Forbidden' });
     }
 
@@ -1197,24 +1198,24 @@ router.delete('/:id/image', auth, async (req, res) => {
     });
 
     if (!targetGym) {
-      console.log(`❌ Salle non trouvée: ID ${id}`);
+      logger.warn(`❌ Salle non trouvée: ID ${id}`);
       return notFound(res, 'Gym', id);
     }
 
     let canDelete = false;
     if (requester.role === 'owner') {
       canDelete = true;
-      console.log(`👑 Owner ${getFullName(requester)} peut supprimer image salle ${id}`);
+      logger.debug(`👑 Owner ${getFullName(requester)} peut supprimer image salle ${id}`);
     } else if (requester.role === 'admin') {
       canDelete = targetGym.id === requester.gymId;
-      console.log(`👨‍💼 Admin ${getFullName(requester)} ${canDelete ? 'peut supprimer' : 'ne peut pas supprimer'} image salle ${id} (sa salle: ${requester.gymId})`);
+      logger.debug(`👨‍💼 Admin ${getFullName(requester)} ${canDelete ? 'peut supprimer' : 'ne peut pas supprimer'} image salle ${id} (sa salle: ${requester.gymId})`);
     } else if (requester.role === 'member') {
       canDelete = false;
-      console.log(`👤 Membre ${getFullName(requester)} ne peut pas supprimer image salle`);
+      logger.debug(`👤 Membre ${getFullName(requester)} ne peut pas supprimer image salle`);
     }
 
     if (!canDelete) {
-      console.log(`🚫 Permissions insuffisantes pour ${getFullName(requester)}`);
+      logger.warn(`🚫 Permissions insuffisantes pour ${getFullName(requester)}`);
       return res.status(403).json({ error: 'Vous n\'avez pas les permissions pour supprimer l\'image de cette salle' });
     }
 
@@ -1224,12 +1225,12 @@ router.delete('/:id/image', auth, async (req, res) => {
       data: { image: null }
     });
 
-    console.log(`✅ Image de salle supprimée pour ${targetGym.name}`);
-    console.log(`📤 Réponse suppression image salle: succès`);
+    logger.info(`✅ Image de salle supprimée pour ${targetGym.name}`);
+    logger.debug(`📤 Réponse suppression image salle: succès`);
     res.json({ message: 'Image de salle supprimée avec succès' });
 
   } catch (e) {
-    console.error('💥 Erreur suppression image salle:', e);
+    logger.error('💥 Erreur suppression image salle:', e);
     handleError(res, e, 500);
   }
 });

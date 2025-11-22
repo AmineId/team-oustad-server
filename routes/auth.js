@@ -1,15 +1,15 @@
 const express = require('express');
 const router = express.Router();
 const { formatUser } = require('../utils/responseFormatter');
-const { PrismaClient } = require('@prisma/client');
+const prisma = require('../utils/prismaClient');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
 const { sendPasswordResetEmail, sendAccountSetupEmail } = require('../services/emailService');
 const { getActiveSubscription, getSubscriptionsWithStatus } = require('../utils/subscriptionUtils');
 const { getFullName, formatUserWithFullName } = require('../utils/nameUtils');
-
-const prisma = new PrismaClient();
+const { authLimiter } = require('../middleware/rateLimiter');
+const logger = require('../utils/logger');
 
 const JWT_SECRET = process.env.JWT_SECRET || 'change_this_secret';
 
@@ -64,12 +64,12 @@ const sanitizeEmail = (email) => {
  *       500:
  *         description: Erreur serveur
  */
-router.post('/check-phone', async (req, res) => {
+router.post('/check-phone', authLimiter, async (req, res) => {
   const { phoneNumber } = req.body;
-  console.log(`📱 Vérification numéro de téléphone - PhoneNumber: ${phoneNumber}`);
+  logger.info(`📱 Vérification numéro de téléphone - PhoneNumber: ${phoneNumber}`);
   
   if (!phoneNumber) {
-    console.log(`❌ Numéro de téléphone manquant`);
+    logger.warn(`❌ Numéro de téléphone manquant`);
     return res.status(400).json({ error: 'Numéro de téléphone requis' });
   }
 
@@ -85,7 +85,7 @@ router.post('/check-phone', async (req, res) => {
     });
 
     if (!user) {
-      console.log(`✅ Numéro ${phoneNumber} n'existe pas - Création possible`);
+      logger.info(`✅ Numéro ${phoneNumber} n'existe pas - Création possible`);
       return res.json({
         exists: false,
         hasPassword: false,
@@ -97,7 +97,7 @@ router.post('/check-phone', async (req, res) => {
     // Un mot de passe temporaire long (généré automatiquement) indique qu'aucun mot de passe n'a été défini
     const hasPassword = user.password && user.password.length > 0;
 
-    console.log(`⚠️ Numéro ${phoneNumber} existe déjà - hasPassword: ${hasPassword}`);
+    logger.warn(`⚠️ Numéro ${phoneNumber} existe déjà - hasPassword: ${hasPassword}`);
     
     if (hasPassword) {
       return res.status(409).json({
@@ -115,7 +115,7 @@ router.post('/check-phone', async (req, res) => {
     }
 
   } catch (e) {
-    console.error(`💥 Erreur vérification numéro de téléphone:`, e);
+    logger.error(`💥 Erreur vérification numéro de téléphone:`, e);
     res.status(500).json({ error: e.message });
   }
 });
@@ -185,13 +185,13 @@ router.post('/check-phone', async (req, res) => {
  *         description: Erreur serveur
  */
 // Login: expect { email or phoneNumber, password }
-router.post('/login', async (req, res) => {
+router.post('/login', authLimiter, async (req, res) => {
   const { email, phoneNumber, password } = req.body;
   const identifier = email || phoneNumber;
-  console.log(`🔐 Tentative de connexion - Identifiant: ${identifier}`);
+  logger.info(`🔐 Tentative de connexion - Identifiant: ${identifier}`);
   
   if ((!email && !phoneNumber) || !password) {
-    console.log(`❌ Connexion échouée - Identifiant ou password manquant`);
+    logger.warn(`❌ Connexion échouée - Identifiant ou password manquant`);
     return res.status(400).json({ error: 'email or phoneNumber and password required' });
   }
 
@@ -202,7 +202,7 @@ router.post('/login', async (req, res) => {
     if (email) {
       const sanitizedEmail = sanitizeEmail(email);
       if (sanitizedEmail !== email.toLowerCase().trim()) {
-        console.log(`⚠️  Email contenait des caractères invalides, nettoyé: ${sanitizedEmail}`);
+        logger.warn(`⚠️  Email contenait des caractères invalides, nettoyé: ${sanitizedEmail}`);
       }
       user = await prisma.user.findUnique({
         where: { email: sanitizedEmail },
@@ -242,26 +242,26 @@ router.post('/login', async (req, res) => {
     }
 
     if (!user) {
-      console.log(`❌ Connexion échouée - Utilisateur non trouvé: ${identifier}`);
+      logger.warn(`❌ Connexion échouée - Utilisateur non trouvé: ${identifier}`);
       return res.status(401).json({ error: 'Invalid credentials' });
     }
 
-    console.log(`✅ Utilisateur trouvé: ${getFullName(user)} (${user.role}) - ID: ${user.id}`);
+    logger.info(`✅ Utilisateur trouvé: ${getFullName(user)} (${user.role}) - ID: ${user.id}`);
 
     // Check password
     const valid = await bcrypt.compare(password, user.password);
-    console.log(`🔍 Vérification password: ${valid ? '✅ VALIDE' : '❌ INVALIDE'}`);
+    logger.debug(`🔍 Vérification password: ${valid ? '✅ VALIDE' : '❌ INVALIDE'}`);
 
     if (!valid) {
-      console.log(`❌ Connexion échouée - Mot de passe incorrect pour: ${identifier}`);
+      logger.warn(`❌ Connexion échouée - Mot de passe incorrect pour: ${identifier}`);
       return res.status(401).json({ error: 'Invalid credentials' });
     }
 
-    console.log(`✅ Connexion réussie pour: ${getFullName(user)} (${user.role})`);
+    logger.info(`✅ Connexion réussie pour: ${getFullName(user)} (${user.role})`);
 
     // Récupérer le statut onboarding du membre (seulement pour les membres)
     const onboarding = user.role === 'member' ? (user.Member?.onboarding || false) : false;
-    console.log(`🔔 Onboarding requis: ${onboarding ? 'OUI ✨' : 'NON'}`);
+    logger.debug(`🔔 Onboarding requis: ${onboarding ? 'OUI ✨' : 'NON'}`);
 
     // Mettre à jour la date de dernière connexion
     await prisma.user.update({
@@ -277,11 +277,11 @@ router.post('/login', async (req, res) => {
       type: user.role
     }, JWT_SECRET, { expiresIn: '30d' });
 
-    console.log(`🎫 Token JWT généré pour: ${user.email || user.phoneNumber}`);
+    logger.debug(`🎫 Token JWT généré pour: ${user.email}`);
 
     // Return different data based on user role
     if (user.role === 'admin') {
-      console.log(`👨‍💼 Réponse admin préparée pour: ${getFullName(user)}`);
+      logger.info(`👨‍💼 Réponse admin préparée pour: ${getFullName(user)}`);
       const responseData = {
         
         token,
@@ -304,13 +304,13 @@ router.post('/login', async (req, res) => {
           type: 'admin'
         }
       };
-      console.log(`📤 Réponse login admin:`, {
+      logger.debug(`📤 Réponse login admin: ${JSON.stringify({
         token: token.substring(0, 20) + '...',
         user: responseData.user
-      });
+      })}`);
       res.json(responseData);
     } else if (user.role === 'owner') {
-      console.log(`👑 Réponse owner préparée pour: ${getFullName(user)}`);
+      logger.info(`👑 Réponse owner préparée pour: ${getFullName(user)}`);
       const responseData = {
         token,
         onboarding,
@@ -338,13 +338,13 @@ router.post('/login', async (req, res) => {
           type: 'owner'
         }
       };
-      console.log(`📤 Réponse login owner:`, {
+      logger.debug(`📤 Réponse login owner: ${JSON.stringify({
         token: token.substring(0, 20) + '...',
         user: responseData.user
-      });
+      })}`);
       res.json(responseData);
     } else if (user.role === 'member') {
-      console.log(`👤 Réponse membre préparée pour: ${getFullName(user)}`);
+      logger.info(`👤 Réponse membre préparée pour: ${getFullName(user)}`);
       const responseData = {
         token,
         onboarding,
@@ -378,17 +378,17 @@ router.post('/login', async (req, res) => {
           type: 'member'
         }
       };
-      console.log(`📤 Réponse login membre:`, {
+      logger.debug(`📤 Réponse login membre: ${JSON.stringify({
         token: token.substring(0, 20) + '...',
         user: responseData.user
-      });
+      })}`);
       res.json(responseData);
     } else {
-      console.log(`❓ Rôle inconnu: ${user.role} pour ${getFullName(user)}`);
+      logger.warn(`❓ Rôle inconnu: ${user.role} pour ${getFullName(user)}`);
       return res.status(400).json({ error: 'Invalid user role' });
     }
   } catch (e) {
-    console.error(`💥 Erreur lors de la connexion:`, e);
+    logger.error(`💥 Erreur lors de la connexion:`, e);
     res.status(500).json({ error: e.message });
   }
 });
@@ -468,12 +468,12 @@ router.post('/login', async (req, res) => {
 // Protected: scan QR code for access
 router.post('/scan-qr', auth, async (req, res) => {
   const { qrCode } = req.body;
-  console.log(`📱 Scan QR - User ID: ${req.user?.sub}, Email: ${req.user?.email}, QR Code: ${qrCode}`);
+  logger.info(`📱 Scan QR - User ID: ${req.user?.sub}, Email: ${req.user?.email}, QR Code: ${qrCode}`);
 
   try {
     // Vérifier que l'utilisateur est un admin
     if (req.user.type !== 'admin') {
-      console.log(`❌ Accès refusé: utilisateur ${req.user.email} n'est pas admin (type: ${req.user.type})`);
+      logger.warn(`❌ Accès refusé: utilisateur ${req.user.email} n'est pas admin (type: ${req.user.type})`);
       return res.status(403).json({ error: 'Only admins can scan QR codes' });
     }
 
@@ -499,18 +499,18 @@ router.post('/scan-qr', auth, async (req, res) => {
     });
 
     if (!member) {
-      console.log(`❌ Membre non trouvé avec QR code: ${qrCode}`);
+      logger.warn(`❌ Membre non trouvé avec QR code: ${qrCode}`);
       return res.status(404).json({ error: 'Member not found' });
     }
 
     if (member.role !== 'member') {
-      console.log(`❌ Utilisateur trouvé mais n'est pas membre: ${getFullName(member)} (rôle: ${member.role})`);
+      logger.warn(`❌ Utilisateur trouvé mais n'est pas membre: ${getFullName(member)} (rôle: ${member.role})`);
       return res.status(400).json({ error: 'QR code is not for a member' });
     }
 
     // Vérifier que le membre appartient à la même salle que l'admin
     if (member.gymId !== req.user.gymId) {
-      console.log(`❌ Membre ${getFullName(member)} n'appartient pas à la salle de l'admin (membre: ${member.gymId}, admin: ${req.user.gymId})`);
+      logger.warn(`❌ Membre ${getFullName(member)} n'appartient pas à la salle de l'admin (membre: ${member.gymId}, admin: ${req.user.gymId})`);
       return res.status(403).json({ error: 'Member does not belong to your gym' });
     }
 
@@ -519,7 +519,7 @@ router.post('/scan-qr', auth, async (req, res) => {
       const activeSubscription = getActiveSubscription(member.Member);
 
       if (!activeSubscription) {
-        console.log(`❌ Membre ${getFullName(member)} n'a pas d'abonnement actif`);
+        logger.warn(`❌ Membre ${getFullName(member)} n'a pas d'abonnement actif`);
         return res.status(403).json({
           error: 'Accès refusé - Aucun abonnement actif',
           reason: 'no_active_subscription',
@@ -531,10 +531,10 @@ router.post('/scan-qr', auth, async (req, res) => {
         });
       }
 
-      console.log(`✅ Abonnement valide pour ${getFullName(member)} - Statut: ${activeSubscription.activeCheck.details ? 'Paiement dû dans ' + activeSubscription.activeCheck.details.daysUntilDue + ' jours' : 'Actif'}`);
+      logger.info(`✅ Abonnement valide pour ${getFullName(member)} - Statut: ${activeSubscription.activeCheck.details ? 'Paiement dû dans ' + activeSubscription.activeCheck.details.daysUntilDue + ' jours' : 'Actif'}`);
     }
 
-    console.log(`✅ Accès autorisé pour ${getFullName(member)} - Abonnement valide jusqu'au ${activeSubscription.endDate}`);
+    logger.info(`✅ Accès autorisé pour ${getFullName(member)}`);
 
     // Enregistrer l'accès
     await prisma.accessLog.create({
@@ -553,25 +553,16 @@ router.post('/scan-qr', auth, async (req, res) => {
         fullName: getFullName(member),
         email: member.email,
         displayId: member.displayId,
-        subscription: activeSubscription ? {
-          id: activeSubscription.id,
-          plan: activeSubscription.plan,
-          membership: activeSubscription.membership,
-          status: activeSubscription.status,
-          endDate: activeSubscription.endDate,
-          isActive: activeSubscription.activeCheck.isActive,
-          nextPaymentDue: activeSubscription.activeCheck.details?.nextPaymentDue,
-          daysUntilDue: activeSubscription.activeCheck.details?.daysUntilDue
-        } : null
+        subscription: member.role === 'member' ? getActiveSubscription(member.Member) : null
       },
       message: 'Access granted'
     };
 
-    console.log(`📤 Réponse scan-qr:`, responseData);
+    logger.info(`📤 Réponse scan-qr: succès`);
     res.json(responseData);
 
   } catch (e) {
-    console.error(`💥 Erreur dans /scan-qr:`, e);
+    logger.error(`💥 Erreur dans /scan-qr:`, e);
     res.status(500).json({ error: e.message });
   }
 });
@@ -629,7 +620,7 @@ router.post('/scan-qr', auth, async (req, res) => {
  */
 // Protected: return current user info (admin or member)
 router.get('/me', auth, async (req, res) => {
-  console.log(`👤 Requête /me - User ID du token: ${req.user?.sub}, Email: ${req.user?.email}, Type: ${req.user?.type}`);
+  logger.info(`👤 Requête /me - User ID du token: ${req.user?.sub}, Email: ${req.user?.email}, Type: ${req.user?.type}`);
 
   try {
     const user = await prisma.user.findUnique({
@@ -659,14 +650,13 @@ router.get('/me', auth, async (req, res) => {
     });
 
     if (!user) {
-      console.log(`❌ Utilisateur non trouvé en base: ID ${req.user.sub}`);
+      logger.warn(`❌ Utilisateur non trouvé en base: ID ${req.user.sub}`);
       return res.status(404).json({ error: 'User not found' });
     }
 
-    console.log(`✅ Utilisateur trouvé: ${getFullName(user)} (${user.role}) - ID: ${user.id}, uniqueCode: ${user.uniqueCode}`);
+    logger.info(`✅ Utilisateur trouvé: ${getFullName(user)} (${user.role}) - ID: ${user.id}`);
 
     if (user.role === 'admin') {
-      console.log(`👨‍💼 Réponse admin pour: ${getFullName(user)}`);
       // Pour les admins : retourner leur salle
       const responseData = {
         id: user.id,
@@ -689,10 +679,9 @@ router.get('/me', auth, async (req, res) => {
         updatedAt: user.updatedAt,
         type: 'admin'
       };
-      console.log(`📤 Réponse /me admin:`, responseData);
+      logger.info(`📤 Réponse /me admin envoyée`);
       res.json(responseData);
     } else if (user.role === 'owner') {
-      console.log(`👑 Réponse owner pour: ${getFullName(user)}`);
       // Pour les owners : retourner toutes les salles avec statistiques
       const allGyms = await prisma.gym.findMany({
         include: {
@@ -755,13 +744,9 @@ router.get('/me', auth, async (req, res) => {
         },
         type: 'owner'
       };
-      console.log(`📤 Réponse /me owner:`, {
-        ...responseData,
-        gyms: `${gymsWithStats.length} salles trouvées`
-      });
+      logger.info(`📤 Réponse /me owner envoyée`);
       res.json(responseData);
     } else if (user.role === 'member') {
-      console.log(`👤 Réponse membre pour: ${getFullName(user)}`);
       // Pour les membres : abonnement actif + derniers paiements
       const activeSubscription = getActiveSubscription(user.Member);
       const subscriptionsWithStatus = getSubscriptionsWithStatus(user.Member);
@@ -799,18 +784,14 @@ router.get('/me', auth, async (req, res) => {
         recentPayments: user.Member?.Payment || [],
         type: 'member'
       };
-      console.log(`📤 Réponse /me membre:`, {
-        ...responseData,
-        recentPayments: `${responseData.recentPayments.length} paiements récents`,
-        subscriptions: `${responseData.subscriptions.length} abonnements`
-      });
+      logger.info(`📤 Réponse /me membre envoyée`);
       res.json(responseData);
     } else {
-      console.log(`❓ Rôle inconnu: ${user.role} pour ${getFullName(user)}`);
+      logger.warn(`❓ Rôle inconnu: ${user.role} pour ${getFullName(user)}`);
       return res.status(400).json({ error: 'Invalid user role' });
     }
   } catch (e) {
-    console.error(`💥 Erreur dans /me:`, e);
+    logger.error(`💥 Erreur dans /me:`, e);
     res.status(500).json({ error: e.message });
   }
 });
@@ -871,7 +852,7 @@ router.get('/me', auth, async (req, res) => {
  *                   type: string
  *                   example: "Erreur lors de l'envoi du code"
  */
-router.post('/forgot-password', async (req, res) => {
+router.post('/forgot-password', authLimiter, async (req, res) => {
   const { email, phoneNumber } = req.body;
   if (!email && !phoneNumber) return res.status(400).json({ error: 'Email ou phoneNumber requis' });
 
@@ -912,10 +893,10 @@ router.post('/forgot-password', async (req, res) => {
     await sendPasswordResetEmail(user.email, resetToken);
 
     const responseData = { message: 'Code de réinitialisation envoyé par email' };
-    console.log(`📤 Réponse forgot-password:`, responseData);
+    logger.info(`📤 Réponse forgot-password:`, responseData);
     res.json(responseData);
   } catch (e) {
-    console.error('Erreur forgot password:', e);
+    logger.error('Erreur forgot password:', e);
     res.status(500).json({ error: 'Erreur lors de l\'envoi du code' });
   }
 });
@@ -1004,7 +985,7 @@ router.post('/forgot-password', async (req, res) => {
  *                   type: string
  *                   example: "Erreur lors de la réinitialisation"
  */
-router.post('/reset-password', async (req, res) => {
+router.post('/reset-password', authLimiter, async (req, res) => {
   const { email, phoneNumber, token, newPassword } = req.body;
   if ((!email && !phoneNumber) || !token || !newPassword) {
     return res.status(400).json({ error: 'Email ou phoneNumber, token et nouveau mot de passe requis' });
@@ -1068,10 +1049,10 @@ router.post('/reset-password', async (req, res) => {
     });
 
     const responseData = { message: 'Mot de passe réinitialisé avec succès' };
-    console.log(`📤 Réponse reset-password:`, responseData);
+    logger.info(`📤 Réponse reset-password: ${JSON.stringify(responseData)}`);
     res.json(responseData);
   } catch (e) {
-    console.error('Erreur reset password:', e);
+    logger.error('Erreur reset password:', e);
     res.status(500).json({ error: 'Erreur lors de la réinitialisation' });
   }
 });
@@ -1131,12 +1112,12 @@ router.post('/reset-password', async (req, res) => {
  *       500:
  *         description: Server error
  */
-router.post('/send-setup-email', auth, async (req, res) => {
+router.post('/send-setup-email', auth, authLimiter, async (req, res) => {
   const { email, userId } = req.body;
-  console.log(`📧 Envoi email de configuration - Email: ${email}, UserId: ${userId}, Requester: ${req.user.email} (${req.user.type})`);
+  logger.info(`📧 Envoi email de configuration - Email: ${email}, UserId: ${userId}, Requester: ${req.user.email} (${req.user.type})`);
 
   if (!email && !userId) {
-    console.log(`❌ Email ou userId requis`);
+    logger.warn(`❌ Email ou userId requis`);
     return res.status(400).json({ error: 'Email ou userId requis' });
   }
 
@@ -1145,11 +1126,11 @@ router.post('/send-setup-email', auth, async (req, res) => {
     const whereClause = userId ? { id: userId } : { email: sanitizeEmail(email) };
     const user = await prisma.user.findUnique({ 
       where: whereClause,
-      include: { Gym: true }
+      include: { gym: true }
     });
 
     if (!user) {
-      console.log(`❌ Utilisateur non trouvé`);
+      logger.warn(`❌ Utilisateur non trouvé`);
       return res.status(404).json({ error: 'Utilisateur non trouvé' });
     }
 
@@ -1157,13 +1138,13 @@ router.post('/send-setup-email', auth, async (req, res) => {
     if (req.user.type === 'admin') {
       // Les admins peuvent seulement envoyer aux membres de leur salle
       if (user.gymId !== req.user.gymId) {
-        console.log(`❌ Permission refusée - Utilisateur d'une autre salle`);
+        logger.warn(`❌ Permission refusée - Utilisateur d'une autre salle`);
         return res.status(403).json({ error: 'Vous ne pouvez envoyer d\'emails qu\'aux membres de votre salle' });
       }
     } else if (req.user.type === 'member') {
       // Les membres ne peuvent envoyer qu'à eux-mêmes
       if (user.id !== req.user.sub) {
-        console.log(`❌ Permission refusée - Les membres ne peuvent pas envoyer d'emails à d'autres`);
+        logger.warn(`❌ Permission refusée - Les membres ne peuvent pas envoyer d'emails à d'autres`);
         return res.status(403).json({ error: 'Permission refusée' });
       }
     }
@@ -1192,7 +1173,7 @@ router.post('/send-setup-email', auth, async (req, res) => {
     // Envoyer l'email avec le nouveau service
     await sendAccountSetupEmail(user.email, getFullName(user), setupToken);
 
-    console.log(`✅ Email de configuration envoyé à ${user.email}`);
+    logger.info(`✅ Email de configuration envoyé à ${user.email}`);
     res.json({ 
       message: `Email de configuration envoyé à ${user.email}`,
       user: {
@@ -1203,7 +1184,7 @@ router.post('/send-setup-email', auth, async (req, res) => {
       }
     });
   } catch (e) {
-    console.error('Erreur send-setup-email:', e);
+    logger.error('Erreur send-setup-email:', e);
     res.status(500).json({ error: "Erreur lors de l'envoi de l'email" });
   }
 });
@@ -1262,17 +1243,17 @@ router.post('/send-setup-email', auth, async (req, res) => {
  *       500:
  *         description: Server error
  */
-router.post('/setup-password', async (req, res) => {
+router.post('/setup-password', authLimiter, async (req, res) => {
   const { email, phoneNumber, token, password } = req.body;
-  console.log(`🔐 Création mot de passe initial - Email: ${email}, PhoneNumber: ${phoneNumber}`);
+  logger.info(`🔐 Création mot de passe initial - Email: ${email}, PhoneNumber: ${phoneNumber}`);
 
   if ((!email && !phoneNumber) || !token || !password) {
-    console.log(`❌ Champs manquants`);
+    logger.warn(`❌ Champs manquants`);
     return res.status(400).json({ error: 'Email ou phoneNumber, token et mot de passe requis' });
   }
 
   if (password.length < 6) {
-    console.log(`❌ Mot de passe trop court`);
+    logger.warn(`❌ Mot de passe trop court`);
     return res.status(400).json({ error: 'Le mot de passe doit contenir au moins 6 caractères' });
   }
 
@@ -1288,7 +1269,7 @@ router.post('/setup-password', async (req, res) => {
     }
     
     if (!user) {
-      console.log(`❌ Utilisateur non trouvé: ${email || phoneNumber}`);
+      logger.warn(`❌ Utilisateur non trouvé: ${email || phoneNumber}`);
       return res.status(404).json({ error: 'Utilisateur non trouvé' });
     }
 
@@ -1305,7 +1286,7 @@ router.post('/setup-password', async (req, res) => {
     });
 
     if (!setupToken) {
-      console.log(`❌ Token invalide ou expiré`);
+      logger.warn(`❌ Token invalide ou expiré`);
       return res.status(400).json({ error: 'Token invalide ou expiré' });
     }
 
@@ -1324,10 +1305,10 @@ router.post('/setup-password', async (req, res) => {
       data: { used: true },
     });
 
-    console.log(`✅ Mot de passe créé pour ${user.email || user.phoneNumber}`);
+    logger.info(`✅ Mot de passe créé pour ${user.email || user.phoneNumber}`);
     res.json({ message: 'Mot de passe créé avec succès' });
   } catch (e) {
-    console.error('Erreur setup-password:', e);
+    logger.error('Erreur setup-password:', e);
     res.status(500).json({ error: 'Erreur lors de la création du mot de passe' });
   }
 });

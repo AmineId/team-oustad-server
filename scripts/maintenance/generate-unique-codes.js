@@ -1,8 +1,6 @@
-const { PrismaClient } = require('@prisma/client');
+const prisma = require('../../utils/prismaClient');
 const { getFullName } = require('../../utils/nameUtils');
 const crypto = require('crypto');
-
-const prisma = new PrismaClient();
 
 async function generateUniqueCodes() {
   try {

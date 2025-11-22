@@ -1,11 +1,10 @@
 // Script de test pour le système d'upload d'images
 // Utilisation: node scripts/test-image-upload.js
 
-const { PrismaClient } = require('@prisma/client');
+const prisma = require('../../utils/prismaClient');
 const { getFullName } = require('../../utils/nameUtils');
 const fs = require('fs');
 const path = require('path');
-const prisma = new PrismaClient();
 
 async function testImageUploadSystem() {
   console.log('🖼️ Test du système d\'upload d\'images\n');
@@ -126,7 +125,7 @@ async function testImageUploadSystem() {
   } catch (error) {
     console.error('❌ Erreur lors du test:', error);
   } finally {
-    await prisma.$disconnect();
+    // await prisma.$disconnect();
   }
 }
 

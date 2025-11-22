@@ -1,9 +1,8 @@
 // Script de test pour le système de planning d'entraînement
 // Utilisation: node scripts/test-planning-system.js
 
-const { PrismaClient } = require('@prisma/client');
+const prisma = require('../../utils/prismaClient');
 const { getFullName } = require('../../utils/nameUtils');
-const prisma = new PrismaClient();
 
 // Fonction pour obtenir un token JWT d'admin
 async function getAdminToken() {
@@ -176,7 +175,7 @@ async function testPlanningSystem() {
   } catch (error) {
     console.error('❌ Erreur lors du test:', error);
   } finally {
-    await prisma.$disconnect();
+    // await prisma.$disconnect();
   }
 }
 

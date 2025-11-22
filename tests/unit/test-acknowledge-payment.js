@@ -77,9 +77,8 @@ async function testAcknowledgePayment() {
     log('📊', `Statut initial de l'abonnement: ${subscription.status}\n`);
 
     // 4. Modifier le statut de l'abonnement à "pending" pour le test
-    const { PrismaClient } = require('@prisma/client');
+    const prisma = require('../../utils/prismaClient');
 const { getFullName } = require("../../utils/nameUtils");
-    const prisma = new PrismaClient();
     
     await prisma.subscription.update({
       where: { id: subscription.id },
@@ -141,7 +140,7 @@ const { getFullName } = require("../../utils/nameUtils");
       log('\n⚠️', `ATTENTION ! L'abonnement est toujours en statut "${status.subscription.status}"`);
     }
 
-    await prisma.$disconnect();
+    // await prisma.$disconnect();
 
   } catch (error) {
     log('❌', 'Erreur pendant le test:');

@@ -1,5 +1,4 @@
-const { PrismaClient } = require('@prisma/client');
-const prisma = new PrismaClient();
+const prisma = require('../../utils/prismaClient');
 
 async function testBobLogin() {
   console.log('🔍 Testing bob@example.com login issue...\n');
@@ -33,7 +32,7 @@ async function testBobLogin() {
   } catch (error) {
     console.error('❌ Error:', error.message);
   } finally {
-    await prisma.$disconnect();
+    // await prisma.$disconnect();
   }
 }
 

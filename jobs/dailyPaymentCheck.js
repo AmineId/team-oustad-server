@@ -14,8 +14,7 @@ const {
   checkUpcomingPayments 
 } = require('../services/subscriptionService');
 const { notifyPaymentOverdue, notifyPaymentDue } = require('../services/pushNotificationService');
-const { PrismaClient } = require('@prisma/client');
-const prisma = new PrismaClient();
+const prisma = require('../utils/prismaClient');
 
 /**
  * Exécute la vérification quotidienne des paiements

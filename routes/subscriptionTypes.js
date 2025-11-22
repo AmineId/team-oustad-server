@@ -1,40 +1,40 @@
 const express = require('express');
 const router = express.Router();
-const { PrismaClient } = require('@prisma/client');
-const prisma = new PrismaClient();
+const prisma = require('../utils/prismaClient');
 const auth = require('../middleware/auth');
 const { generateSubscriptionTypeId } = require('../utils/idGenerator');
+const logger = require('../utils/logger');
+const apiLimiter = require('../middleware/apiLimiter');
 
 /**
  * GET /subscription-types
  * Liste tous les types d'abonnements disponibles (actifs)
  */
 router.get('/', async (req, res) => {
-  console.log(`📋 Liste types abonnement - Filtres:`, req.query);
+  logger.info(`📋 Liste types abonnement - Filtres: ${JSON.stringify(req.query)}`);
 
   try {
     const { includeInactive } = req.query;
-    console.log(`🔍 includeInactive: ${includeInactive}`);
+    logger.debug(`🔍 includeInactive: ${includeInactive}`);
     
     const whereClause = includeInactive === 'true' ? {} : { isActive: true };
-    console.log(`🔍 Clause WHERE:`, whereClause);
-    console.log(`🔍 Recherche types abonnement...`);
+    logger.debug(`🔍 Clause WHERE: ${JSON.stringify(whereClause)}`);
+    logger.debug(`🔍 Recherche types abonnement...`);
     
     const types = await prisma.subscriptionType.findMany({
       where: whereClause,
       orderBy: { monthlyPrice: 'asc' }
     });
     
-    console.log(`✅ ${types.length} type(s) trouvé(s)`);
+    logger.info(`✅ ${types.length} type(s) trouvé(s)`);
     if (types.length > 0) {
-      console.log(`📊 Types:`, types.map(t => `${t.name} (${t.monthlyPrice}€/mois, ${t.isActive ? 'actif' : 'inactif'})`));
+      logger.debug(`📊 Types: ${types.map(t => `${t.name} (${t.monthlyPrice}€/mois, ${t.isActive ? 'actif' : 'inactif'})`).join(', ')}`);
     }
     
-    console.log(`📤 Réponse liste types: ${types.length} résultat(s)`);
-    console.log(types);
+    logger.debug(`📤 Réponse liste types: ${types.length} résultat(s)`);
     res.json(types);
   } catch (error) {
-    console.error('💥 Erreur récupération types:', error);
+    logger.error('💥 Erreur récupération types:', error);
     res.status(500).json({ error: error.message });
   }
 });
@@ -44,11 +44,11 @@ router.get('/', async (req, res) => {
  * Obtenir les détails d'un type d'abonnement
  */
 router.get('/:id', async (req, res) => {
-  console.log(`🔍 Détails type abonnement - ID: ${req.params.id}`);
+  logger.info(`🔍 Détails type abonnement - ID: ${req.params.id}`);
 
   try {
     const typeId = parseInt(req.params.id);
-    console.log(`🔍 Recherche type ${typeId}...`);
+    logger.debug(`🔍 Recherche type ${typeId}...`);
     
     const type = await prisma.subscriptionType.findUnique({
       where: { id: typeId },
@@ -60,17 +60,17 @@ router.get('/:id', async (req, res) => {
     });
     
     if (!type) {
-      console.log(`❌ Type non trouvé: ID ${typeId}`);
+      logger.warn(`❌ Type non trouvé: ID ${typeId}`);
       return res.status(404).json({ error: 'Type d\'abonnement non trouvé' });
     }
     
-    console.log(`✅ Type trouvé: ${type.name}`);
-    console.log(`📊 Prix: ${type.monthlyPrice}€/mois, ${type._count.Subscription} abonnement(s) actif(s)`);
-    console.log(`📤 Réponse détails type ${typeId}`);
+    logger.info(`✅ Type trouvé: ${type.name}`);
+    logger.debug(`📊 Prix: ${type.monthlyPrice}€/mois, ${type._count.Subscription} abonnement(s) actif(s)`);
+    logger.debug(`📤 Réponse détails type ${typeId}`);
     
     res.json({ type });
   } catch (error) {
-    console.error('💥 Erreur récupération type:', error);
+    logger.error('💥 Erreur récupération type:', error);
     res.status(500).json({ error: error.message });
   }
 });
@@ -79,18 +79,20 @@ router.get('/:id', async (req, res) => {
  * POST /subscription-types
  * Créer un nouveau type d'abonnement (Owner uniquement)
  */
-router.post('/', auth, async (req, res) => {
+router.post('/', auth, apiLimiter, async (req, res) => {
   try {
     const requester = req.user;
     
     // Seuls les owners peuvent créer des types
     if (requester.role !== 'owner') {
+      logger.warn(`⛔ Tentative création type non autorisée par ${requester.sub}`);
       return res.status(403).json({ error: 'Accès réservé aux propriétaires' });
     }
     
     const { name, description, monthlyPrice, features } = req.body;
     
     if (!name || !monthlyPrice) {
+      logger.warn('❌ Paramètres manquants pour création type');
       return res.status(400).json({ error: 'name et monthlyPrice sont requis' });
     }
     
@@ -100,6 +102,7 @@ router.post('/', auth, async (req, res) => {
     });
     
     if (existing) {
+      logger.warn(`❌ Type existe déjà: ${name}`);
       return res.status(400).json({ error: 'Un type avec ce nom existe déjà' });
     }
     
@@ -114,14 +117,14 @@ router.post('/', auth, async (req, res) => {
       }
     });
     
-    console.log(`✅ Type d'abonnement créé: ${type.name} (${type.monthlyPrice}€/mois)`);
+    logger.info(`✅ Type d'abonnement créé: ${type.name} (${type.monthlyPrice}€/mois)`);
     
     res.status(201).json({
       message: 'Type d\'abonnement créé avec succès',
       type
     });
   } catch (error) {
-    console.error('Erreur création type:', error);
+    logger.error('Erreur création type:', error);
     res.status(500).json({ error: error.message });
   }
 });
@@ -130,11 +133,12 @@ router.post('/', auth, async (req, res) => {
  * PUT /subscription-types/:id
  * Mettre à jour un type d'abonnement (Owner uniquement)
  */
-router.put('/:id', auth, async (req, res) => {
+router.put('/:id', auth, apiLimiter, async (req, res) => {
   try {
     const requester = req.user;
     
     if (requester.role !== 'owner') {
+      logger.warn(`⛔ Tentative modification type non autorisée par ${requester.sub}`);
       return res.status(403).json({ error: 'Accès réservé aux propriétaires' });
     }
     
@@ -146,6 +150,7 @@ router.put('/:id', auth, async (req, res) => {
     });
     
     if (!existing) {
+      logger.warn(`❌ Type non trouvé pour modification: ${typeId}`);
       return res.status(404).json({ error: 'Type d\'abonnement non trouvé' });
     }
     
@@ -161,14 +166,14 @@ router.put('/:id', auth, async (req, res) => {
       data: updateData
     });
     
-    console.log(`✅ Type d'abonnement mis à jour: ${type.name}`);
+    logger.info(`✅ Type d'abonnement mis à jour: ${type.name}`);
     
     res.json({
       message: 'Type d\'abonnement mis à jour avec succès',
       type
     });
   } catch (error) {
-    console.error('Erreur mise à jour type:', error);
+    logger.error('Erreur mise à jour type:', error);
     res.status(500).json({ error: error.message });
   }
 });
@@ -177,11 +182,12 @@ router.put('/:id', auth, async (req, res) => {
  * DELETE /subscription-types/:id
  * Désactiver un type d'abonnement (soft delete) (Owner uniquement)
  */
-router.delete('/:id', auth, async (req, res) => {
+router.delete('/:id', auth, apiLimiter, async (req, res) => {
   try {
     const requester = req.user;
     
     if (requester.role !== 'owner') {
+      logger.warn(`⛔ Tentative suppression type non autorisée par ${requester.sub}`);
       return res.status(403).json({ error: 'Accès réservé aux propriétaires' });
     }
     
@@ -196,6 +202,7 @@ router.delete('/:id', auth, async (req, res) => {
     });
     
     if (activeSubscriptionsCount > 0) {
+      logger.warn(`❌ Impossible supprimer type ${typeId}: ${activeSubscriptionsCount} abonnements actifs`);
       return res.status(400).json({
         error: `Impossible de supprimer ce type: ${activeSubscriptionsCount} abonnement(s) actif(s) l'utilisent`,
         activeSubscriptions: activeSubscriptionsCount
@@ -208,14 +215,14 @@ router.delete('/:id', auth, async (req, res) => {
       data: { isActive: false }
     });
     
-    console.log(`✅ Type d'abonnement désactivé: ${type.name}`);
+    logger.info(`✅ Type d'abonnement désactivé: ${type.name}`);
     
     res.json({
       message: 'Type d\'abonnement désactivé avec succès',
       type
     });
   } catch (error) {
-    console.error('Erreur suppression type:', error);
+    logger.error('Erreur suppression type:', error);
     res.status(500).json({ error: error.message });
   }
 });
@@ -230,6 +237,7 @@ router.get('/:id/subscriptions', auth, async (req, res) => {
     const typeId = parseInt(req.params.id);
     
     if (requester.role === 'member') {
+      logger.warn(`⛔ Accès refusé pour membre ${requester.sub} aux abonnements du type ${typeId}`);
       return res.status(403).json({ error: 'Accès refusé' });
     }
     
@@ -253,7 +261,7 @@ router.get('/:id/subscriptions', auth, async (req, res) => {
               select: {
                 id: true,
                 firstName: true,
-              lastName: true,
+                lastName: true,
                 email: true
               }
             }
@@ -264,12 +272,14 @@ router.get('/:id/subscriptions', auth, async (req, res) => {
       orderBy: { createdAt: 'desc' }
     });
     
+    logger.info(`✅ ${subscriptions.length} abonnements trouvés pour le type ${typeId}`);
+    
     res.json({
       count: subscriptions.length,
       subscriptions
     });
   } catch (error) {
-    console.error('Erreur récupération abonnements par type:', error);
+    logger.error('Erreur récupération abonnements par type:', error);
     res.status(500).json({ error: error.message });
   }
 });

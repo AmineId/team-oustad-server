@@ -1,7 +1,5 @@
-const { PrismaClient } = require('@prisma/client');
+const prisma = require('../../utils/prismaClient');
 const { getFullName } = require('../../utils/nameUtils');
-
-const prisma = new PrismaClient();
 
 async function checkUniqueCodes() {
   try {
