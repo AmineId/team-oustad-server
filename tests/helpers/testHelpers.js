@@ -10,12 +10,14 @@ const JWT_SECRET = process.env.JWT_SECRET || 'test_jwt_secret_key_for_testing_pu
  */
 async function cleanDatabase() {
   // Delete in order to respect foreign key constraints
-  await prisma.accessLog.deleteMany({});
   await prisma.passwordResetToken.deleteMany({});
   await prisma.payment.deleteMany({});
   await prisma.planningExercise.deleteMany({});
+  await prisma.planningDay.deleteMany({});
   await prisma.exercise.deleteMany({});
   await prisma.planning.deleteMany({});
+  await prisma.memberMeasurement.deleteMany({});
+  await prisma.memberGoal.deleteMany({});
   await prisma.subscription.deleteMany({});
   await prisma.member.deleteMany({});
   await prisma.admin.deleteMany({});
