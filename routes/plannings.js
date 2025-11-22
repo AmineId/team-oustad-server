@@ -411,16 +411,16 @@ router.post('/', auth, requireCoach, async (req, res) => {
         endDate: new Date(endDate)
       },
       include: {
-        member: {
+        Member: {
           include: { User: { select: { id: true, firstName: true,
               lastName: true, email: true } } }
         },
         User: { select: { id: true, firstName: true,
               lastName: true, email: true } },
-        days: {
+        PlanningDay: {
           include: {
-            exercises: {
-              include: { exercise: true },
+            PlanningExercise: {
+              include: { Exercise: true },
               orderBy: { order: 'asc' }
             }
           },
@@ -545,7 +545,7 @@ router.get('/', auth, async (req, res) => {
     const plannings = await prisma.planning.findMany({
       where: whereClause,
       include: {
-        member: {
+        Member: {
           include: { User: { select: { id: true, firstName: true,
               lastName: true, email: true } } }
         },
@@ -569,7 +569,7 @@ router.get('/', auth, async (req, res) => {
       console.log(`📊 Détails des plannings:`, plannings.map(p => ({
         id: p.id,
         title: p.title,
-        member: getFullName(p.member.User),
+        member: getFullName(p.Member.User),
         status: p.status,
         daysCount: p.PlanningDay.length
       })));
@@ -638,7 +638,7 @@ router.delete('/:planningId', auth, requireCoach, async (req, res) => {
       where: { id: planningId },
       include: { 
         User: true,
-        member: {
+        Member: {
           include: { User: true }
         }
       }
@@ -668,9 +668,9 @@ router.delete('/:planningId', auth, requireCoach, async (req, res) => {
     console.log(`✅ Planning supprimé: ${planning.title} (ID: ${planningId})`);
 
     // Envoyer notification au membre
-    if (planning.member.User.fcmToken) {
-      console.log(`🔔 Envoi notification suppression planning à ${getFullName(planning.member.User)}`);
-      await notifyPlanningDeleted(planning.member.User.fcmToken, planning).catch(err =>
+    if (planning.Member.User.fcmToken) {
+      console.log(`🔔 Envoi notification suppression planning à ${getFullName(planning.Member.User)}`);
+      await notifyPlanningDeleted(planning.Member.User.fcmToken, planning).catch(err =>
         console.error('⚠️ Erreur notification FCM:', err)
       );
     }
@@ -870,12 +870,12 @@ router.post('/:planningId/days/:dayOfWeek/exercises', auth, requireCoach, async 
         order
       },
       include: {
-        exercise: true,
-        planningDay: {
+        Exercise: true,
+        PlanningDay: {
           include: {
-            planning: {
+            Planning: {
               include: {
-                member: { include: { User: { select: { firstName: true, lastName: true } } } }
+                Member: { include: { User: { select: { firstName: true, lastName: true } } } }
               }
             }
           }
@@ -884,7 +884,7 @@ router.post('/:planningId/days/:dayOfWeek/exercises', auth, requireCoach, async 
     });
 
     console.log(`✅ Exercice ajouté: ${exercise.name} au jour ${dayOfWeek} du planning ${planning.title}`);
-    console.log(`👤 Pour le membre: ${getFullName(planningExercise.planningDay.planning.member.User)}`);
+    console.log(`👤 Pour le membre: ${getFullName(planningExercise.PlanningDay.Planning.Member.User)}`);
 
     // Envoyer notification au membre
     const memberUser = await prisma.user.findUnique({
