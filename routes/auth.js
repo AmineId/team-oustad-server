@@ -1145,7 +1145,7 @@ router.post('/send-setup-email', auth, async (req, res) => {
     const whereClause = userId ? { id: userId } : { email: sanitizeEmail(email) };
     const user = await prisma.user.findUnique({ 
       where: whereClause,
-      include: { gym: true }
+      include: { Gym: true }
     });
 
     if (!user) {
