@@ -182,7 +182,7 @@ router.get('/:id', auth, async (req, res) => {
       return res.status(403).json({ error: 'Accès refusé' });
     }
     
-    if (requester.role === 'admin' && status.subscription.member.User.gymId !== requester.gymId) {
+    if (requester.role === 'admin' && status.subscription.Member.User.gymId !== requester.gymId) {
       console.log(`🚫 Admin ${requester.email} tente d'accéder à abonnement d'autre salle`);
       return res.status(403).json({ error: 'Accès refusé' });
     }
@@ -343,11 +343,11 @@ router.post('/payments/:paymentId/acknowledge', auth, async (req, res) => {
     const subscription = await prisma.subscription.findUnique({
       where: { id: payment.subscriptionId },
       include: {
-        subscriptionType: true
+        SubscriptionType: true
       }
     });
     
-    console.log(`✅ Abonnement: ${subscription ? subscription.subscriptionType.name : 'NON TROUVÉ'}`);
+    console.log(`✅ Abonnement: ${subscription ? subscription.SubscriptionType.name : 'NON TROUVÉ'}`);
     if (subscription) {
       console.log(`📊 Statut abonnement: ${subscription.status}`);
     }
@@ -358,7 +358,7 @@ router.post('/payments/:paymentId/acknowledge', auth, async (req, res) => {
       subscription: subscription ? {
         id: subscription.id,
         status: subscription.status,
-        type: subscription.subscriptionType.name,
+        type: subscription.SubscriptionType.name,
         startDate: subscription.startDate,
         endDate: subscription.endDate
       } : null
@@ -470,8 +470,8 @@ router.get('/payments/upcoming', auth, async (req, res) => {
     
     // Si admin, filtrer par salle
     if (requester.role === 'admin') {
-      whereClause.member = {
-        user: {
+      whereClause.Member = {
+        User: {
           gymId: requester.gymId
         }
       };
