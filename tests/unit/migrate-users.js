@@ -1,7 +1,4 @@
-const { PrismaClient } = require('@prisma/client');
-const bcrypt = require('bcryptjs');
-
-const prisma = new PrismaClient();
+const prisma = require('../../utils/prismaClient');
 
 async function migrateUsers() {
   console.log('Migration des données User/Admin/Member...');
@@ -82,7 +79,7 @@ async function migrateUsers() {
     console.error('Erreur lors de la migration:', error);
     process.exit(1);
   } finally {
-    await prisma.$disconnect();
+    // await prisma.$disconnect();
   }
 }
 

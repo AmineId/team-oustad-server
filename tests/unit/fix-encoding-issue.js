@@ -1,5 +1,4 @@
-const { PrismaClient } = require('@prisma/client');
-const prisma = new PrismaClient();
+const prisma = require('../../utils/prismaClient');
 
 async function fixEncodingIssues() {
   console.log('🔍 Checking for encoding issues in user emails...\n');
@@ -48,7 +47,7 @@ async function fixEncodingIssues() {
     console.error('❌ Error:', error.message);
     throw error;
   } finally {
-    await prisma.$disconnect();
+    // await prisma.$disconnect();
   }
 }
 

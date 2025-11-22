@@ -54,8 +54,7 @@ async function testUserSetupWorkflow() {
     console.log('3️⃣ Récupération du token d\'activation depuis la base de données...');
     
     // Pour le test, on va chercher le token directement en base
-    const { PrismaClient } = require('@prisma/client');
-    const prisma = new PrismaClient();
+    const prisma = require('../../utils/prismaClient');
     
     const user = await prisma.user.findUnique({
       where: { email: newUserEmail }
@@ -74,7 +73,7 @@ async function testUserSetupWorkflow() {
       }
     });
 
-    await prisma.$disconnect();
+    // await prisma.$disconnect();
 
     if (!tokenRecord) {
       throw new Error('Token non trouvé en base de données');

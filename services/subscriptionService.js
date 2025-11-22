@@ -1,5 +1,4 @@
-const { PrismaClient } = require('@prisma/client');
-const prisma = new PrismaClient();
+const prisma = require('../utils/prismaClient');
 const { notifyPaymentStatusChange } = require('./pushNotificationService');
 const { generateSubscriptionId, generatePaymentId } = require('../utils/idGenerator');
 const { getFullName } = require('../utils/nameUtils');

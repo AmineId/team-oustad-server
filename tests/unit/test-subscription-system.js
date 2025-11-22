@@ -7,9 +7,8 @@
  * 3. La mise en pause automatique des abonnements
  */
 
-const { PrismaClient } = require('@prisma/client');
+const prisma = require('../../utils/prismaClient');
 const { getFullName } = require("../../utils/nameUtils");
-const prisma = new PrismaClient();
 const { 
   createYearlySubscriptionWithPayments,
   checkOverduePayments,
@@ -120,7 +119,7 @@ async function testSubscriptionSystem() {
     console.error('\n❌ ERREUR LORS DU TEST:', error);
     console.error(error.stack);
   } finally {
-    await prisma.$disconnect();
+    // await prisma.$disconnect();
   }
 }
 

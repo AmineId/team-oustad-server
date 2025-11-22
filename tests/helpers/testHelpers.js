@@ -1,8 +1,4 @@
-const { PrismaClient } = require('@prisma/client');
-const bcrypt = require('bcryptjs');
-const jwt = require('jsonwebtoken');
-
-const prisma = new PrismaClient();
+const prisma = require('../../utils/prismaClient');
 const JWT_SECRET = process.env.JWT_SECRET || 'test_jwt_secret_key_for_testing_purposes';
 
 /**
@@ -32,7 +28,7 @@ async function cleanDatabase() {
  * Disconnect from database
  */
 async function disconnectDatabase() {
-  await prisma.$disconnect();
+  // await prisma.$disconnect();
 }
 
 /**

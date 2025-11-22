@@ -1,5 +1,4 @@
-const { PrismaClient } = require('@prisma/client');
-const prisma = new PrismaClient();
+const prisma = require('../../utils/prismaClient');
 
 async function setOnboardingTrue() {
   console.log('🔄 Mise à jour du champ onboarding pour tous les membres...');

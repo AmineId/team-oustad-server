@@ -5,6 +5,8 @@ const fs = require('fs').promises;
 const crypto = require('crypto');
 const multer = require('multer');
 const uploadAuth = require('../middleware/uploadAuth');
+const logger = require('../utils/logger');
+const apiLimiter = require('../middleware/apiLimiter');
 
 // Configure multer for APK uploads
 // NOTE: Multer processes file upload BEFORE body parsing is complete.
@@ -64,7 +66,7 @@ async function handleCheckUpdate(req, res, channel) {
       });
     }
 
-    console.log(`📱 OTA Update Check (${channel}) - Device: ${deviceId}, Current Version: ${currentVersion}`);
+    logger.info(`📱 OTA Update Check (${channel}) - Device: ${deviceId}, Current Version: ${currentVersion}`);
 
     const channelPath = getChannelPath(channel);
     const versionPath = path.join(channelPath, 'version.json');
@@ -96,17 +98,17 @@ async function handleCheckUpdate(req, res, channel) {
     };
 
     if (updateAvailable) {
-      console.log(`✅ Update available: v${latestVersion.version_name} (${latestVersion.version_code})`);
+      logger.info(`✅ Update available: v${latestVersion.version_name} (${latestVersion.version_code})`);
       if (forceUpdate) {
-        console.log(`⚠️  Force update required (min version: ${latestVersion.min_supported_version})`);
+        logger.warn(`⚠️  Force update required (min version: ${latestVersion.min_supported_version})`);
       }
     } else {
-      console.log(`✅ App is up to date`);
+      logger.info(`✅ App is up to date`);
     }
 
     res.json(response);
   } catch (error) {
-    console.error('❌ Error checking update:', error);
+    logger.error('❌ Error checking update:', error);
     res.status(500).json({
       error: 'Internal server error',
       message: error.message,
@@ -119,7 +121,7 @@ async function handleDownload(req, res, channel) {
   try {
     // Pour le canal beta, rediriger vers Google Play Internal Testing
     if (channel === 'beta') {
-      console.log(`🔄 Redirecting beta download to Google Play Internal Testing`);
+      logger.info(`🔄 Redirecting beta download to Google Play Internal Testing`);
       return res.redirect(301, 'https://play.google.com/store/apps/details?id=team.fitness.team_fitness_app');
     }
 
@@ -127,12 +129,12 @@ async function handleDownload(req, res, channel) {
     const apkFileName = getApkFileName(channel);
     const apkPath = path.join(channelPath, apkFileName);
     
-    console.log(`📥 APK Download requested (${channel} channel)`);
+    logger.info(`📥 APK Download requested (${channel} channel)`);
 
     try {
       await fs.access(apkPath);
     } catch (error) {
-      console.error('❌ APK file not found:', apkPath);
+      logger.error(`❌ APK file not found: ${apkPath}`);
       const channelFolder = channel === 'beta' ? 'beta' : 'release';
       const apkFileName = getApkFileName(channel);
       return res.status(404).json({
@@ -153,25 +155,25 @@ async function handleDownload(req, res, channel) {
     req.setTimeout(10 * 60 * 1000); // 10 minutes
     res.setTimeout(10 * 60 * 1000); // 10 minutes
 
-    console.log(`✅ Sending APK file (${Math.round(stats.size / 1024 / 1024)}MB)...`);
+    logger.info(`✅ Sending APK file (${Math.round(stats.size / 1024 / 1024)}MB)...`);
 
     res.sendFile(apkPath, (err) => {
       if (err) {
         // Client abort is expected if connection drops - don't treat as error
         if (err.code === 'ECONNABORTED' || err.code === 'ECONNRESET') {
-          console.log(`⚠️  Client connection closed during download (${channel})`);
+          logger.warn(`⚠️  Client connection closed during download (${channel})`);
         } else {
-          console.error('❌ Error sending APK:', err);
+          logger.error('❌ Error sending APK:', err);
           if (!res.headersSent) {
             res.status(500).json({ error: 'Error sending file' });
           }
         }
       } else {
-        console.log(`✅ APK sent successfully (${channel})`);
+        logger.info(`✅ APK sent successfully (${channel})`);
       }
     });
   } catch (error) {
-    console.error('❌ Error downloading APK:', error);
+    logger.error('❌ Error downloading APK:', error);
     res.status(500).json({
       error: 'Internal server error',
       message: error.message,
@@ -187,11 +189,11 @@ async function handleVersion(req, res, channel) {
     const versionData = await fs.readFile(versionPath, 'utf-8');
     const version = JSON.parse(versionData);
 
-    console.log(`📋 Version info requested (${channel}): v${version.version_name} (${version.version_code})`);
+    logger.info(`📋 Version info requested (${channel}): v${version.version_name} (${version.version_code})`);
 
     res.json(version);
   } catch (error) {
-    console.error('❌ Error reading version:', error);
+    logger.error('❌ Error reading version:', error);
     res.status(500).json({
       error: 'Internal server error',
       message: error.message,
@@ -214,17 +216,14 @@ async function handleChecksum(req, res, channel) {
       });
     }
 
-    console.log(`🔐 Calculating checksums for APK (${channel})...`);
+    logger.info(`🔐 Calculating checksums for APK (${channel})...`);
 
     const fileBuffer = await fs.readFile(apkPath);
     const md5Hash = crypto.createHash('md5').update(fileBuffer).digest('hex');
     const sha256Hash = crypto.createHash('sha256').update(fileBuffer).digest('hex');
     const fileSize = fileBuffer.length;
 
-    console.log(`✅ Checksums calculated:`);
-    console.log(`   MD5: ${md5Hash}`);
-    console.log(`   SHA256: ${sha256Hash}`);
-    console.log(`   Size: ${fileSize} bytes`);
+    logger.info(`✅ Checksums calculated: MD5=${md5Hash}, SHA256=${sha256Hash}, Size=${fileSize} bytes`);
 
     res.json({
       md5: md5Hash,
@@ -233,7 +232,7 @@ async function handleChecksum(req, res, channel) {
       channel: channel,
     });
   } catch (error) {
-    console.error('❌ Error calculating checksum:', error);
+    logger.error('❌ Error calculating checksum:', error);
     res.status(500).json({
       error: 'Internal server error',
       message: error.message,
@@ -517,7 +516,7 @@ router.get('/checksum', (req, res) => {
  *       500:
  *         description: Server error
  */
-router.post('/upload', uploadAuth, upload.single('apk'), async (req, res) => {
+router.post('/upload', uploadAuth, apiLimiter, upload.single('apk'), async (req, res) => {
   try {
     const { version_code, version_name, changelog, min_supported_version, force_update, channel } = req.body;
     const uploadUser = req.user; // Fourni par le middleware uploadAuth
@@ -548,10 +547,10 @@ router.post('/upload', uploadAuth, upload.single('apk'), async (req, res) => {
       });
     }
 
-    console.log(`📤 Uploading APK to ${uploadChannel} channel...`);
-    console.log(`   Uploaded by: ${uploadUser.email} (${uploadUser.type})`);
-    console.log(`   Version: ${version_name} (${version_code})`);
-    console.log(`   Temp file: ${req.file.filename} (${req.file.size} bytes)`);
+    logger.info(`📤 Uploading APK to ${uploadChannel} channel...`);
+    logger.info(`   Uploaded by: ${uploadUser.email} (${uploadUser.type})`);
+    logger.info(`   Version: ${version_name} (${version_code})`);
+    logger.info(`   Temp file: ${req.file.filename} (${req.file.size} bytes)`);
 
     // Determine target paths based on channel
     const channelFolder = uploadChannel === 'beta' ? 'beta' : 'release';
@@ -569,9 +568,7 @@ router.post('/upload', uploadAuth, upload.single('apk'), async (req, res) => {
     const md5Hash = crypto.createHash('md5').update(fileBuffer).digest('hex');
     const sha256Hash = crypto.createHash('sha256').update(fileBuffer).digest('hex');
 
-    console.log(`   📝 Checksums calculated:`);
-    console.log(`      MD5: ${md5Hash}`);
-    console.log(`      SHA256: ${sha256Hash}`);
+    logger.info(`   📝 Checksums calculated: MD5=${md5Hash}, SHA256=${sha256Hash}`);
 
     // Backup old APK and version metadata if exists
     try {
@@ -590,21 +587,21 @@ router.post('/upload', uploadAuth, upload.single('apk'), async (req, res) => {
       const backupApkName = `${apkPrefix}-v${oldVersion.version_name}.apk`;
       const backupApkPath = path.join(backupDir, backupApkName);
       await fs.copyFile(finalApkPath, backupApkPath);
-      console.log(`   ✅ Old APK backed up: ${backupApkName}`);
+      logger.info(`   ✅ Old APK backed up: ${backupApkName}`);
       
       // Backup metadata with timestamp
       const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
       await fs.copyFile(versionPath, path.join(backupDir, `version-${timestamp}.json`));
-      console.log(`   ✅ Old version metadata backed up`);
+      logger.info(`   ✅ Old version metadata backed up`);
     } catch (error) {
       // No existing version or APK, skip backup
-      console.log(`   ℹ️  No previous version to backup`);
+      logger.info(`   ℹ️  No previous version to backup`);
     }
 
     // Move temp file to final destination
-    console.log(`   📦 Moving APK to: ${finalApkPath}`);
+    logger.info(`   📦 Moving APK to: ${finalApkPath}`);
     await fs.rename(req.file.path, finalApkPath);
-    console.log(`   ✅ APK moved successfully`);
+    logger.info(`   ✅ APK moved successfully`);
 
     // Prepare version metadata
     const baseUrl = `https://app.team-oustad.com/android/${channelFolder}`;
@@ -635,11 +632,11 @@ router.post('/upload', uploadAuth, upload.single('apk'), async (req, res) => {
     
     await fs.writeFile(versionPath, JSON.stringify(versionMetadata, null, 2));
 
-    console.log(`✅ APK uploaded successfully to ${uploadChannel} channel`);
-    console.log(`   Uploaded by: ${uploadUser.email}`);
-    console.log(`   Filename: ${apkFileName}`);
-    console.log(`   MD5: ${md5Hash}`);
-    console.log(`   SHA256: ${sha256Hash}`);
+    logger.info(`✅ APK uploaded successfully to ${uploadChannel} channel`);
+    logger.info(`   Uploaded by: ${uploadUser.email}`);
+    logger.info(`   Filename: ${apkFileName}`);
+    logger.info(`   MD5: ${md5Hash}`);
+    logger.info(`   SHA256: ${sha256Hash}`);
 
     res.json({
       message: `APK uploaded successfully to ${uploadChannel} channel`,
@@ -650,7 +647,7 @@ router.post('/upload', uploadAuth, upload.single('apk'), async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('❌ Error uploading APK:', error);
+    logger.error('❌ Error uploading APK:', error);
     
     // Clean up temp file if it exists
     if (req.file && req.file.path) {

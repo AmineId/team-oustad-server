@@ -1,9 +1,7 @@
 const cron = require('node-cron');
-const { PrismaClient } = require('@prisma/client');
+const prisma = require('../utils/prismaClient');
 const { sendPushNotification } = require('../services/pushNotificationService');
 const { getFullName } = require('../utils/nameUtils');
-
-const prisma = new PrismaClient();
 
 /**
  * Job qui s'exécute tous les matins à 6h pour notifier les membres

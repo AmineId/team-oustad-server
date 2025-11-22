@@ -510,8 +510,7 @@ async function notifyPlanningDeleted(fcmToken, planning) {
  * @param {Object} notification - Contenu de la notification
  */
 async function notifyGymMembers(gymId, notification) {
-  const { PrismaClient } = require('@prisma/client');
-  const prisma = new PrismaClient();
+  const prisma = require('../utils/prismaClient');
 
   try {
     console.log(`📢 Notification pour tous les membres de la salle ${gymId}`);
@@ -542,8 +541,6 @@ async function notifyGymMembers(gymId, notification) {
   } catch (error) {
     console.error('❌ Erreur notification membres salle:', error);
     return { success: false, error: error.message };
-  } finally {
-    await prisma.$disconnect();
   }
 }
 

@@ -1,13 +1,26 @@
 const express = require('express');
-const { PrismaClient } = require('@prisma/client');
+const prisma = require('./utils/prismaClient');
+const helmet = require('helmet');
+const cors = require('cors');
+const compression = require('compression');
+const morgan = require('morgan');
+const logger = require('./utils/logger');
 require('dotenv').config();
 
-console.log('🚀 Démarrage du serveur Team Fitness...');
+logger.info('🚀 Démarrage du serveur Team Fitness...');
 
 const app = express();
-const prisma = new PrismaClient();
 
-console.log('📦 Configuration Express...');
+logger.info('📦 Configuration Express...');
+
+// Security Middleware
+app.use(helmet());
+app.use(cors());
+app.use(compression());
+
+// Logging Middleware
+app.use(morgan('combined', { stream: { write: message => logger.info(message.trim()) } }));
+
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ limit: '50mb', extended: true }));
 
@@ -118,6 +131,27 @@ if (!firebaseServiceAccountPath) {
     console.warn('    Les notifications push sont désactivées.');
   }
 }
+
+// 404 Handler
+app.use((req, res, next) => {
+  res.status(404).json({
+    error: 'Not Found',
+    message: `Route ${req.originalUrl} not found`
+  });
+});
+
+// Global Error Handler
+app.use((err, req, res, next) => {
+  logger.error(`Unhandled Error: ${err.message}`, { stack: err.stack });
+
+  const statusCode = err.statusCode || 500;
+  const message = err.message || 'Internal Server Error';
+
+  res.status(statusCode).json({
+    error: statusCode === 500 ? 'Internal Server Error' : 'Error',
+    message: process.env.NODE_ENV === 'production' ? 'Something went wrong' : message
+  });
+});
 
 // Démarrer les cron jobs
 console.log('⏰ Démarrage des jobs planifiés...');

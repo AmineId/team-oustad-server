@@ -2,9 +2,8 @@
  * Script de vérification des displayIds générés
  */
 
-const { PrismaClient } = require('@prisma/client');
+const prisma = require('../../utils/prismaClient');
 const { getFullName } = require('../../utils/nameUtils');
-const prisma = new PrismaClient();
 
 async function checkDisplayIds() {
   console.log('🔍 Vérification des displayIds générés\n');
@@ -81,7 +80,7 @@ async function checkDisplayIds() {
     console.error('❌ Erreur:', error);
     throw error;
   } finally {
-    await prisma.$disconnect();
+    // await prisma.$disconnect();
   }
 }
 

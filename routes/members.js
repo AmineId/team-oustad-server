@@ -1,8 +1,9 @@
 const express = require('express');
-const { PrismaClient } = require('@prisma/client');
+const prisma = require('../utils/prismaClient');
+const logger = require('../utils/logger');
+const { apiLimiter } = require('../middleware/rateLimiter');
 
 const router = express.Router();
-const prisma = new PrismaClient();
 const auth = require('../middleware/auth');
 const { generateUserIdByRole } = require('../utils/idGenerator');
 const { getFullName } = require('../utils/nameUtils');
@@ -54,7 +55,7 @@ const canAccessMemberProfile = async (req, res, next) => {
 
     return res.status(403).json({ error: 'Vous n\'avez pas les permissions pour accéder à ce profil' });
   } catch (error) {
-    console.error('Erreur middleware canAccessMemberProfile:', error);
+    logger.error('Erreur middleware canAccessMemberProfile:', error);
     return res.status(500).json({ error: error.message });
   }
 };
@@ -123,8 +124,8 @@ const canAccessMemberProfile = async (req, res, next) => {
  *       500:
  *         description: Server error
  */
-router.put('/:id/profile', auth, canAccessMemberProfile, async (req, res) => {
-  console.log(`👤 Mise à jour profil membre - User ID: ${req.params.id}`);
+router.put('/:id/profile', auth, canAccessMemberProfile, apiLimiter, async (req, res) => {
+  logger.info(`👤 Mise à jour profil membre - User ID: ${req.params.id}`);
 
   try {
     const memberId = Number(req.params.id);
@@ -202,7 +203,7 @@ router.put('/:id/profile', auth, canAccessMemberProfile, async (req, res) => {
       }
     });
 
-    console.log(`✅ Profil membre mis à jour pour ${getFullName(updatedMember.User)}`);
+    logger.info(`✅ Profil membre mis à jour pour ${getFullName(updatedMember.User)}`);
 
     res.json({
       message: 'Profil membre mis à jour avec succès',
@@ -225,7 +226,7 @@ router.put('/:id/profile', auth, canAccessMemberProfile, async (req, res) => {
     });
 
   } catch (e) {
-    console.error('💥 Erreur mise à jour profil membre:', e);
+    logger.error('💥 Erreur mise à jour profil membre:', e);
     handleError(res, e, 500);
   }
 });
@@ -298,8 +299,8 @@ router.put('/:id/profile', auth, canAccessMemberProfile, async (req, res) => {
  *       500:
  *         description: Server error
  */
-router.post('/:id/goals', auth, canAccessMemberProfile, async (req, res) => {
-  console.log(`🎯 Création objectif membre - User ID: ${req.params.id}`);
+router.post('/:id/goals', auth, canAccessMemberProfile, apiLimiter, async (req, res) => {
+  logger.info(`🎯 Création objectif membre - User ID: ${req.params.id}`);
 
   try {
     const memberId = Number(req.params.id);
@@ -346,7 +347,7 @@ router.post('/:id/goals', auth, canAccessMemberProfile, async (req, res) => {
       }
     });
 
-    console.log(`✅ Objectif créé pour ${getFullName(goal.Member.User)}: ${goal.title}`);
+    logger.info(`✅ Objectif créé pour ${getFullName(goal.Member.User)}: ${goal.title}`);
 
     res.status(201).json({
       message: 'Objectif créé avec succès',
@@ -366,7 +367,7 @@ router.post('/:id/goals', auth, canAccessMemberProfile, async (req, res) => {
     });
 
   } catch (e) {
-    console.error('💥 Erreur création objectif:', e);
+    logger.error('💥 Erreur création objectif:', e);
     handleError(res, e, 500);
   }
 });
@@ -398,7 +399,7 @@ router.post('/:id/goals', auth, canAccessMemberProfile, async (req, res) => {
  *         description: Server error
  */
 router.get('/:id/goals', auth, canAccessMemberProfile, async (req, res) => {
-  console.log(`📋 Récupération objectifs membre - User ID: ${req.params.id}`);
+  logger.info(`📋 Récupération objectifs membre - User ID: ${req.params.id}`);
 
   try {
     const memberId = Number(req.params.id);
@@ -408,12 +409,12 @@ router.get('/:id/goals', auth, canAccessMemberProfile, async (req, res) => {
       orderBy: { createdAt: 'desc' }
     });
 
-    console.log(`✅ ${goals.length} objectifs trouvés`);
+    logger.info(`✅ ${goals.length} objectifs trouvés`);
 
     res.json({ goals });
 
   } catch (e) {
-    console.error('💥 Erreur récupération objectifs:', e);
+    logger.error('💥 Erreur récupération objectifs:', e);
     handleError(res, e, 500);
   }
 });
@@ -500,8 +501,8 @@ router.get('/:id/goals', auth, canAccessMemberProfile, async (req, res) => {
  *       500:
  *         description: Server error
  */
-router.post('/:id/measurements', auth, canAccessMemberProfile, async (req, res) => {
-  console.log(`📏 Création mesure membre - User ID: ${req.params.id}`);
+router.post('/:id/measurements', auth, canAccessMemberProfile, apiLimiter, async (req, res) => {
+  logger.info(`📏 Création mesure membre - User ID: ${req.params.id}`);
 
   try {
     const memberId = Number(req.params.id);
@@ -549,7 +550,7 @@ router.post('/:id/measurements', auth, canAccessMemberProfile, async (req, res) 
       }
     });
 
-    console.log(`✅ Mesure créée pour ${getFullName(measurement.Member.User)}`);
+    logger.info(`✅ Mesure créée pour ${getFullName(measurement.Member.User)}`);
 
     res.status(201).json({
       message: 'Mesure créée avec succès',
@@ -572,7 +573,7 @@ router.post('/:id/measurements', auth, canAccessMemberProfile, async (req, res) 
     });
 
   } catch (e) {
-    console.error('💥 Erreur création mesure:', e);
+    logger.error('💥 Erreur création mesure:', e);
     handleError(res, e, 500);
   }
 });
@@ -622,7 +623,7 @@ router.post('/:id/measurements', auth, canAccessMemberProfile, async (req, res) 
  *         description: Server error
  */
 router.get('/:id/measurements', auth, canAccessMemberProfile, async (req, res) => {
-  console.log(`📊 Récupération mesures membre - User ID: ${req.params.id}`);
+  logger.info(`📊 Récupération mesures membre - User ID: ${req.params.id}`);
 
   try {
     const memberId = Number(req.params.id);
@@ -643,12 +644,12 @@ router.get('/:id/measurements', auth, canAccessMemberProfile, async (req, res) =
       take: Number(limit)
     });
 
-    console.log(`✅ ${measurements.length} mesures trouvées`);
+    logger.info(`✅ ${measurements.length} mesures trouvées`);
 
     res.json({ measurements });
 
   } catch (e) {
-    console.error('💥 Erreur récupération mesures:', e);
+    logger.error('💥 Erreur récupération mesures:', e);
     handleError(res, e, 500);
   }
 });
