@@ -4,7 +4,7 @@ const prisma = require('../utils/prismaClient');
 const auth = require('../middleware/auth');
 const { generateSubscriptionTypeId } = require('../utils/idGenerator');
 const logger = require('../utils/logger');
-const apiLimiter = require('../middleware/apiLimiter');
+const { apiLimiter } = require('../middleware/rateLimiter');
 
 /**
  * GET /subscription-types
