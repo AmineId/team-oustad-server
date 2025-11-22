@@ -71,7 +71,7 @@ async function createYearlySubscriptionWithPayments(memberId, subscriptionTypeId
       paymentFrequency
     },
     include: {
-      subscriptionType: true
+      SubscriptionType: true
     }
   });
   
@@ -139,8 +139,8 @@ async function checkOverduePayments() {
       }
     },
     include: {
-      subscription: true,
-      member: {
+      Subscription: true,
+      Member: {
         include: {
           User: true
         }
@@ -160,15 +160,15 @@ async function checkOverduePayments() {
     });
     
     console.log(`⚠️  Paiement ${payment.id} marqué en retard`);
-    console.log(`   Membre: ${getFullName(payment.member.User)}`);
+    console.log(`   Membre: ${getFullName(payment.Member.User)}`);
     console.log(`   Montant: ${payment.amount}€`);
     console.log(`   Date due: ${payment.dueDate.toLocaleDateString()}`);
     
     // Envoyer notification de changement de statut
-    if (payment.member.User.fcmToken) {
-      console.log(`🔔 Envoi notification changement statut à ${getFullName(payment.member.User)}`);
+    if (payment.Member.User.fcmToken) {
+      console.log(`🔔 Envoi notification changement statut à ${getFullName(payment.Member.User)}`);
       await notifyPaymentStatusChange(
-        payment.member.User.fcmToken,
+        payment.Member.User.fcmToken,
         updatedPayment,
         'pending',
         'overdue'
@@ -176,15 +176,15 @@ async function checkOverduePayments() {
     }
     
     // Si l'abonnement n'est pas déjà en pause, le mettre en pause
-    if (payment.subscription && payment.subscription.status === 'active') {
-      if (!updatedSubscriptions.has(payment.subscription.id)) {
+    if (payment.Subscription && payment.Subscription.status === 'active') {
+      if (!updatedSubscriptions.has(payment.Subscription.id)) {
         await prisma.subscription.update({
-          where: { id: payment.subscription.id },
+          where: { id: payment.Subscription.id },
           data: { status: 'paused' }
         });
         
-        updatedSubscriptions.add(payment.subscription.id);
-        console.log(`⏸️  Abonnement ${payment.subscription.id} mis en pause`);
+        updatedSubscriptions.add(payment.Subscription.id);
+        console.log(`⏸️  Abonnement ${payment.Subscription.id} mis en pause`);
       }
     }
   }
@@ -217,8 +217,8 @@ async function checkUpcomingPayments() {
       }
     },
     include: {
-      subscription: true,
-      member: {
+      Subscription: true,
+      Member: {
         include: {
           User: true
         }
@@ -231,7 +231,7 @@ async function checkUpcomingPayments() {
   for (const payment of upcomingPayments) {
     const daysUntilDue = Math.ceil((payment.dueDate - now) / (1000 * 60 * 60 * 24));
     console.log(`   💰 Paiement ${payment.id} dû dans ${daysUntilDue} jour(s)`);
-    console.log(`      Membre: ${getFullName(payment.member.User)}`);
+    console.log(`      Membre: ${getFullName(payment.Member.User)}`);
     console.log(`      Montant: ${payment.amount}€`);
   }
   
@@ -252,7 +252,7 @@ async function markPaymentAsCompleted(paymentId, paymentMethod, transactionId = 
   const oldPayment = await prisma.payment.findUnique({
     where: { id: paymentId },
     include: {
-      member: { include: { User: true } }
+      Member: { include: { User: true } }
     }
   });
   const oldStatus = oldPayment?.status;
@@ -275,10 +275,10 @@ async function markPaymentAsCompleted(paymentId, paymentMethod, transactionId = 
   console.log(`   Montant: ${payment.amount}€, Méthode: ${payment.paymentMethod}`);
   
   // Envoyer notification de changement de statut
-  if (oldPayment?.member.User.fcmToken && oldStatus !== 'completed') {
-    console.log(`🔔 Envoi notification changement statut à ${getFullName(oldPayment.member.User)}`);
+  if (oldPayment?.Member.User.fcmToken && oldStatus !== 'completed') {
+    console.log(`🔔 Envoi notification changement statut à ${getFullName(oldPayment.Member.User)}`);
     await notifyPaymentStatusChange(
-      oldPayment.member.User.fcmToken,
+      oldPayment.Member.User.fcmToken,
       payment,
       oldStatus,
       'completed'
@@ -286,7 +286,7 @@ async function markPaymentAsCompleted(paymentId, paymentMethod, transactionId = 
   }
   
   // Si c'était le dernier paiement en retard, réactiver l'abonnement
-  if (payment.subscription && payment.subscription.status === 'paused') {
+  if (payment.Subscription && payment.Subscription.status === 'paused') {
     console.log(`🔍 Abonnement en pause détecté - Vérification paiements en retard...`);
     const remainingOverdue = await prisma.payment.count({
       where: {
@@ -328,12 +328,12 @@ async function acknowledgePayment(paymentId, paymentMethod, transactionId = null
   const payment = await prisma.payment.findUnique({
     where: { id: paymentId },
     include: {
-      subscription: {
+      Subscription: {
         include: {
-          subscriptionType: true
+          SubscriptionType: true
         }
       },
-      member: {
+      Member: {
         include: {
           User: true
         }
@@ -346,7 +346,7 @@ async function acknowledgePayment(paymentId, paymentMethod, transactionId = null
     throw new Error('Paiement non trouvé');
   }
 
-  console.log(`✅ Paiement trouvé - Membre: ${getFullName(payment.member.User)}, Montant: ${payment.amount}€`);
+  console.log(`✅ Paiement trouvé - Membre: ${getFullName(payment.Member.User)}, Montant: ${payment.amount}€`);
   console.log(`   Statut actuel: ${payment.status}`);
 
   if (payment.status === 'completed') {
@@ -355,7 +355,7 @@ async function acknowledgePayment(paymentId, paymentMethod, transactionId = null
   }
 
   console.log(`💳 Acquittement du paiement ${paymentId}`);
-  console.log(`   Membre: ${getFullName(payment.member.User)}`);
+  console.log(`   Membre: ${getFullName(payment.Member.User)}`);
   console.log(`   Montant: ${payment.amount}€`);
 
   // Mettre à jour le paiement
@@ -369,15 +369,15 @@ async function acknowledgePayment(paymentId, paymentMethod, transactionId = null
       paidAt: new Date()
     },
     include: {
-      subscription: true
+      Subscription: true
     }
   });
 
   console.log(`✅ Paiement ${paymentId} acquitté avec succès`);
 
   // Si le paiement est lié à un abonnement
-  if (payment.subscription) {
-    const subscription = payment.subscription;
+  if (payment.Subscription) {
+    const subscription = payment.Subscription;
     console.log(`🔍 Paiement lié à abonnement ${subscription.id} (statut: ${subscription.status})`);
     
     // Si l'abonnement est en attente, l'activer
@@ -389,7 +389,7 @@ async function acknowledgePayment(paymentId, paymentMethod, transactionId = null
       });
       
       console.log(`✨ Abonnement ${subscription.id} activé (était en attente)`);
-      console.log(`   Type: ${subscription.subscriptionType.name}`);
+      console.log(`   Type: ${subscription.SubscriptionType.name}`);
       console.log(`   Période: ${subscription.startDate.toLocaleDateString()} → ${subscription.endDate.toLocaleDateString()}`);
     }
     // Si l'abonnement était en pause et qu'il n'y a plus de paiements en retard, le réactiver
@@ -433,10 +433,10 @@ async function getSubscriptionStatus(subscriptionId) {
   const subscription = await prisma.subscription.findUnique({
     where: { id: subscriptionId },
     include: {
-      payments: {
+      Payment: {
         orderBy: { monthNumber: 'asc' }
       },
-      member: {
+      Member: {
         include: {
           User: true
         }
@@ -448,12 +448,12 @@ async function getSubscriptionStatus(subscriptionId) {
     throw new Error('Abonnement non trouvé');
   }
   
-  const totalPayments = subscription.payments.length;
-  const completedPayments = subscription.payments.filter(p => p.status === 'completed').length;
-  const overduePayments = subscription.payments.filter(p => p.status === 'overdue').length;
-  const pendingPayments = subscription.payments.filter(p => p.status === 'pending').length;
+  const totalPayments = subscription.Payment.length;
+  const completedPayments = subscription.Payment.filter(p => p.status === 'completed').length;
+  const overduePayments = subscription.Payment.filter(p => p.status === 'overdue').length;
+  const pendingPayments = subscription.Payment.filter(p => p.status === 'pending').length;
   
-  const nextPayment = subscription.payments.find(p => p.status === 'pending');
+  const nextPayment = subscription.Payment.find(p => p.status === 'pending');
   
   return {
     subscription,
