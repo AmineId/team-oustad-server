@@ -6,7 +6,7 @@ const crypto = require('crypto');
 const multer = require('multer');
 const uploadAuth = require('../middleware/uploadAuth');
 const logger = require('../utils/logger');
-const apiLimiter = require('../middleware/apiLimiter');
+const { apiLimiter } = require('../middleware/rateLimiter');
 
 // Configure multer for APK uploads
 // NOTE: Multer processes file upload BEFORE body parsing is complete.
