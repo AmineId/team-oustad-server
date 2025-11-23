@@ -245,8 +245,8 @@ router.get('/:id/subscriptions', auth, async (req, res) => {
     
     // Si admin, filtrer par salle
     if (requester.role === 'admin') {
-      whereClause.member = {
-        user: {
+      whereClause.Member = {
+        User: {
           gymId: requester.gymId
         }
       };
@@ -255,9 +255,9 @@ router.get('/:id/subscriptions', auth, async (req, res) => {
     const subscriptions = await prisma.subscription.findMany({
       where: whereClause,
       include: {
-        member: {
+        Member: {
           include: {
-            user: {
+            User: {
               select: {
                 id: true,
                 firstName: true,
@@ -267,7 +267,7 @@ router.get('/:id/subscriptions', auth, async (req, res) => {
             }
           }
         },
-        subscriptionType: true
+        SubscriptionType: true
       },
       orderBy: { createdAt: 'desc' }
     });
