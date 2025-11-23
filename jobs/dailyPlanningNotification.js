@@ -26,32 +26,33 @@ const dailyPlanningNotification = cron.schedule('0 6 * * *', async () => {
         endDate: { gte: today }
       },
       include: {
-        member: {
+        Member: {
           include: {
             User: {
               select: {
                 id: true,
                 firstName: true,
                 lastName: true,
-                fcmToken: true
+                fcmToken: true,
+                notificationsEnabled: true
               }
             }
           }
         },
-        coach: {
+        Coach: {
           select: {
             firstName: true,
             lastName: true
           }
         },
-        days: {
+        PlanningDay: {
           where: {
             dayOfWeek: currentDayOfWeek
           },
           include: {
-            exercises: {
+            PlanningExercise: {
               include: {
-                exercise: true
+                Exercise: true
               },
               orderBy: { order: 'asc' }
             }
@@ -64,7 +65,7 @@ const dailyPlanningNotification = cron.schedule('0 6 * * *', async () => {
 
     // Filtrer les plannings qui ont des exercices aujourd'hui
     const planningsWithExercisesToday = activePlannings.filter(
-      planning => planning.days.length > 0 && planning.days[0].exercises.length > 0
+      planning => planning.PlanningDay.length > 0 && planning.PlanningDay[0].PlanningExercise.length > 0
     );
 
     console.log(`✅ ${planningsWithExercisesToday.length} planning(s) avec exercices aujourd'hui`);
@@ -74,9 +75,9 @@ const dailyPlanningNotification = cron.schedule('0 6 * * *', async () => {
 
     // Envoyer une notification à chaque membre
     for (const planning of planningsWithExercisesToday) {
-      const member = planning.member.User;
-      const day = planning.days[0];
-      const exerciseCount = day.exercises.length;
+      const member = planning.Member.User;
+      const day = planning.PlanningDay[0];
+      const exerciseCount = day.PlanningExercise.length;
       const memberFullName = getFullName(member);
 
       console.log(`📤 Envoi notification à ${memberFullName} - ${exerciseCount} exercice(s)`);
@@ -88,7 +89,7 @@ const dailyPlanningNotification = cron.schedule('0 6 * * *', async () => {
       }
 
       // Vérifier que le membre a activé les notifications d'entraînement spécifiques
-      if (!planning.member.workoutNotificationsEnabled) {
+      if (!planning.Member.workoutNotificationsEnabled) {
         console.log(`⚠️ ${memberFullName} a désactivé les notifications d'entraînement`);
         continue;
       }
@@ -103,9 +104,9 @@ const dailyPlanningNotification = cron.schedule('0 6 * * *', async () => {
       try {
         // Créer le message de notification
         const dayNames = ['Dimanche', 'Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi'];
-        const exercisesList = day.exercises
+        const exercisesList = day.PlanningExercise
           .slice(0, 3)
-          .map(ex => ex.exercise.name)
+          .map(ex => ex.Exercise.name)
           .join(', ');
         
         const moreExercises = exerciseCount > 3 ? ` et ${exerciseCount - 3} autre${exerciseCount - 3 > 1 ? 's' : ''}` : '';
