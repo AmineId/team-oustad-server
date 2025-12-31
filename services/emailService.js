@@ -34,58 +34,127 @@ async function sendPasswordResetEmail(email, resetToken, isSetup = false) {
   console.log(`   Token: ${resetToken}`);
   console.log(`   Type: ${isSetup ? 'Activation compte' : 'Réinitialisation mot de passe'}`);
   
+  const baseUrl = process.env.API_URL || 'http://localhost:3000';
   const resetUrl = isSetup 
-    ? `${process.env.API_URL || 'http://localhost:3000'}/setup-password?token=${resetToken}`
-    : `${process.env.API_URL || 'http://localhost:3000'}/reset-password?token=${resetToken}`;
+    ? `${baseUrl}/setup-password?token=${resetToken}`
+    : `${baseUrl}/reset-password?token=${resetToken}`;
+  const logoUrl = `${baseUrl}/android/assets/logo.png`;
 
   console.log(`🔗 URL générée: ${resetUrl}`);
 
   const mobileAppLink = process.env.MOBILE_APP_LINK || '';
   
   const mailOptions = isSetup ? {
-    from: process.env.NO_REPLY_EMAIL,
+    from: `"Team Fitness" <${process.env.SMTP_USER}>`,
     to: email,
-    subject: 'Bienvenue sur Team Fitness - Créez votre mot de passe',
+    subject: '🎉 Bienvenue sur Team Fitness - Créez votre mot de passe',
     html: `
-      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
-        <h2 style="color: #333;">Bienvenue sur Team Fitness ! 🎉</h2>
-        <p>Votre compte a été créé avec succès. Pour finaliser votre inscription, vous devez créer votre mot de passe.</p>
-        
-        <div style="background-color: #f8f9fa; border-left: 4px solid #28a745; padding: 15px; margin: 20px 0;">
-          <p style="margin: 0 0 10px 0; color: #333; font-weight: bold;">🔐 Votre code d'activation :</p>
-          <p style="margin: 0; font-size: 24px; font-weight: bold; color: #28a745; letter-spacing: 2px;">${resetToken}</p>
-        </div>
-        
-        ${mobileAppLink ? `
-        <div style="background-color: #e8f5e9; border: 2px solid #28a745; border-radius: 8px; padding: 20px; margin: 20px 0; text-align: center;">
-          <p style="margin: 0 0 15px 0; color: #2e7d32; font-size: 16px; font-weight: bold;">📱 Pour créer votre mot de passe :</p>
-          <a href="${mobileAppLink}" style="background-color: #28a745; color: white; padding: 12px 30px; text-decoration: none; border-radius: 5px; display: inline-block; font-size: 16px; font-weight: bold;">Ouvrir l'application Team Fitness</a>
-          <p style="margin: 15px 0 0 0; font-size: 13px; color: #666;">Cliquez sur le bouton ci-dessus, puis entrez votre code d'activation dans l'app</p>
-        </div>
-        ` : `
-        <div style="text-align: center; margin: 20px 0;">
-          <p style="margin: 0 0 15px 0; color: #333; font-weight: bold;">Pour créer votre mot de passe, entrez ce code dans l'application mobile Team Fitness</p>
-        </div>
-        `}
-        
-        <p style="margin-top: 25px; font-size: 13px; color: #999;">⏱️ Ce code expire dans 24 heures.</p>
-        <p style="font-size: 13px; color: #999;">Si vous n'avez pas créé de compte, ignorez cet email.</p>
-      </div>
+      <!DOCTYPE html>
+      <html lang="fr">
+      <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      </head>
+      <body style="margin: 0; padding: 0; font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: linear-gradient(135deg, #374151 0%, #1a202c 100%);">
+        <table width="100%" cellpadding="0" cellspacing="0" style="background: linear-gradient(135deg, #374151 0%, #1a202c 100%); padding: 40px 20px;">
+          <tr>
+            <td align="center">
+              <table width="600" cellpadding="0" cellspacing="0" style="background-color: rgba(255, 255, 255, 0.05); backdrop-filter: blur(10px); border-radius: 16px; overflow: hidden; box-shadow: 0 8px 32px rgba(0,0,0,0.3); border: 1px solid rgba(255, 255, 255, 0.1);">
+                <tr>
+                  <td style="padding: 40px 30px; text-align: center; background: linear-gradient(135deg, rgba(232, 149, 71, 0.1) 0%, rgba(245, 158, 11, 0.1) 100%);">
+                    <img src="${logoUrl}" alt="Team Fitness" style="width: 80px; height: 80px; margin-bottom: 20px;">
+                    <h1 style="color: #e89547; margin: 0; font-size: 32px; font-weight: 700;">Team Fitness</h1>
+                    <p style="color: #f4a261; margin: 10px 0 0 0; font-size: 14px;">Bienvenue ! 🎉</p>
+                  </td>
+                </tr>
+                <tr>
+                  <td style="padding: 40px 30px; color: #e5e7eb;">
+                    <p style="color: #d1d5db; font-size: 16px; line-height: 1.8; margin: 20px 0;">Votre compte a été créé avec succès. Pour finaliser votre inscription, vous devez créer votre mot de passe.</p>
+                    <div style="background: rgba(232, 149, 71, 0.1); border-left: 4px solid #e89547; padding: 20px; margin: 30px 0; border-radius: 8px;">
+                      <p style="margin: 0; color: #e89547; font-size: 16px; font-weight: 600; margin-bottom: 10px;">🔐 Votre code d'activation :</p>
+                      <p style="margin: 0; font-size: 32px; font-weight: bold; color: #f4a261; letter-spacing: 3px;">${resetToken}</p>
+                    </div>
+                    ${mobileAppLink ? `
+                    <div style="background: linear-gradient(135deg, rgba(232, 149, 71, 0.15) 0%, rgba(245, 158, 11, 0.15) 100%); border: 2px solid rgba(232, 149, 71, 0.3); border-radius: 12px; padding: 25px; margin: 30px 0; text-align: center;">
+                      <p style="margin: 0 0 20px 0; color: #f4a261; font-size: 18px; font-weight: 600;">📱 Pour créer votre mot de passe</p>
+                      <a href="${mobileAppLink}" style="background: linear-gradient(135deg, #e89547 0%, #f59e0b 100%); color: #1a202c; padding: 16px 40px; text-decoration: none; border-radius: 12px; display: inline-block; font-size: 16px; font-weight: 700; box-shadow: 0 4px 12px rgba(232, 149, 71, 0.3);">Ouvrir l'application →</a>
+                      <p style="margin: 20px 0 0 0; color: #9ca3af; font-size: 14px;">Cliquez sur le bouton, puis entrez votre code</p>
+                    </div>
+                    ` : `
+                    <div style="text-align: center; margin: 25px 0; padding: 20px; background-color: rgba(255, 255, 255, 0.05); border-radius: 8px;">
+                      <p style="margin: 0; color: #d1d5db; font-size: 16px; font-weight: bold;">Pour créer votre mot de passe, entrez ce code dans l'application mobile Team Fitness</p>
+                    </div>
+                    `}
+                    <div style="background: rgba(245, 158, 11, 0.1); border: 1px solid rgba(245, 158, 11, 0.3); border-radius: 8px; padding: 16px; margin-top: 30px;">
+                      <p style="margin: 0; color: #fcd34d; font-size: 14px;">⏱️ <strong>Important :</strong> Ce code expire dans 24 heures.</p>
+                    </div>
+                    <p style="color: #9ca3af; font-size: 14px; margin-top: 30px; text-align: center;">Si vous n'avez pas créé de compte, ignorez cet email.</p>
+                  </td>
+                </tr>
+                <tr>
+                  <td style="background-color: rgba(0, 0, 0, 0.2); padding: 30px; text-align: center; border-top: 1px solid rgba(255, 255, 255, 0.1);">
+                    <p style="margin: 0; color: #9ca3af; font-size: 13px;">© ${new Date().getFullYear()} Team Fitness. Tous droits réservés.</p>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+        </table>
+      </body>
+      </html>
     `,
   } : {
-    from: process.env.NO_REPLY_EMAIL,
+    from: `"Team Fitness" <${process.env.SMTP_USER}>`,
     to: email,
-    subject: 'Réinitialisation de votre mot de passe - Team Fitness',
+    subject: '🔐 Réinitialisation de votre mot de passe - Team Fitness',
     html: `
-      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-        <h2 style="color: #333;">Réinitialisation de mot de passe</h2>
-        <p>Vous avez demandé la réinitialisation de votre mot de passe.</p>
-        <p>Votre code de vérification est : <strong style="font-size: 18px; color: #007bff;">${resetToken}</strong></p>
-        <p>Ou cliquez sur le lien ci-dessous pour réinitialiser votre mot de passe :</p>
-        <a href="${resetUrl}" style="background-color: #007bff; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; display: inline-block; margin: 10px 0;">Réinitialiser le mot de passe</a>
-        <p><small>Ce lien expire dans 1 heure.</small></p>
-        <p>Si vous n'avez pas demandé cette réinitialisation, ignorez cet email.</p>
-      </div>
+      <!DOCTYPE html>
+      <html lang="fr">
+      <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      </head>
+      <body style="margin: 0; padding: 0; font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: linear-gradient(135deg, #374151 0%, #1a202c 100%);">
+        <table width="100%" cellpadding="0" cellspacing="0" style="background: linear-gradient(135deg, #374151 0%, #1a202c 100%); padding: 40px 20px;">
+          <tr>
+            <td align="center">
+              <table width="600" cellpadding="0" cellspacing="0" style="background-color: rgba(255, 255, 255, 0.05); backdrop-filter: blur(10px); border-radius: 16px; overflow: hidden; box-shadow: 0 8px 32px rgba(0,0,0,0.3); border: 1px solid rgba(255, 255, 255, 0.1);">
+                <tr>
+                  <td style="padding: 40px 30px; text-align: center; background: linear-gradient(135deg, rgba(232, 149, 71, 0.1) 0%, rgba(245, 158, 11, 0.1) 100%);">
+                    <img src="${logoUrl}" alt="Team Fitness" style="width: 80px; height: 80px; margin-bottom: 20px;">
+                    <h1 style="color: #e89547; margin: 0; font-size: 32px; font-weight: 700;">Team Fitness</h1>
+                    <p style="color: #f4a261; margin: 10px 0 0 0; font-size: 14px;">Réinitialisation mot de passe</p>
+                  </td>
+                </tr>
+                <tr>
+                  <td style="padding: 40px 30px; color: #e5e7eb;">
+                    <h2 style="color: #e89547; margin-top: 0; font-size: 24px;">Réinitialisation de mot de passe</h2>
+                    <p style="color: #d1d5db; font-size: 16px; line-height: 1.8;">Vous avez demandé la réinitialisation de votre mot de passe.</p>
+                    <div style="background: rgba(232, 149, 71, 0.1); border-left: 4px solid #e89547; padding: 20px; margin: 30px 0; border-radius: 8px;">
+                      <p style="margin: 0; color: #e89547; font-size: 16px; font-weight: 600; margin-bottom: 10px;">🔑 Votre code de vérification :</p>
+                      <p style="margin: 0; font-size: 32px; font-weight: bold; color: #f4a261; letter-spacing: 3px;">${resetToken}</p>
+                    </div>
+                    <div style="text-align: center; margin: 30px 0;">
+                      <p style="margin: 0 0 15px 0; color: #d1d5db; font-size: 15px;">Ou cliquez sur le lien ci-dessous :</p>
+                      <a href="${resetUrl}" style="background: linear-gradient(135deg, #e89547 0%, #f59e0b 100%); color: #1a202c; padding: 16px 40px; text-decoration: none; border-radius: 12px; display: inline-block; font-size: 16px; font-weight: 700; box-shadow: 0 4px 12px rgba(232, 149, 71, 0.3);">Réinitialiser le mot de passe →</a>
+                    </div>
+                    <div style="background: rgba(239, 68, 68, 0.1); border: 1px solid rgba(239, 68, 68, 0.3); border-radius: 8px; padding: 16px; margin-top: 30px;">
+                      <p style="margin: 0; color: #fca5a5; font-size: 14px;">⏱️ <strong style="color: #ef4444;">Important :</strong> Ce lien expire dans 1 heure.</p>
+                    </div>
+                    <p style="color: #9ca3af; font-size: 14px; margin-top: 30px; text-align: center;">Si vous n'avez pas demandé cette réinitialisation, ignorez cet email.</p>
+                  </td>
+                </tr>
+                <tr>
+                  <td style="background-color: rgba(0, 0, 0, 0.2); padding: 30px; text-align: center; border-top: 1px solid rgba(255, 255, 255, 0.1);">
+                    <p style="margin: 0; color: #9ca3af; font-size: 13px;">© ${new Date().getFullYear()} Team Fitness. Tous droits réservés.</p>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+        </table>
+      </body>
+      </html>
     `,
   };
 
@@ -118,6 +187,7 @@ async function sendAccountSetupEmail(email, fullName, setupToken) {
   const baseUrl = process.env.API_URL || 'http://localhost:3000';
   const setupUrl = `${baseUrl}/setup-password.html?email=${encodeURIComponent(email)}&token=${setupToken}`;
   const mobileAppLink = process.env.MOBILE_APP_LINK || '';
+  const logoUrl = `${baseUrl}/android/assets/logo.png`;
 
   console.log(`🔗 URL de configuration: ${setupUrl}`);
   console.log(`📱 Lien app mobile: ${mobileAppLink || 'Non configuré'}`);
@@ -128,69 +198,70 @@ async function sendAccountSetupEmail(email, fullName, setupToken) {
     subject: '🎉 Bienvenue sur Team Fitness - Configurez votre compte',
     html: `
       <!DOCTYPE html>
-      <html>
+      <html lang="fr">
       <head>
         <meta charset="utf-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
       </head>
-      <body style="margin: 0; padding: 0; font-family: Arial, sans-serif; background-color: #f4f4f4;">
-        <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #f4f4f4; padding: 20px;">
+      <body style="margin: 0; padding: 0; font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: linear-gradient(135deg, #374151 0%, #1a202c 100%);">
+        <table width="100%" cellpadding="0" cellspacing="0" style="background: linear-gradient(135deg, #374151 0%, #1a202c 100%); padding: 40px 20px;">
           <tr>
             <td align="center">
-              <table width="600" cellpadding="0" cellspacing="0" style="background-color: #ffffff; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+              <table width="600" cellpadding="0" cellspacing="0" style="background-color: rgba(255, 255, 255, 0.05); backdrop-filter: blur(10px); border-radius: 16px; overflow: hidden; box-shadow: 0 8px 32px rgba(0,0,0,0.3); border: 1px solid rgba(255, 255, 255, 0.1);">
                 <!-- Header -->
                 <tr>
-                  <td style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 40px 20px; text-align: center;">
-                    <h1 style="color: #ffffff; margin: 0; font-size: 28px;">🏋️ Team Fitness</h1>
+                  <td style="padding: 40px 30px; text-align: center; background: linear-gradient(135deg, rgba(232, 149, 71, 0.1) 0%, rgba(245, 158, 11, 0.1) 100%);">
+                    <img src="${logoUrl}" alt="Team Fitness" style="width: 80px; height: 80px; margin-bottom: 20px;">
+                    <h1 style="color: #e89547; margin: 0; font-size: 32px; font-weight: 700;">Team Fitness</h1>
                   </td>
                 </tr>
                 
                 <!-- Content -->
                 <tr>
-                  <td style="padding: 40px 30px;">
-                    <h2 style="color: #333333; margin-top: 0; font-size: 24px;">Bienvenue ${fullName} ! 🎉</h2>
-                    <p style="color: #666666; font-size: 16px; line-height: 1.6;">
+                  <td style="padding: 40px 30px; color: #e5e7eb;">
+                    <h2 style="color: #e89547; margin-top: 0; font-size: 26px; font-weight: 600;">Bienvenue ${fullName} ! 🎉</h2>
+                    <p style="color: #d1d5db; font-size: 16px; line-height: 1.8; margin: 20px 0;">
                       Votre compte Team Fitness a été créé avec succès. Pour commencer à utiliser votre compte, 
                       vous devez créer votre mot de passe.
                     </p>
                     
-                    <div style="background-color: #f8f9fa; border-left: 4px solid #667eea; padding: 15px; margin: 25px 0;">
-                      <p style="margin: 0; color: #333333; font-size: 14px;">
+                    <div style="background: rgba(232, 149, 71, 0.1); border-left: 4px solid #e89547; padding: 20px; margin: 30px 0; border-radius: 8px;">
+                      <p style="margin: 0; color: #e89547; font-size: 16px; font-weight: 600; margin-bottom: 10px;">
                         <strong>Votre code de configuration :</strong>
                       </p>
-                      <p style="margin: 10px 0 0 0; font-size: 32px; font-weight: bold; color: #667eea; letter-spacing: 3px;">
+                      <p style="margin: 0; font-size: 32px; font-weight: bold; color: #f4a261; letter-spacing: 3px;">
                         ${setupToken}
                       </p>
                     </div>
                     
                     ${mobileAppLink ? `
-                    <div style="background-color: #e8f5e9; border: 2px solid #4caf50; border-radius: 8px; padding: 20px; margin: 25px 0; text-align: center;">
-                      <p style="margin: 0 0 15px 0; color: #2e7d32; font-size: 18px; font-weight: bold;">
+                    <div style="background: linear-gradient(135deg, rgba(232, 149, 71, 0.15) 0%, rgba(245, 158, 11, 0.15) 100%); border: 2px solid rgba(232, 149, 71, 0.3); border-radius: 12px; padding: 25px; margin: 30px 0; text-align: center;">
+                      <p style="margin: 0 0 20px 0; color: #f4a261; font-size: 18px; font-weight: 600;">
                         📱 Pour créer votre mot de passe
                       </p>
                       <a href="${mobileAppLink}" 
-                         style="background-color: #4caf50; color: #ffffff; padding: 15px 40px; text-decoration: none; border-radius: 5px; display: inline-block; font-size: 16px; font-weight: bold; margin: 10px 0;">
+                         style="background: linear-gradient(135deg, #e89547 0%, #f59e0b 100%); color: #1a202c; padding: 16px 40px; text-decoration: none; border-radius: 12px; display: inline-block; font-size: 16px; font-weight: 700; box-shadow: 0 4px 12px rgba(232, 149, 71, 0.3);">
                         🚀 Ouvrir l'application Team Fitness
                       </a>
-                      <p style="margin: 15px 0 0 0; color: #666666; font-size: 14px;">
+                      <p style="margin: 20px 0 0 0; color: #9ca3af; font-size: 14px;">
                         Cliquez sur le bouton ci-dessus, puis entrez votre code de configuration dans l'app
                       </p>
                     </div>
                     ` : `
-                    <div style="text-align: center; margin: 25px 0; padding: 20px; background-color: #f8f9fa; border-radius: 8px;">
-                      <p style="margin: 0; color: #333333; font-size: 16px; font-weight: bold;">
+                    <div style="text-align: center; margin: 25px 0; padding: 20px; background-color: rgba(255, 255, 255, 0.05); border-radius: 8px;">
+                      <p style="margin: 0; color: #d1d5db; font-size: 16px; font-weight: bold;">
                         Pour créer votre mot de passe, entrez ce code dans l'application mobile Team Fitness
                       </p>
                     </div>
                     `}
                     
-                    <div style="background-color: #fff3cd; border: 1px solid #ffc107; border-radius: 4px; padding: 12px; margin-top: 25px;">
-                      <p style="margin: 0; color: #856404; font-size: 14px;">
+                    <div style="background: rgba(245, 158, 11, 0.1); border: 1px solid rgba(245, 158, 11, 0.3); border-radius: 8px; padding: 16px; margin-top: 30px;">
+                      <p style="margin: 0; color: #fcd34d; font-size: 14px;">
                         ⏱️ <strong>Important :</strong> Ce lien expire dans 24 heures pour des raisons de sécurité.
                       </p>
                     </div>
                     
-                    <p style="color: #999999; font-size: 14px; line-height: 1.6; margin-top: 30px;">
+                    <p style="color: #9ca3af; font-size: 14px; line-height: 1.6; margin-top: 30px; text-align: center;">
                       Si vous n'avez pas créé de compte sur Team Fitness, ignorez simplement cet email.
                     </p>
                   </td>
@@ -198,11 +269,11 @@ async function sendAccountSetupEmail(email, fullName, setupToken) {
                 
                 <!-- Footer -->
                 <tr>
-                  <td style="background-color: #f8f9fa; padding: 20px; text-align: center; border-top: 1px solid #e9ecef;">
-                    <p style="margin: 0; color: #6c757d; font-size: 12px;">
+                  <td style="background-color: rgba(0, 0, 0, 0.2); padding: 30px; text-align: center; border-top: 1px solid rgba(255, 255, 255, 0.1);">
+                    <p style="margin: 0; color: #9ca3af; font-size: 13px;">
                       © ${new Date().getFullYear()} Team Fitness. Tous droits réservés.
                     </p>
-                    <p style="margin: 10px 0 0 0; color: #6c757d; font-size: 12px;">
+                    <p style="margin: 15px 0 0 0; color: #6b7280; font-size: 12px;">
                       Cet email a été envoyé automatiquement, merci de ne pas y répondre.
                     </p>
                   </td>
@@ -252,7 +323,177 @@ Team Fitness
   }
 }
 
+// Fonction pour envoyer un email d'invitation à l'accès anticipé bêta
+async function sendBetaAccessEmail(email, fullName) {
+  console.log(`\n📧 SERVICE: Envoi email d'accès bêta`);
+  console.log(`   Destinataire: ${email}`);
+  console.log(`   Nom: ${fullName}`);
+  
+  const baseUrl = process.env.API_URL || 'http://localhost:3000';
+  const betaUrl = `${baseUrl}/android/beta/`;
+  const logoUrl = `${baseUrl}/android/assets/logo.png`;
+
+  console.log(`🔗 URL bêta: ${betaUrl}`);
+
+  const mailOptions = {
+    from: `"Team Fitness" <${process.env.SMTP_USER}>`,
+    to: email,
+    subject: '🎉 Vous êtes invité(e) à la Bêta Team Fitness !',
+    html: `
+      <!DOCTYPE html>
+      <html lang="fr">
+      <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      </head>
+      <body style="margin: 0; padding: 0; font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: linear-gradient(135deg, #374151 0%, #1a202c 100%);">
+        <table width="100%" cellpadding="0" cellspacing="0" style="background: linear-gradient(135deg, #374151 0%, #1a202c 100%); padding: 40px 20px;">
+          <tr>
+            <td align="center">
+              <table width="600" cellpadding="0" cellspacing="0" style="background-color: rgba(255, 255, 255, 0.05); backdrop-filter: blur(10px); border-radius: 16px; overflow: hidden; box-shadow: 0 8px 32px rgba(0,0,0,0.3); border: 1px solid rgba(255, 255, 255, 0.1);">
+                
+                <!-- Header avec logo -->
+                <tr>
+                  <td style="padding: 40px 30px; text-align: center; background: linear-gradient(135deg, rgba(251, 191, 36, 0.1) 0%, rgba(245, 158, 11, 0.1) 100%);">
+                    <img src="${logoUrl}" alt="Team Fitness" style="width: 80px; height: 80px; margin-bottom: 20px;">
+                    <h1 style="color: #fbbf24; margin: 0; font-size: 32px; font-weight: 700; text-shadow: 0 2px 4px rgba(0,0,0,0.2);">
+                      Team Fitness
+                    </h1>
+                    <p style="color: #fcd34d; margin: 10px 0 0 0; font-size: 14px; text-transform: uppercase; letter-spacing: 2px;">
+                      Accès Anticipé Bêta
+                    </p>
+                  </td>
+                </tr>
+                
+                <!-- Content -->
+                <tr>
+                  <td style="padding: 40px 30px; color: #e5e7eb;">
+                    <h2 style="color: #fbbf24; margin-top: 0; font-size: 26px; font-weight: 600;">
+                      Bonjour ${fullName} ! 🎉
+                    </h2>
+                    
+                    <p style="color: #d1d5db; font-size: 16px; line-height: 1.8; margin: 20px 0;">
+                      Félicitations ! Vous avez été sélectionné(e) pour rejoindre le programme d'<strong style="color: #fbbf24;">accès anticipé bêta</strong> de l'application Team Fitness.
+                    </p>
+                    
+                    <div style="background: rgba(251, 191, 36, 0.1); border-left: 4px solid #fbbf24; padding: 20px; margin: 30px 0; border-radius: 8px;">
+                      <p style="margin: 0; color: #fbbf24; font-size: 16px; font-weight: 600; margin-bottom: 10px;">
+                        🚀 Pourquoi vous ?
+                      </p>
+                      <p style="margin: 0; color: #d1d5db; font-size: 15px; line-height: 1.6;">
+                        Vous faites partie des premiers à découvrir nos dernières fonctionnalités en avant-première. Votre feedback sera essentiel pour façonner l'avenir de Team Fitness.
+                      </p>
+                    </div>
+                    
+                    <div style="background: linear-gradient(135deg, rgba(251, 191, 36, 0.15) 0%, rgba(245, 158, 11, 0.15) 100%); border: 2px solid rgba(251, 191, 36, 0.3); border-radius: 12px; padding: 25px; margin: 30px 0; text-align: center;">
+                      <p style="margin: 0 0 20px 0; color: #fcd34d; font-size: 18px; font-weight: 600;">
+                        📱 Téléchargez la version bêta
+                      </p>
+                      <a href="${betaUrl}" 
+                         style="background: linear-gradient(135deg, #f59e0b 0%, #eab308 100%); color: #1a202c; padding: 16px 40px; text-decoration: none; border-radius: 12px; display: inline-block; font-size: 16px; font-weight: 700; box-shadow: 0 4px 12px rgba(251, 191, 36, 0.3); transition: all 0.3s;">
+                        Rejoindre la Bêta →
+                      </a>
+                      <p style="margin: 20px 0 0 0; color: #9ca3af; font-size: 14px;">
+                        Testez en exclusivité les nouvelles fonctionnalités
+                      </p>
+                    </div>
+                    
+                    <div style="background: rgba(245, 158, 11, 0.08); border-radius: 8px; padding: 20px; margin: 30px 0;">
+                      <p style="margin: 0 0 15px 0; color: #fbbf24; font-size: 16px; font-weight: 600;">
+                        ⭐ Ce que vous allez découvrir :
+                      </p>
+                      <ul style="margin: 0; padding-left: 20px; color: #d1d5db; font-size: 15px; line-height: 1.8;">
+                        <li style="margin-bottom: 8px;">Nouvelles fonctionnalités avant tout le monde</li>
+                        <li style="margin-bottom: 8px;">Interface améliorée et optimisée</li>
+                        <li style="margin-bottom: 8px;">Impact direct sur le développement</li>
+                        <li style="margin-bottom: 0;">Support prioritaire de l'équipe</li>
+                      </ul>
+                    </div>
+                    
+                    <div style="background: rgba(239, 68, 68, 0.1); border: 1px solid rgba(239, 68, 68, 0.3); border-radius: 8px; padding: 16px; margin-top: 30px;">
+                      <p style="margin: 0; color: #fca5a5; font-size: 14px; line-height: 1.6;">
+                        <strong style="color: #ef4444;">⚠️ Note importante :</strong> Cette version bêta peut contenir des bugs. Votre feedback nous aidera à créer une expérience parfaite !
+                      </p>
+                    </div>
+                    
+                    <p style="color: #9ca3af; font-size: 14px; line-height: 1.6; margin-top: 30px; text-align: center;">
+                      Merci de faire partie de l'aventure Team Fitness ! 💪
+                    </p>
+                  </td>
+                </tr>
+                
+                <!-- Footer -->
+                <tr>
+                  <td style="background-color: rgba(0, 0, 0, 0.2); padding: 30px; text-align: center; border-top: 1px solid rgba(255, 255, 255, 0.1);">
+                    <p style="margin: 0; color: #9ca3af; font-size: 13px;">
+                      © ${new Date().getFullYear()} Team Fitness. Tous droits réservés.
+                    </p>
+                    <p style="margin: 15px 0 0 0; color: #6b7280; font-size: 12px;">
+                      Cet email a été envoyé car vous avez été sélectionné(e) pour l'accès bêta.
+                    </p>
+                    <div style="margin-top: 20px;">
+                      <span style="display: inline-block; width: 8px; height: 8px; background-color: #fbbf24; border-radius: 50%; margin: 0 5px; box-shadow: 0 0 8px rgba(251, 191, 36, 0.6);"></span>
+                      <span style="color: #9ca3af; font-size: 12px; text-transform: uppercase; letter-spacing: 1px;">Canal Bêta</span>
+                    </div>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+        </table>
+      </body>
+      </html>
+    `,
+    text: `
+🎉 Vous êtes invité(e) à la Bêta Team Fitness !
+
+Bonjour ${fullName},
+
+Félicitations ! Vous avez été sélectionné(e) pour rejoindre le programme d'accès anticipé bêta de l'application Team Fitness.
+
+🚀 Pourquoi vous ?
+Vous faites partie des premiers à découvrir nos dernières fonctionnalités en avant-première. Votre feedback sera essentiel pour façonner l'avenir de Team Fitness.
+
+📱 Téléchargez la version bêta :
+${betaUrl}
+
+⭐ Ce que vous allez découvrir :
+• Nouvelles fonctionnalités avant tout le monde
+• Interface améliorée et optimisée
+• Impact direct sur le développement
+• Support prioritaire de l'équipe
+
+⚠️ Note importante : Cette version bêta peut contenir des bugs. Votre feedback nous aidera à créer une expérience parfaite !
+
+Merci de faire partie de l'aventure Team Fitness ! 💪
+
+---
+Team Fitness
+© ${new Date().getFullYear()}
+    `.trim(),
+  };
+
+  console.log(`📬 Configuration email:`);
+  console.log(`   From: ${mailOptions.from}`);
+  console.log(`   To: ${mailOptions.to}`);
+  console.log(`   Subject: ${mailOptions.subject}`);
+
+  try {
+    console.log(`🔄 Envoi email en cours...`);
+    await transporter.sendMail(mailOptions);
+    console.log(`✅ Email d'accès bêta envoyé avec succès à: ${email}`);
+    console.log(`📤 Retour service: email envoyé\n`);
+    return { success: true };
+  } catch (error) {
+    console.error('💥 Erreur envoi email:', error);
+    console.error(`   Code erreur: ${error.code}`);
+    console.error(`   Message: ${error.message}`);
+    throw new Error('Erreur lors de l\'envoi de l\'email');
+  }
+}
+
 module.exports = {
   sendPasswordResetEmail,
   sendAccountSetupEmail,
+  sendBetaAccessEmail,
 };
