@@ -35,6 +35,30 @@ router.get('/', async (req, res) => {
 });
 
 /**
+ * GET /banners/stats/summary
+ * Résumé des statistiques de toutes les bannières
+ */
+router.get('/stats/summary', authenticateToken, requireAdminOrOwner, async (req, res) => {
+  try {
+    const { gymId, startDate, endDate } = req.query;
+
+    const summary = await bannerService.getStatsSummary({
+      gymId: gymId ? parseInt(gymId) : undefined,
+      startDate: startDate ? new Date(startDate) : undefined,
+      endDate: endDate ? new Date(endDate) : undefined
+    });
+
+    res.json(summary);
+  } catch (error) {
+    console.error('Error fetching stats summary:', error);
+    res.status(500).json({ 
+      error: 'Failed to fetch stats summary',
+      message: error.message 
+    });
+  }
+});
+
+/**
  * GET /banners/:id
  * Récupère les détails d'une bannière par ID
  */
@@ -315,30 +339,6 @@ router.get('/:id/stats', authenticateToken, requireAdminOrOwner, async (req, res
     console.error('Error fetching stats:', error);
     res.status(500).json({ 
       error: 'Failed to fetch stats',
-      message: error.message 
-    });
-  }
-});
-
-/**
- * GET /banners/stats/summary
- * Résumé des statistiques de toutes les bannières
- */
-router.get('/stats/summary', authenticateToken, requireAdminOrOwner, async (req, res) => {
-  try {
-    const { gymId, startDate, endDate } = req.query;
-
-    const summary = await bannerService.getStatsSummary({
-      gymId: gymId ? parseInt(gymId) : undefined,
-      startDate: startDate ? new Date(startDate) : undefined,
-      endDate: endDate ? new Date(endDate) : undefined
-    });
-
-    res.json(summary);
-  } catch (error) {
-    console.error('Error fetching stats summary:', error);
-    res.status(500).json({ 
-      error: 'Failed to fetch stats summary',
       message: error.message 
     });
   }
