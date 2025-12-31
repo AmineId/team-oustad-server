@@ -784,9 +784,15 @@ components:
         description:
           type: string
           example: "Protéine saveur vanille 1kg"
-        imageUrl:
-          type: string
-          example: "https://api.example.com/store/products/product-123.jpg"
+        images:
+          type: array
+          items:
+            type: string
+          example: 
+            - "https://api.example.com/store/products/product-123-1.jpg"
+            - "https://api.example.com/store/products/product-123-2.jpg"
+            - "https://api.example.com/store/products/product-123-3.jpg"
+          description: "Tableau d'URLs des images du produit (max 5)"
         price:
           type: number
           format: float
@@ -6420,10 +6426,13 @@ paths:
                 category:
                   type: string
                   example: "Nutrition"
-                image:
-                  type: string
-                  format: binary
-                  description: Image du produit (jpeg/jpg/png/webp, max 5MB)
+                images:
+                  type: array
+                  items:
+                    type: string
+                    format: binary
+                  maxItems: 5
+                  description: Images du produit (max 5, jpeg/jpg/png/webp, 5MB chacune)
       responses:
         '201':
           description: Produit créé
@@ -6509,9 +6518,13 @@ paths:
                   type: string
                 isActive:
                   type: boolean
-                image:
-                  type: string
-                  format: binary
+                images:
+                  type: array
+                  items:
+                    type: string
+                    format: binary
+                  maxItems: 5
+                  description: Nouvelles images à ajouter (max 5 total, conserve les existantes)
       responses:
         '200':
           description: Produit mis à jour

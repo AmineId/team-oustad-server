@@ -11,10 +11,10 @@ const requireAdminOrOwner = (req, res, next) => {
       });
     }
 
-    const { role } = req.user;
+    const { type } = req.user;
 
     // Vérifier si l'utilisateur est admin ou owner
-    if (role !== 'admin' && role !== 'owner') {
+    if (type !== 'admin' && type !== 'owner') {
       return res.status(403).json({ 
         error: 'Access forbidden',
         message: 'Only admins and owners can perform this action' 
