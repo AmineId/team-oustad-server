@@ -1,5 +1,6 @@
 const cron = require('node-cron');
 const prisma = require('../utils/prismaClient');
+const { executeWithRetry } = require('../utils/prismaClient');
 const { sendPushNotification } = require('../services/pushNotificationService');
 const { getFullName } = require('../utils/nameUtils');
 
@@ -18,47 +19,49 @@ const dailyPlanningNotification = cron.schedule('0 6 * * *', async () => {
 
     console.log(`📅 Date: ${today.toISOString().split('T')[0]}, Jour de la semaine: ${currentDayOfWeek}`);
 
-    // Trouver tous les plannings actifs pour aujourd'hui
-    const activePlannings = await prisma.planning.findMany({
-      where: {
-        status: 'active',
-        startDate: { lte: today },
-        endDate: { gte: today }
-      },
-      include: {
-        Member: {
-          include: {
-            User: {
-              select: {
-                id: true,
-                firstName: true,
-                lastName: true,
-                fcmToken: true,
-                notificationsEnabled: true
+    // Trouver tous les plannings actifs pour aujourd'hui avec retry
+    const activePlannings = await executeWithRetry(async () => {
+      return await prisma.planning.findMany({
+        where: {
+          status: 'active',
+          startDate: { lte: today },
+          endDate: { gte: today }
+        },
+        include: {
+          Member: {
+            include: {
+              User: {
+                select: {
+                  id: true,
+                  firstName: true,
+                  lastName: true,
+                  fcmToken: true,
+                  notificationsEnabled: true
+                }
+              }
+            }
+          },
+          Coach: {
+            select: {
+              firstName: true,
+              lastName: true
+            }
+          },
+          PlanningDay: {
+            where: {
+              dayOfWeek: currentDayOfWeek
+            },
+            include: {
+              PlanningExercise: {
+                include: {
+                  Exercise: true
+                },
+                orderBy: { order: 'asc' }
               }
             }
           }
-        },
-        Coach: {
-          select: {
-            firstName: true,
-            lastName: true
-          }
-        },
-        PlanningDay: {
-          where: {
-            dayOfWeek: currentDayOfWeek
-          },
-          include: {
-            PlanningExercise: {
-              include: {
-                Exercise: true
-              },
-              orderBy: { order: 'asc' }
-            }
-          }
         }
-      }
+      });
     });
 
     console.log(`✅ ${activePlannings.length} planning(s) actif(s) trouvé(s)`);

@@ -15,6 +15,7 @@ const {
 } = require('../services/subscriptionService');
 const { notifyPaymentOverdue, notifyPaymentDue } = require('../services/pushNotificationService');
 const prisma = require('../utils/prismaClient');
+const { executeWithRetry } = require('../utils/prismaClient');
 
 /**
  * Exécute la vérification quotidienne des paiements
@@ -27,16 +28,20 @@ async function runDailyPaymentCheck() {
   console.log('═══════════════════════════════════════════════════════════\n');
   
   try {
-    // 1. Vérifier les paiements en retard
-    const overdueResult = await checkOverduePayments();
+    // 1. Vérifier les paiements en retard avec retry
+    const overdueResult = await executeWithRetry(async () => {
+      return await checkOverduePayments();
+    });
     
     // Envoyer notifications pour paiements en retard
     if (overdueResult.overduePaymentsList && overdueResult.overduePaymentsList.length > 0) {
       console.log(`🔔 Envoi notifications pour ${overdueResult.overduePaymentsList.length} paiements en retard`);
       for (const payment of overdueResult.overduePaymentsList) {
-        const memberUser = await prisma.user.findUnique({
-          where: { id: payment.memberId },
-          select: { id: true, firstName: true, lastName: true, fcmToken: true, notificationsEnabled: true }
+        const memberUser = await executeWithRetry(async () => {
+          return await prisma.user.findUnique({
+            where: { id: payment.memberId },
+            select: { id: true, firstName: true, lastName: true, fcmToken: true, notificationsEnabled: true }
+          });
         });
         if (memberUser?.fcmToken && memberUser.notificationsEnabled) {
           await notifyPaymentOverdue(memberUser.fcmToken, payment).catch(err =>
@@ -63,9 +68,11 @@ async function runDailyPaymentCheck() {
     if (paymentsIn3Days.length > 0) {
       console.log(`🔔 Envoi notifications pour ${paymentsIn3Days.length} paiements dus dans 3 jours`);
       for (const payment of paymentsIn3Days) {
-        const memberUser = await prisma.user.findUnique({
-          where: { id: payment.memberId },
-          select: { id: true, firstName: true, lastName: true, fcmToken: true, notificationsEnabled: true }
+        const memberUser = await executeWithRetry(async () => {
+          return await prisma.user.findUnique({
+            where: { id: payment.memberId },
+            select: { id: true, firstName: true, lastName: true, fcmToken: true, notificationsEnabled: true }
+          });
         });
         if (memberUser?.fcmToken && memberUser.notificationsEnabled) {
           await notifyPaymentDue(memberUser.fcmToken, payment).catch(err =>
