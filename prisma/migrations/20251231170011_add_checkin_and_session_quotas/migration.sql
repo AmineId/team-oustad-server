@@ -158,21 +158,22 @@ CREATE TABLE IF NOT EXISTS "BannerStats" (
     "id" SERIAL NOT NULL,
     "bannerId" INTEGER NOT NULL,
     "variantId" INTEGER,
-    "userId" INTEGER NOT NULL,
-    "views" INTEGER NOT NULL DEFAULT 0,
-    "clicks" INTEGER NOT NULL DEFAULT 0,
-    "lastViewedAt" TIMESTAMP(3),
-    "lastClickedAt" TIMESTAMP(3),
+    "userId" INTEGER,
+    "eventType" TEXT NOT NULL,
+    "viewedAt" TIMESTAMP(3),
+    "clickedAt" TIMESTAMP(3),
+    "userAgent" TEXT,
+    "ipAddress" TEXT,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "updatedAt" TIMESTAMP(3) NOT NULL,
 
     CONSTRAINT "BannerStats_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateIndex
-CREATE INDEX IF NOT EXISTS "BannerStats_bannerId_idx" ON "BannerStats"("bannerId");
-CREATE INDEX IF NOT EXISTS "BannerStats_userId_idx" ON "BannerStats"("userId");
-CREATE UNIQUE INDEX IF NOT EXISTS "BannerStats_bannerId_userId_key" ON "BannerStats"("bannerId", "userId");
+CREATE INDEX IF NOT EXISTS "BannerStats_bannerId_eventType_idx" ON "BannerStats"("bannerId", "eventType");
+CREATE INDEX IF NOT EXISTS "BannerStats_bannerId_userId_idx" ON "BannerStats"("bannerId", "userId");
+CREATE INDEX IF NOT EXISTS "BannerStats_variantId_eventType_idx" ON "BannerStats"("variantId", "eventType");
+CREATE INDEX IF NOT EXISTS "BannerStats_createdAt_idx" ON "BannerStats"("createdAt");
 
 -- AddForeignKey
 DO $$ 
