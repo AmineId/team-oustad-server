@@ -2,6 +2,7 @@
 
 const admin = require('firebase-admin');
 const path = require('path');
+const prisma = require('../utils/prismaClient');
 
 // Initialiser Firebase Admin SDK (à configurer avec vos credentials)
 // Pour initialiser Firebase, vous devez:
@@ -44,15 +45,40 @@ function initializeFirebase() {
 }
 
 /**
+ * Désactiver les notifications pour un utilisateur (appelé quand le token devient invalide)
+ * @param {string} fcmToken - Token FCM invalide
+ * @returns {Promise<void>}
+ */
+async function disableNotificationsForInvalidToken(fcmToken) {
+  try {
+    const user = await prisma.user.findFirst({
+      where: { fcmToken },
+      select: { id: true, email: true, firstName: true, lastName: true }
+    });
+
+    if (user) {
+      await prisma.user.update({
+        where: { id: user.id },
+        data: { notificationsEnabled: false }
+      });
+      console.log(`🔕 Notifications désactivées pour ${user.email} (token invalide)`);
+    }
+  } catch (error) {
+    console.error('❌ Erreur désactivation notifications:', error.message);
+  }
+}
+
+/**
  * Envoyer une notification push à un utilisateur
  * @param {string} fcmToken - Token FCM de l'utilisateur
  * @param {Object} notification - Contenu de la notification
  * @param {string} notification.title - Titre de la notification
  * @param {string} notification.body - Corps de la notification
  * @param {Object} notification.data - Données additionnelles (optionnel)
+ * @param {number} [userId] - ID de l'utilisateur (optionnel, pour désactiver les notifications si token invalide)
  * @returns {Promise<Object>} Résultat de l'envoi
  */
-async function sendPushNotification(fcmToken, notification) {
+async function sendPushNotification(fcmToken, notification, userId = null) {
   // Vérifier que le token FCM existe et n'est pas vide
   if (!fcmToken || fcmToken.trim() === '') {
     console.log('⚠️ Token FCM manquant ou vide - Notification non envoyée');
@@ -97,6 +123,10 @@ async function sendPushNotification(fcmToken, notification) {
     if (error.code === 'messaging/registration-token-not-registered' || 
         error.code === 'messaging/invalid-registration-token') {
       console.warn(`⚠️ Token FCM invalide ou non enregistré - Token: ${fcmToken.substring(0, 20)}...`);
+      
+      // Désactiver automatiquement les notifications pour cet utilisateur
+      await disableNotificationsForInvalidToken(fcmToken);
+      
       return { success: false, error: 'Token FCM invalide', tokenInvalid: true };
     }
     
@@ -155,17 +185,30 @@ async function sendMulticastPushNotification(fcmTokens, notification) {
     
     if (response.failureCount > 0) {
       console.warn(`⚠️ ${response.failureCount} notifications ont échoué`);
+      
+      // Désactiver les notifications pour les tokens invalides
+      const invalidTokens = [];
       response.responses.forEach((resp, idx) => {
         if (!resp.success) {
           const errorCode = resp.error?.code;
           if (errorCode === 'messaging/registration-token-not-registered' || 
               errorCode === 'messaging/invalid-registration-token') {
-            console.warn(`⚠️ Token FCM invalide ignoré: ${validTokens[idx].substring(0, 20)}...`);
+            const invalidToken = validTokens[idx];
+            invalidTokens.push(invalidToken);
+            console.warn(`⚠️ Token FCM invalide: ${invalidToken.substring(0, 20)}...`);
+            // Désactiver les notifications pour ce token
+            disableNotificationsForInvalidToken(invalidToken).catch(err => 
+              console.error('Erreur désactivation notification:', err)
+            );
           } else {
             console.error(`❌ Échec pour token ${validTokens[idx].substring(0, 20)}... : ${resp.error}`);
           }
         }
       });
+      
+      if (invalidTokens.length > 0) {
+        console.log(`🔕 ${invalidTokens.length} token(s) invalide(s) - Notifications désactivées`);
+      }
     }
 
     return {
@@ -515,11 +558,12 @@ async function notifyGymMembers(gymId, notification) {
   try {
     console.log(`📢 Notification pour tous les membres de la salle ${gymId}`);
 
-    // Récupérer tous les tokens FCM des membres de cette salle
+    // Récupérer tous les tokens FCM des membres de cette salle avec notifications activées
     const users = await prisma.user.findMany({
       where: {
         gymId: gymId,
-        fcmToken: { not: null }
+        fcmToken: { not: null },
+        notificationsEnabled: true
       },
       select: {
         id: true,
@@ -530,17 +574,65 @@ async function notifyGymMembers(gymId, notification) {
     });
 
     if (users.length === 0) {
-      console.log('⚠️ Aucun membre avec FCM token dans cette salle');
+      console.log('⚠️ Aucun membre avec FCM token et notifications activées dans cette salle');
       return { success: false, error: 'Aucun destinataire' };
     }
 
     const fcmTokens = users.map(u => u.fcmToken);
-    console.log(`📲 Envoi à ${fcmTokens.length} membres`);
+    console.log(`📲 Envoi à ${fcmTokens.length} membres (notifications activées)`);
 
     return await sendMulticastPushNotification(fcmTokens, notification);
   } catch (error) {
     console.error('❌ Erreur notification membres salle:', error);
     return { success: false, error: error.message };
+  }
+}
+
+/**
+ * Vérifier si FCM est disponible et configuré
+ * @returns {boolean} true si FCM est disponible, false sinon
+ */
+function isFCMAvailable() {
+  return initializeFirebase();
+}
+
+/**
+ * Vérifier si un token FCM est valide en envoyant une notification de test
+ * @param {string} fcmToken - Token FCM à vérifier
+ * @returns {Promise<Object>} Résultat de la vérification
+ */
+async function validateFCMToken(fcmToken) {
+  if (!fcmToken || fcmToken.trim() === '') {
+    return { valid: false, error: 'Token FCM manquant' };
+  }
+
+  if (!initializeFirebase()) {
+    return { valid: false, error: 'Firebase non configuré' };
+  }
+
+  try {
+    // Envoyer un message de validation (dry-run)
+    const message = {
+      token: fcmToken,
+      notification: {
+        title: 'Test',
+        body: 'Validation du token FCM'
+      }
+    };
+
+    // Utiliser validateOnly pour tester sans envoyer réellement
+    await admin.messaging().send(message, true); // dry-run = true
+    console.log(`✅ Token FCM valide: ${fcmToken.substring(0, 20)}...`);
+    return { valid: true };
+  } catch (error) {
+    if (error.code === 'messaging/registration-token-not-registered' || 
+        error.code === 'messaging/invalid-registration-token') {
+      console.warn(`❌ Token FCM invalide: ${fcmToken.substring(0, 20)}...`);
+      return { valid: false, error: 'Token FCM invalide', tokenInvalid: true };
+    }
+    
+    console.error('❌ Erreur validation token FCM:', error.message);
+    return { valid: false, error: error.message };
   }
 }
 
@@ -556,5 +648,7 @@ module.exports = {
   notifyNewPayment,
   notifyPlanningModified,
   notifyPlanningDeleted,
-  notifyGymMembers
+  notifyGymMembers,
+  isFCMAvailable,
+  validateFCMToken
 };

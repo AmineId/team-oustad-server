@@ -94,6 +94,12 @@ const dailyPlanningNotification = cron.schedule('0 6 * * *', async () => {
         continue;
       }
 
+      // Vérifier que le membre a activé les notifications globales
+      if (!member.notificationsEnabled) {
+        console.log(`⚠️ ${memberFullName} a désactivé les notifications globales`);
+        continue;
+      }
+
       // Vérifier que le membre a un token FCM
       if (!member.fcmToken) {
         console.log(`⚠️ ${memberFullName} n'a pas de FCM token, notification ignorée`);

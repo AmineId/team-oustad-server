@@ -36,12 +36,14 @@ async function runDailyPaymentCheck() {
       for (const payment of overdueResult.overduePaymentsList) {
         const memberUser = await prisma.user.findUnique({
           where: { id: payment.memberId },
-          select: { id: true, firstName: true, lastName: true, fcmToken: true }
+          select: { id: true, firstName: true, lastName: true, fcmToken: true, notificationsEnabled: true }
         });
-        if (memberUser?.fcmToken) {
+        if (memberUser?.fcmToken && memberUser.notificationsEnabled) {
           await notifyPaymentOverdue(memberUser.fcmToken, payment).catch(err =>
             console.error(`⚠️ Erreur notification FCM pour ${getFullName(memberUser)}:`, err)
           );
+        } else if (memberUser && !memberUser.notificationsEnabled) {
+          console.log(`⚠️ Notifications désactivées pour ${getFullName(memberUser)}`);
         }
       }
     }
@@ -63,12 +65,14 @@ async function runDailyPaymentCheck() {
       for (const payment of paymentsIn3Days) {
         const memberUser = await prisma.user.findUnique({
           where: { id: payment.memberId },
-          select: { id: true, firstName: true, lastName: true, fcmToken: true }
+          select: { id: true, firstName: true, lastName: true, fcmToken: true, notificationsEnabled: true }
         });
-        if (memberUser?.fcmToken) {
+        if (memberUser?.fcmToken && memberUser.notificationsEnabled) {
           await notifyPaymentDue(memberUser.fcmToken, payment).catch(err =>
             console.error(`⚠️ Erreur notification FCM pour ${getFullName(memberUser)}:`, err)
           );
+        } else if (memberUser && !memberUser.notificationsEnabled) {
+          console.log(`⚠️ Notifications désactivées pour ${getFullName(memberUser)}`);
         }
       }
     }
