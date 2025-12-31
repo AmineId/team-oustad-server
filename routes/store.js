@@ -19,7 +19,7 @@ const storage = multer.diskStorage({
 
 const upload = multer({
   storage: storage,
-  limits: { fileSize: 5 * 1024 * 1024 }, // 5MB max
+  limits: { fileSize: 5 * 1024 * 1024 }, // 5MB max per file
   fileFilter: (req, file, cb) => {
     const filetypes = /jpeg|jpg|png|webp/;
     const mimetype = filetypes.test(file.mimetype);
@@ -30,6 +30,9 @@ const upload = multer({
     cb(new Error('Seules les images sont autorisées (jpeg, jpg, png, webp)'));
   }
 });
+
+// Upload multiple images (max 5)
+const uploadMultiple = upload.array('images', 5);
 
 // ============= ROUTES PUBLIQUES (tous les membres) =============
 
@@ -163,10 +166,10 @@ router.patch('/reservations/:id/cancel', authenticateToken, async (req, res) => 
  * @route POST /store/products
  * @desc Créer un nouveau produit
  */
-router.post('/products', authenticateToken, upload.single('image'), async (req, res) => {
+router.post('/products', authenticateToken, uploadMultiple, async (req, res) => {
   try {
     // Vérifier que l'utilisateur est admin ou owner
-    if (!['admin', 'owner'].includes(req.user.role)) {
+    if (!['admin', 'owner'].includes(req.user.type)) {
       return res.status(403).json({ 
         success: false, 
         error: 'Accessible uniquement aux admin et owner' 
@@ -182,19 +185,20 @@ router.post('/products', authenticateToken, upload.single('image'), async (req, 
       });
     }
 
-    const imageUrl = req.file 
-      ? `${process.env.API_URL}/store/products/${req.file.filename}`
-      : null;
+    // Construire les URLs des images uploadées
+    const images = req.files && req.files.length > 0
+      ? req.files.map(file => `${process.env.API_URL}/store/products/${file.filename}`)
+      : [];
 
     const product = await storeService.createProduct({
       name,
       description,
-      imageUrl,
+      images,
       price: parseFloat(price),
       stock: parseInt(stock),
       category,
       gymId: req.user.gymId,
-      createdBy: req.user.id
+      createdBy: req.user.sub
     });
 
     res.status(201).json({ success: true, product });
@@ -208,9 +212,9 @@ router.post('/products', authenticateToken, upload.single('image'), async (req, 
  * @route PUT /store/products/:id
  * @desc Mettre à jour un produit
  */
-router.put('/products/:id', authenticateToken, upload.single('image'), async (req, res) => {
+router.put('/products/:id', authenticateToken, uploadMultiple, async (req, res) => {
   try {
-    if (!['admin', 'owner'].includes(req.user.role)) {
+    if (!['admin', 'owner'].includes(req.user.type)) {
       return res.status(403).json({ 
         success: false, 
         error: 'Accessible uniquement aux admin et owner' 
@@ -219,8 +223,14 @@ router.put('/products/:id', authenticateToken, upload.single('image'), async (re
 
     const updates = { ...req.body };
     
-    if (req.file) {
-      updates.imageUrl = `${process.env.API_URL}/store/products/${req.file.filename}`;
+    // Ajouter les nouvelles images si uploadées
+    if (req.files && req.files.length > 0) {
+      const newImages = req.files.map(file => `${process.env.API_URL}/store/products/${file.filename}`);
+      
+      // Si le produit a déjà des images, les combiner
+      // Sinon utiliser uniquement les nouvelles
+      const existingProduct = await storeService.getProductById(req.params.id);
+      updates.images = [...(existingProduct?.images || []), ...newImages];
     }
 
     if (updates.price) updates.price = parseFloat(updates.price);
