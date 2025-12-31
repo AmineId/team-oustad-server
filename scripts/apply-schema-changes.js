@@ -102,7 +102,7 @@ async function applySchemaChanges() {
           SELECT 1 FROM pg_constraint WHERE conname = 'GymCheckIn_memberId_fkey'
         ) THEN
           ALTER TABLE "GymCheckIn" ADD CONSTRAINT "GymCheckIn_memberId_fkey" 
-            FOREIGN KEY ("memberId") REFERENCES "Member"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+            FOREIGN KEY ("memberId") REFERENCES "Member"("userId") ON DELETE CASCADE ON UPDATE CASCADE;
           RAISE NOTICE 'Foreign key GymCheckIn_memberId_fkey ajoutée';
         END IF;
 
