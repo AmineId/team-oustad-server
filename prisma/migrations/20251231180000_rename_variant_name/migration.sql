@@ -1,2 +1,3 @@
--- Renommer la colonne name en variantName dans BannerVariant
-ALTER TABLE "BannerVariant" RENAME COLUMN "name" TO "variantName";
+-- Migration vide - la colonne variantName existe déjà dans la création de BannerVariant
+-- (migration 20251231170011_add_checkin_and_session_quotas)
+SELECT 1;
