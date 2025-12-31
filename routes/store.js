@@ -6,33 +6,40 @@ const { generateStoreProductId, generateStoreReservationId } = require('../utils
 const multer = require('multer');
 const path = require('path');
 
-// Configuration multer pour upload d'images
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    cb(null, 'public/store/products/');
-  },
-  filename: (req, file, cb) => {
-    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-    cb(null, 'product-' + uniqueSuffix + path.extname(file.originalname));
-  }
-});
+// Middleware pour gérer l'upload et conversion en base64
+const handleProductUpload = (req, res, next) => {
+  const storage = multer.memoryStorage(); // Stocker en mémoire pour conversion base64
 
-const upload = multer({
-  storage: storage,
-  limits: { fileSize: 5 * 1024 * 1024 }, // 5MB max per file
-  fileFilter: (req, file, cb) => {
-    const filetypes = /jpeg|jpg|png|webp/;
-    const mimetype = filetypes.test(file.mimetype);
-    const extname = filetypes.test(path.extname(file.originalname).toLowerCase());
-    if (mimetype && extname) {
-      return cb(null, true);
+  const upload = multer({
+    storage: storage,
+    limits: { fileSize: 5 * 1024 * 1024 }, // 5MB max per file
+    fileFilter: (req, file, cb) => {
+      const filetypes = /jpeg|jpg|png|webp/;
+      const mimetype = filetypes.test(file.mimetype);
+      const extname = filetypes.test(path.extname(file.originalname).toLowerCase());
+      if (mimetype && extname) {
+        return cb(null, true);
+      }
+      cb(new Error('Seules les images sont autorisées (jpeg, jpg, png, webp)'));
     }
-    cb(new Error('Seules les images sont autorisées (jpeg, jpg, png, webp)'));
-  }
-});
+  });
 
-// Upload multiple images (max 5)
-const uploadMultiple = upload.array('images', 5);
+  // Exécuter multer avec max 5 images
+  upload.array('images', 5)(req, res, (err) => {
+    if (err) return next(err);
+    
+    // Convertir les fichiers en base64
+    if (req.files && req.files.length > 0) {
+      req.imagesBase64 = req.files.map(file => {
+        const base64 = file.buffer.toString('base64');
+        const mimeType = file.mimetype;
+        return `data:${mimeType};base64,${base64}`;
+      });
+    }
+    
+    next();
+  });
+};
 
 // ============= ROUTES PUBLIQUES (tous les membres) =============
 
@@ -166,7 +173,7 @@ router.patch('/reservations/:id/cancel', authenticateToken, async (req, res) => 
  * @route POST /store/products
  * @desc Créer un nouveau produit
  */
-router.post('/products', authenticateToken, uploadMultiple, async (req, res) => {
+router.post('/products', authenticateToken, handleProductUpload, async (req, res) => {
   try {
     // Vérifier que l'utilisateur est admin ou owner
     if (!['admin', 'owner'].includes(req.user.type)) {
@@ -185,15 +192,17 @@ router.post('/products', authenticateToken, uploadMultiple, async (req, res) => 
       });
     }
 
-    // Construire les URLs des images uploadées
-    const images = req.files && req.files.length > 0
-      ? req.files.map(file => `${process.env.API_URL}/store/products/${file.filename}`)
-      : [];
+    // Générer l'ID du produit
+    const productId = generateStoreProductId();
+    
+    // Récupérer les images converties en base64
+    const imagesBase64 = req.imagesBase64 || [];
 
     const product = await storeService.createProduct({
+      displayId: productId,
       name,
       description,
-      images,
+      imagesBase64,
       price: parseFloat(price),
       stock: parseInt(stock),
       category,
@@ -212,7 +221,7 @@ router.post('/products', authenticateToken, uploadMultiple, async (req, res) => 
  * @route PUT /store/products/:id
  * @desc Mettre à jour un produit
  */
-router.put('/products/:id', authenticateToken, uploadMultiple, async (req, res) => {
+router.put('/products/:id', authenticateToken, handleProductUpload, async (req, res) => {
   try {
     if (!['admin', 'owner'].includes(req.user.type)) {
       return res.status(403).json({ 
@@ -223,14 +232,16 @@ router.put('/products/:id', authenticateToken, uploadMultiple, async (req, res) 
 
     const updates = { ...req.body };
     
-    // Ajouter les nouvelles images si uploadées
-    if (req.files && req.files.length > 0) {
-      const newImages = req.files.map(file => `${process.env.API_URL}/store/products/${file.filename}`);
-      
-      // Si le produit a déjà des images, les combiner
-      // Sinon utiliser uniquement les nouvelles
-      const existingProduct = await storeService.getProductById(req.params.id);
-      updates.images = [...(existingProduct?.images || []), ...newImages];
+    // Récupérer le produit existant
+    const existingProduct = await storeService.getProductById(req.params.id);
+    if (!existingProduct) {
+      return res.status(404).json({ success: false, error: 'Produit non trouvé' });
+    }
+    
+    // Ajouter les nouvelles images en base64 si uploadées
+    if (req.imagesBase64 && req.imagesBase64.length > 0) {
+      // Combiner avec les images existantes
+      updates.imagesBase64 = [...(existingProduct.imagesBase64 || []), ...req.imagesBase64];
     }
 
     if (updates.price) updates.price = parseFloat(updates.price);
@@ -250,14 +261,22 @@ router.put('/products/:id', authenticateToken, uploadMultiple, async (req, res) 
  */
 router.delete('/products/:id', authenticateToken, async (req, res) => {
   try {
-    if (!['admin', 'owner'].includes(req.user.role)) {
+    if (!['admin', 'owner'].includes(req.user.type)) {
       return res.status(403).json({ 
         success: false, 
         error: 'Accessible uniquement aux admin et owner' 
       });
     }
 
+    // Récupérer le produit existant
+    const product = await storeService.getProductById(req.params.id);
+    if (!product) {
+      return res.status(404).json({ success: false, error: 'Produit non trouvé' });
+    }
+
+    // Supprimer le produit de la BDD (les images base64 sont dans la BDD)
     await storeService.deleteProduct(req.params.id);
+    
     res.json({ success: true, message: 'Produit supprimé' });
   } catch (error) {
     console.error('Erreur suppression produit:', error);
