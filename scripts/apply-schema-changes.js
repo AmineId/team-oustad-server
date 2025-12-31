@@ -85,14 +85,13 @@ async function applySchemaChanges() {
     console.log('✅ Table GymCheckIn créée\n');
 
     // Étape 4: Créer les index pour GymCheckIn
-    await prisma.$executeRawUnsafe(`
-      CREATE UNIQUE INDEX IF NOT EXISTS "GymCheckIn_displayId_key" ON "GymCheckIn"("displayId");
-      CREATE INDEX IF NOT EXISTS "GymCheckIn_memberId_idx" ON "GymCheckIn"("memberId");
-      CREATE INDEX IF NOT EXISTS "GymCheckIn_subscriptionId_idx" ON "GymCheckIn"("subscriptionId");
-      CREATE INDEX IF NOT EXISTS "GymCheckIn_gymId_idx" ON "GymCheckIn"("gymId");
-      CREATE INDEX IF NOT EXISTS "GymCheckIn_checkInTime_idx" ON "GymCheckIn"("checkInTime");
-      CREATE INDEX IF NOT EXISTS "GymCheckIn_memberId_checkInTime_idx" ON "GymCheckIn"("memberId", "checkInTime");
-    `);
+    await prisma.$executeRawUnsafe(`CREATE UNIQUE INDEX IF NOT EXISTS "GymCheckIn_displayId_key" ON "GymCheckIn"("displayId")`);
+    await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "GymCheckIn_memberId_idx" ON "GymCheckIn"("memberId")`);
+    await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "GymCheckIn_subscriptionId_idx" ON "GymCheckIn"("subscriptionId")`);
+    await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "GymCheckIn_gymId_idx" ON "GymCheckIn"("gymId")`);
+    await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "GymCheckIn_checkInTime_idx" ON "GymCheckIn"("checkInTime")`);
+    await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "GymCheckIn_memberId_checkInTime_idx" ON "GymCheckIn"("memberId", "checkInTime")`);
+    console.log('✅ Index GymCheckIn créés\n');
     console.log('✅ Index GymCheckIn créés\n');
 
     // Étape 5: Ajouter les foreign keys pour GymCheckIn
@@ -160,13 +159,12 @@ async function applySchemaChanges() {
 
           CONSTRAINT "Banner_pkey" PRIMARY KEY ("id")
       );
-
-      CREATE UNIQUE INDEX IF NOT EXISTS "Banner_displayId_key" ON "Banner"("displayId");
-      CREATE INDEX IF NOT EXISTS "Banner_type_idx" ON "Banner"("type");
-      CREATE INDEX IF NOT EXISTS "Banner_isActive_idx" ON "Banner"("isActive");
-      CREATE INDEX IF NOT EXISTS "Banner_startDate_endDate_idx" ON "Banner"("startDate", "endDate");
-      CREATE INDEX IF NOT EXISTS "Banner_gymId_idx" ON "Banner"("gymId");
     `);
+    await prisma.$executeRawUnsafe(`CREATE UNIQUE INDEX IF NOT EXISTS "Banner_displayId_key" ON "Banner"("displayId")`);
+    await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "Banner_type_idx" ON "Banner"("type")`);
+    await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "Banner_isActive_idx" ON "Banner"("isActive")`);
+    await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "Banner_startDate_endDate_idx" ON "Banner"("startDate", "endDate")`);
+    await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "Banner_gymId_idx" ON "Banner"("gymId")`);
     console.log('✅ Table Banner créée\n');
 
     // Étape 7: Foreign key pour Banner
@@ -201,10 +199,9 @@ async function applySchemaChanges() {
 
           CONSTRAINT "BannerVariant_pkey" PRIMARY KEY ("id")
       );
-
-      CREATE UNIQUE INDEX IF NOT EXISTS "BannerVariant_displayId_key" ON "BannerVariant"("displayId");
-      CREATE INDEX IF NOT EXISTS "BannerVariant_bannerId_idx" ON "BannerVariant"("bannerId");
     `);
+    await prisma.$executeRawUnsafe(`CREATE UNIQUE INDEX IF NOT EXISTS "BannerVariant_displayId_key" ON "BannerVariant"("displayId")`);
+    await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "BannerVariant_bannerId_idx" ON "BannerVariant"("bannerId")`);
     console.log('✅ Table BannerVariant créée\n');
 
     // Étape 9: Foreign key pour BannerVariant
@@ -237,11 +234,10 @@ async function applySchemaChanges() {
 
           CONSTRAINT "BannerStats_pkey" PRIMARY KEY ("id")
       );
-
-      CREATE INDEX IF NOT EXISTS "BannerStats_bannerId_idx" ON "BannerStats"("bannerId");
-      CREATE INDEX IF NOT EXISTS "BannerStats_userId_idx" ON "BannerStats"("userId");
-      CREATE UNIQUE INDEX IF NOT EXISTS "BannerStats_bannerId_userId_key" ON "BannerStats"("bannerId", "userId");
     `);
+    await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "BannerStats_bannerId_idx" ON "BannerStats"("bannerId")`);
+    await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "BannerStats_userId_idx" ON "BannerStats"("userId")`);
+    await prisma.$executeRawUnsafe(`CREATE UNIQUE INDEX IF NOT EXISTS "BannerStats_bannerId_userId_key" ON "BannerStats"("bannerId", "userId")`);
     console.log('✅ Table BannerStats créée\n');
 
     // Étape 11: Foreign keys pour BannerStats
@@ -284,11 +280,10 @@ async function applySchemaChanges() {
 
           CONSTRAINT "QuotaNotification_pkey" PRIMARY KEY ("id")
       );
-
-      CREATE UNIQUE INDEX IF NOT EXISTS "QuotaNotification_subscriptionId_key" ON "QuotaNotification"("subscriptionId");
-      CREATE INDEX IF NOT EXISTS "QuotaNotification_subscriptionId_idx" ON "QuotaNotification"("subscriptionId");
-      CREATE INDEX IF NOT EXISTS "QuotaNotification_sentAt_idx" ON "QuotaNotification"("sentAt");
     `);
+    await prisma.$executeRawUnsafe(`CREATE UNIQUE INDEX IF NOT EXISTS "QuotaNotification_subscriptionId_key" ON "QuotaNotification"("subscriptionId")`);
+    await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "QuotaNotification_subscriptionId_idx" ON "QuotaNotification"("subscriptionId")`);
+    await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "QuotaNotification_sentAt_idx" ON "QuotaNotification"("sentAt")`);
     console.log('✅ Table QuotaNotification créée\n');
 
     // Étape 13: Foreign key pour QuotaNotification
@@ -327,13 +322,13 @@ async function applySchemaChanges() {
 
           CONSTRAINT "StoreProduct_pkey" PRIMARY KEY ("id")
       );
-
-      CREATE UNIQUE INDEX IF NOT EXISTS "StoreProduct_displayId_key" ON "StoreProduct"("displayId");
-      CREATE INDEX IF NOT EXISTS "StoreProduct_gymId_idx" ON "StoreProduct"("gymId");
-      CREATE INDEX IF NOT EXISTS "StoreProduct_isActive_idx" ON "StoreProduct"("isActive");
-      CREATE INDEX IF NOT EXISTS "StoreProduct_category_idx" ON "StoreProduct"("category");
-      CREATE INDEX IF NOT EXISTS "StoreProduct_createdBy_idx" ON "StoreProduct"("createdBy");
     `);
+    
+    await prisma.$executeRawUnsafe(`CREATE UNIQUE INDEX IF NOT EXISTS "StoreProduct_displayId_key" ON "StoreProduct"("displayId")`);
+    await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "StoreProduct_gymId_idx" ON "StoreProduct"("gymId")`);
+    await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "StoreProduct_isActive_idx" ON "StoreProduct"("isActive")`);
+    await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "StoreProduct_category_idx" ON "StoreProduct"("category")`);
+    await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "StoreProduct_createdBy_idx" ON "StoreProduct"("createdBy")`);
     console.log('✅ Table StoreProduct créée\n');
 
     // Étape 15: Foreign keys pour StoreProduct
@@ -378,13 +373,13 @@ async function applySchemaChanges() {
 
           CONSTRAINT "StoreReservation_pkey" PRIMARY KEY ("id")
       );
-
-      CREATE UNIQUE INDEX IF NOT EXISTS "StoreReservation_displayId_key" ON "StoreReservation"("displayId");
-      CREATE INDEX IF NOT EXISTS "StoreReservation_productId_idx" ON "StoreReservation"("productId");
-      CREATE INDEX IF NOT EXISTS "StoreReservation_memberId_idx" ON "StoreReservation"("memberId");
-      CREATE INDEX IF NOT EXISTS "StoreReservation_status_idx" ON "StoreReservation"("status");
-      CREATE INDEX IF NOT EXISTS "StoreReservation_reservedAt_idx" ON "StoreReservation"("reservedAt");
     `);
+    
+    await prisma.$executeRawUnsafe(`CREATE UNIQUE INDEX IF NOT EXISTS "StoreReservation_displayId_key" ON "StoreReservation"("displayId")`);
+    await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "StoreReservation_productId_idx" ON "StoreReservation"("productId")`);
+    await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "StoreReservation_memberId_idx" ON "StoreReservation"("memberId")`);
+    await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "StoreReservation_status_idx" ON "StoreReservation"("status")`);
+    await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "StoreReservation_reservedAt_idx" ON "StoreReservation"("reservedAt")`);
     console.log('✅ Table StoreReservation créée\n');
 
     // Étape 17: Foreign keys pour StoreReservation
