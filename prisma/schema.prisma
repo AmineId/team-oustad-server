@@ -42,6 +42,7 @@ model Gym {
   OpeningHour OpeningHour[]
   User        User[]
   Banner      Banner[]
+  GymCheckIn  GymCheckIn[]
 
   @@index([name])
 }
@@ -63,6 +64,7 @@ model Member {
   Payment                     Payment[]
   Planning                    Planning[]
   Subscription                Subscription[]
+  GymCheckIn                  GymCheckIn[]
 }
 
 model MemberGoal {
@@ -145,7 +147,7 @@ model Payment {
   id             Int           @id @default(autoincrement())
   memberId       Int
   amount         Float
-  currency       String        @default("EUR")
+  currency       String        @default("MAD")
   status         String
   type           String
   paymentMethod  String?
@@ -229,7 +231,10 @@ model Subscription {
   subscriptionTypeId Int
   paymentFrequency   Int              @default(12)
   displayId          String           @unique
+  sessionsUsed       Int              @default(0) // Séances consommées
+  sessionQuota       Int?             // Quota copié du SubscriptionType au moment de la création
   Payment            Payment[]
+  GymCheckIn         GymCheckIn[]
   Member             Member           @relation(fields: [memberId], references: [userId])
   SubscriptionType   SubscriptionType @relation(fields: [subscriptionTypeId], references: [id])
 
@@ -250,10 +255,14 @@ model SubscriptionType {
   createdAt    DateTime       @default(now())
   updatedAt            DateTime @updatedAt
   displayId    String         @unique
+  sessionQuota Int?           // Nombre de séances (12, 18, 36, null=illimité)
+  sessionType  String         @default("unlimited") // "limited" ou "unlimited"
+  durationMonths Int          @default(1) // Durée en mois (1 mois pour quotas, 12 pour annuel)
   Subscription Subscription[]
 
   @@index([isActive])
   @@index([name])
+  @@index([sessionType])
 }
 
 model User {
@@ -371,4 +380,29 @@ model BannerStats {
   @@index([bannerId, userId])
   @@index([variantId, eventType])
   @@index([createdAt])
+}
+
+model GymCheckIn {
+  id             Int          @id @default(autoincrement())
+  displayId      String       @unique
+  memberId       Int
+  subscriptionId Int
+  gymId          Int
+  checkInTime    DateTime     @default(now())
+  checkOutTime   DateTime?    // Auto checkout à minuit
+  duration       Int?         // Durée en minutes
+  isManual       Boolean      @default(false) // Check-in manuel par staff
+  createdBy      Int?         // ID du staff qui a fait le check-in manuel
+  notes          String?
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+  Member         Member       @relation(fields: [memberId], references: [userId], onDelete: Cascade)
+  Subscription   Subscription @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
+  Gym            Gym          @relation(fields: [gymId], references: [id], onDelete: Cascade)
+
+  @@index([memberId])
+  @@index([subscriptionId])
+  @@index([gymId])
+  @@index([checkInTime])
+  @@index([memberId, checkInTime])
 }
