@@ -4,6 +4,7 @@ const QRCode = require('qrcode');
 const bcrypt = require('bcryptjs');
 const crypto = require('crypto');
 const { sendPasswordResetEmail } = require('../services/emailService');
+const { isFCMAvailable, validateFCMToken } = require('../services/pushNotificationService');
 const logger = require('../utils/logger');
 const { apiLimiter } = require('../middleware/rateLimiter');
 
@@ -745,23 +746,89 @@ router.put('/fcm-token', auth, async (req, res) => {
       return res.status(400).json({ error: 'FCM token requis et doit être une chaîne de caractères' });
     }
 
+    // Vérifier si FCM est disponible
+    const fcmAvailable = isFCMAvailable();
+    if (!fcmAvailable) {
+      logger.warn(`⚠️ FCM non disponible - Désactivation des notifications pour l'utilisateur`);
+      
+      const updatedUser = await prisma.user.update({
+        where: { id: req.user.sub },
+        data: { 
+          fcmToken,
+          notificationsEnabled: false
+        },
+        select: {
+          id: true,
+          email: true,
+          firstName: true,
+          lastName: true,
+          fcmToken: true,
+          notificationsEnabled: true
+        }
+      });
+
+      return res.json({
+        message: 'FCM token enregistré mais notifications désactivées (FCM non configuré)',
+        user: updatedUser,
+        fcmAvailable: false
+      });
+    }
+
+    // Valider le token FCM
+    const validation = await validateFCMToken(fcmToken);
+    
+    if (!validation.valid) {
+      logger.warn(`❌ Token FCM invalide - Désactivation des notifications`);
+      
+      const updatedUser = await prisma.user.update({
+        where: { id: req.user.sub },
+        data: { 
+          fcmToken,
+          notificationsEnabled: false
+        },
+        select: {
+          id: true,
+          email: true,
+          firstName: true,
+          lastName: true,
+          fcmToken: true,
+          notificationsEnabled: true
+        }
+      });
+
+      return res.status(400).json({
+        error: 'Token FCM invalide',
+        message: 'Le token a été enregistré mais les notifications sont désactivées',
+        user: updatedUser,
+        fcmAvailable: true,
+        tokenValid: false
+      });
+    }
+
+    // Token valide - activer les notifications
     const updatedUser = await prisma.user.update({
       where: { id: req.user.sub },
-      data: { fcmToken },
+      data: { 
+        fcmToken,
+        notificationsEnabled: true
+      },
       select: {
         id: true,
         email: true,
         firstName: true,
         lastName: true,
-        fcmToken: true
+        fcmToken: true,
+        notificationsEnabled: true
       }
     });
 
-    logger.info(`✅ FCM token mis à jour pour ${getFullName(updatedUser)}`);
+    logger.info(`✅ FCM token mis à jour et validé pour ${getFullName(updatedUser)}`);
     
     res.json({
       message: 'FCM token mis à jour avec succès',
-      user: updatedUser
+      user: updatedUser,
+      fcmAvailable: true,
+      tokenValid: true
     });
   } catch (error) {
     logger.error('💥 Erreur mise à jour FCM token:', error);
