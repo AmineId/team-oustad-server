@@ -8,10 +8,10 @@ async function cleanupOldSubscriptions() {
     // Récupérer tous les types d'abonnement (on va tous les lister et demander confirmation)
     const allSubscriptionTypes = await prisma.subscriptionType.findMany({
       include: {
-        subscriptions: true,
+        Subscription: true,
         _count: {
           select: {
-            subscriptions: true
+            Subscription: true
           }
         }
       }
@@ -28,7 +28,7 @@ async function cleanupOldSubscriptions() {
       console.log(`${index + 1}. ${subType.name}`);
       console.log(`   ID: ${subType.displayId}`);
       console.log(`   Prix: ${subType.monthlyPrice} (description: ${subType.description})`);
-      console.log(`   Abonnements actifs: ${subType._count.subscriptions}`);
+      console.log(`   Abonnements actifs: ${subType._count.Subscription}`);
       console.log('');
     });
 
@@ -36,7 +36,7 @@ async function cleanupOldSubscriptions() {
     console.log('⚠️  Les nouveaux types MAD avec quotas seront créés par le script seed\n');
 
     // Pour la sécurité, on ne supprime que ceux sans abonnements actifs
-    const typesToDelete = allSubscriptionTypes.filter(st => st._count.subscriptions === 0);
+    const typesToDelete = allSubscriptionTypes.filter(st => st._count.Subscription === 0);
 
     if (typesToDelete.length === 0) {
       console.log('✅ Aucun type d\'abonnement à supprimer (tous ont des abonnements actifs)');
@@ -57,11 +57,11 @@ async function cleanupOldSubscriptions() {
     }
 
     // Afficher ceux qui ont été gardés
-    const keptTypes = allSubscriptionTypes.filter(st => st._count.subscriptions > 0);
+    const keptTypes = allSubscriptionTypes.filter(st => st._count.Subscription > 0);
     if (keptTypes.length > 0) {
       console.log(`\n⚠️  ${keptTypes.length} type(s) conservé(s) car ils ont des abonnements actifs:\n`);
       keptTypes.forEach(st => {
-        console.log(`   - ${st.name} (${st.displayId}) - ${st._count.subscriptions} abonnement(s)`);
+        console.log(`   - ${st.name} (${st.displayId}) - ${st._count.Subscription} abonnement(s)`);
       });
     }
 
