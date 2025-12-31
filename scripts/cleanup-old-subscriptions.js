@@ -5,23 +5,8 @@ async function cleanupOldSubscriptions() {
   console.log('🧹 Nettoyage des anciens types d\'abonnement (EUR)...');
 
   try {
-    // Récupérer tous les types d'abonnement en EUR
-    const eurSubscriptionTypes = await prisma.subscriptionType.findMany({
-      where: {
-        OR: [
-          { name: { contains: 'EUR' } },
-          { name: { contains: '€' } },
-          { description: { contains: 'EUR' } },
-          { description: { contains: '€' } },
-          // Anciens types d'abonnement sans quotas de sessions
-          {
-            AND: [
-              { sessionQuota: null },
-              { sessionType: null }
-            ]
-          }
-        ]
-      },
+    // Récupérer tous les types d'abonnement (on va tous les lister et demander confirmation)
+    const allSubscriptionTypes = await prisma.subscriptionType.findMany({
       include: {
         subscriptions: true,
         _count: {
@@ -32,35 +17,55 @@ async function cleanupOldSubscriptions() {
       }
     });
 
-    if (eurSubscriptionTypes.length === 0) {
-      console.log('✅ Aucun ancien type d\'abonnement à supprimer');
+    if (allSubscriptionTypes.length === 0) {
+      console.log('✅ Aucun type d\'abonnement trouvé');
       return;
     }
 
-    console.log(`📋 ${eurSubscriptionTypes.length} type(s) d'abonnement trouvé(s):`);
+    console.log(`\n📋 ${allSubscriptionTypes.length} type(s) d'abonnement trouvé(s) dans la base:\n`);
+    
+    allSubscriptionTypes.forEach((subType, index) => {
+      console.log(`${index + 1}. ${subType.name}`);
+      console.log(`   ID: ${subType.displayId}`);
+      console.log(`   Prix: ${subType.monthlyPrice} (description: ${subType.description})`);
+      console.log(`   Abonnements actifs: ${subType._count.subscriptions}`);
+      console.log('');
+    });
+
+    console.log('\n⚠️  Ce script va supprimer TOUS les types d\'abonnement sans abonnements actifs');
+    console.log('⚠️  Les nouveaux types MAD avec quotas seront créés par le script seed\n');
+
+    // Pour la sécurité, on ne supprime que ceux sans abonnements actifs
+    const eurSubscriptionTypes = allSubscriptionTypes.filter(st => st._count.subscriptions === 0);
+
+    // Pour la sécurité, on ne supprime que ceux sans abonnements actifs
+    const eurSubscriptionTypes = allSubscriptionTypes.filter(st => st._count.subscriptions === 0);
+
+    if (eurSubscriptionTypes.length === 0) {
+      console.log('✅ Aucun type d\'abonnement à supprimer (tous ont des abonnements actifs)');
+      return;
+    }
+
+    console.log(`\n🗑️  ${eurSubscriptionTypes.length} type(s) d'abonnement seront supprimés:\n`);
     
     for (const subType of eurSubscriptionTypes) {
-      console.log(`\n   - ${subType.name} (${subType.displayId})`);
-      console.log(`     Abonnements actifs: ${subType._count.subscriptions}`);
+      console.log(`   - ${subType.name} (${subType.displayId})`);
       
-      if (subType._count.subscriptions > 0) {
-        console.log(`     ⚠️  ATTENTION: Ce type a des abonnements actifs!`);
-        console.log(`     Veuillez d'abord migrer ou annuler ces abonnements.`);
-        console.log(`     Abonnement(s) concerné(s):`);
-        
-        for (const sub of subType.subscriptions) {
-          console.log(`       * ${sub.displayId} - Membre: ${sub.memberId} - Statut: ${sub.status}`);
-        }
-        
-        continue; // Ne pas supprimer si des abonnements existent
-      }
-
-      // Supprimer le type d'abonnement si aucun abonnement actif
+      // Supprimer le type d'abonnement
       await prisma.subscriptionType.delete({
         where: { id: subType.id }
       });
       
       console.log(`     ✅ Supprimé`);
+    }
+
+    // Afficher ceux qui ont été gardés
+    const keptTypes = allSubscriptionTypes.filter(st => st._count.subscriptions > 0);
+    if (keptTypes.length > 0) {
+      console.log(`\n⚠️  ${keptTypes.length} type(s) conservé(s) car ils ont des abonnements actifs:\n`);
+      keptTypes.forEach(st => {
+        console.log(`   - ${st.name} (${st.displayId}) - ${st._count.subscriptions} abonnement(s)`);
+      });
     }
 
     console.log('\n✅ Nettoyage terminé');
