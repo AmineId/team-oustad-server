@@ -3,7 +3,7 @@ const prisma = require('../utils/prismaClient');
 const QRCode = require('qrcode');
 const bcrypt = require('bcryptjs');
 const crypto = require('crypto');
-const { sendPasswordResetEmail } = require('../services/emailService');
+const { sendPasswordResetEmail, sendBetaAccessEmail } = require('../services/emailService');
 const { isFCMAvailable, validateFCMToken } = require('../services/pushNotificationService');
 const logger = require('../utils/logger');
 const { apiLimiter } = require('../middleware/rateLimiter');
@@ -877,6 +877,159 @@ router.delete('/fcm-token', auth, async (req, res) => {
     });
   } catch (error) {
     logger.error('💥 Erreur suppression FCM token:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+/**
+ * @swagger
+ * /users/send-beta-access:
+ *   post:
+ *     summary: Send beta access invitation emails
+ *     description: Send beta access invitation emails to selected users. Only accessible by owners and admins.
+ *     tags: [Users]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - userIds
+ *             properties:
+ *               userIds:
+ *                 type: array
+ *                 items:
+ *                   type: integer
+ *                 description: Array of user IDs to send beta access emails to
+ *                 example: [1, 2, 3]
+ *     responses:
+ *       200:
+ *         description: Beta access emails sent successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                   example: "Emails d'accès bêta envoyés avec succès"
+ *                 sent:
+ *                   type: integer
+ *                   example: 3
+ *                 failed:
+ *                   type: integer
+ *                   example: 0
+ *                 results:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       email:
+ *                         type: string
+ *                       success:
+ *                         type: boolean
+ *                       error:
+ *                         type: string
+ *       400:
+ *         description: Invalid input
+ *       403:
+ *         description: Forbidden - Only owners and admins can send beta invitations
+ *       500:
+ *         description: Server error
+ */
+router.post('/send-beta-access', auth, async (req, res) => {
+  logger.info(`📧 Envoi emails accès bêta - User: ${req.user?.email}, Role: ${req.user?.role}`);
+  
+  try {
+    // Vérifier que l'utilisateur est owner ou admin
+    if (req.user.role !== 'owner' && req.user.role !== 'admin') {
+      logger.warn(`❌ Accès refusé - Rôle insuffisant: ${req.user.role}`);
+      return res.status(403).json({ 
+        error: 'Accès refusé. Seuls les owners et admins peuvent envoyer des invitations bêta.' 
+      });
+    }
+
+    const { userIds } = req.body;
+
+    // Validation
+    if (!userIds || !Array.isArray(userIds) || userIds.length === 0) {
+      logger.warn(`❌ IDs utilisateurs invalides`);
+      return res.status(400).json({ 
+        error: 'Le champ userIds doit être un tableau non vide d\'IDs utilisateurs' 
+      });
+    }
+
+    logger.info(`📋 Traitement de ${userIds.length} utilisateur(s)`);
+
+    // Récupérer les utilisateurs
+    const users = await prisma.user.findMany({
+      where: {
+        id: { in: userIds }
+      },
+      select: {
+        id: true,
+        email: true,
+        firstName: true,
+        lastName: true
+      }
+    });
+
+    if (users.length === 0) {
+      logger.warn(`⚠️ Aucun utilisateur trouvé avec les IDs fournis`);
+      return res.status(404).json({ 
+        error: 'Aucun utilisateur trouvé avec les IDs fournis' 
+      });
+    }
+
+    logger.info(`✅ ${users.length} utilisateur(s) trouvé(s)`);
+
+    // Envoyer les emails
+    const results = [];
+    let successCount = 0;
+    let failCount = 0;
+
+    for (const user of users) {
+      try {
+        const fullName = getFullName(user);
+        logger.info(`📨 Envoi email à ${fullName} (${user.email})`);
+        
+        await sendBetaAccessEmail(user.email, fullName);
+        
+        results.push({
+          userId: user.id,
+          email: user.email,
+          success: true
+        });
+        successCount++;
+        
+        logger.info(`✅ Email envoyé à ${user.email}`);
+      } catch (error) {
+        logger.error(`❌ Échec envoi email à ${user.email}:`, error.message);
+        
+        results.push({
+          userId: user.id,
+          email: user.email,
+          success: false,
+          error: error.message
+        });
+        failCount++;
+      }
+    }
+
+    logger.info(`📊 Résumé: ${successCount} envoyé(s), ${failCount} échoué(s)`);
+
+    res.json({
+      message: `Emails d'accès bêta envoyés: ${successCount} succès, ${failCount} échec(s)`,
+      sent: successCount,
+      failed: failCount,
+      total: users.length,
+      results
+    });
+  } catch (error) {
+    logger.error('💥 Erreur envoi emails accès bêta:', error);
     res.status(500).json({ error: error.message });
   }
 });
