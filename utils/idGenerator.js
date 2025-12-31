@@ -95,6 +95,22 @@ function generateSubscriptionTypeId() {
 }
 
 /**
+ * Génère un ID avec préfixe pour un produit du store
+ * @returns {string} Format: PROD-XXXXXXXXXXXXXXXX
+ */
+function generateStoreProductId() {
+  return `PROD-${generateRandomHex()}`;
+}
+
+/**
+ * Génère un ID avec préfixe pour une réservation du store
+ * @returns {string} Format: RESV-XXXXXXXXXXXXXXXX
+ */
+function generateStoreReservationId() {
+  return `RESV-${generateRandomHex()}`;
+}
+
+/**
  * Génère un ID utilisateur basé sur le rôle
  * @param {string} role - 'member', 'admin', 'owner'
  * @returns {string} ID formaté selon le rôle
@@ -157,6 +173,8 @@ module.exports = {
   generatePlanningId,
   generateExerciseId,
   generateSubscriptionTypeId,
+  generateStoreProductId,
+  generateStoreReservationId,
   generateUserIdByRole,
   extractPrefix,
   isValidId

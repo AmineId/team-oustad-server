@@ -492,8 +492,113 @@ Team Fitness
   }
 }
 
+/**
+ * Envoie un email d'alerte quota bas
+ */
+async function sendLowQuotaEmail(email, data) {
+  console.log(`\n📧 SERVICE: Envoi email alerte quota bas`);
+  console.log(`   Destinataire: ${email}`);
+  console.log(`   Séances restantes: ${data.sessionsRemaining}/${data.sessionQuota}`);
+  
+  const baseUrl = process.env.API_URL || 'http://localhost:3000';
+  const logoUrl = `${baseUrl}/android/assets/logo.png`;
+
+  const mailOptions = {
+    from: `"Team Fitness" <${process.env.SMTP_USER}>`,
+    to: email,
+    subject: '⚠️ Quota de séances faible - Team Fitness',
+    html: `
+      <!DOCTYPE html>
+      <html lang="fr">
+      <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      </head>
+      <body style="margin: 0; padding: 0; font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: linear-gradient(135deg, #374151 0%, #1a202c 100%);">
+        <table width="100%" cellpadding="0" cellspacing="0" style="background: linear-gradient(135deg, #374151 0%, #1a202c 100%); padding: 40px 20px;">
+          <tr>
+            <td align="center">
+              <table width="600" cellpadding="0" cellspacing="0" style="background-color: rgba(255, 255, 255, 0.05); backdrop-filter: blur(10px); border-radius: 16px; overflow: hidden; box-shadow: 0 8px 32px rgba(0,0,0,0.3); border: 1px solid rgba(255, 255, 255, 0.1);">
+                <tr>
+                  <td style="padding: 40px 30px; text-align: center; background: linear-gradient(135deg, rgba(239, 68, 68, 0.1) 0%, rgba(245, 101, 101, 0.1) 100%);">
+                    <img src="${logoUrl}" alt="Team Fitness" style="width: 80px; height: 80px; margin-bottom: 20px;">
+                    <h1 style="color: #e89547; margin: 0; font-size: 32px; font-weight: 700;">Team Fitness</h1>
+                    <p style="color: #fca5a5; margin: 10px 0 0 0; font-size: 14px;">⚠️ Alerte Quota</p>
+                  </td>
+                </tr>
+                <tr>
+                  <td style="padding: 40px 30px; color: #e5e7eb;">
+                    <h2 style="color: #ef4444; margin-top: 0; font-size: 24px;">Votre quota de séances est faible</h2>
+                    <p style="color: #d1d5db; font-size: 16px; line-height: 1.8;">Bonjour ${data.firstName} ${data.lastName},</p>
+                    <p style="color: #d1d5db; font-size: 16px; line-height: 1.8;">Nous vous informons que votre quota de séances arrive bientôt à épuisement.</p>
+                    
+                    <div style="background: rgba(239, 68, 68, 0.1); border-left: 4px solid #ef4444; padding: 20px; margin: 30px 0; border-radius: 8px;">
+                      <p style="margin: 0; color: #fca5a5; font-size: 16px; font-weight: 600; margin-bottom: 15px;">📊 État de votre abonnement :</p>
+                      <table style="width: 100%; color: #e5e7eb;">
+                        <tr>
+                          <td style="padding: 8px 0; color: #9ca3af;">Type d'abonnement :</td>
+                          <td style="padding: 8px 0; text-align: right; font-weight: 600; color: #e89547;">${data.subscriptionType}</td>
+                        </tr>
+                        <tr>
+                          <td style="padding: 8px 0; color: #9ca3af;">Séances restantes :</td>
+                          <td style="padding: 8px 0; text-align: right; font-weight: 700; font-size: 20px; color: #ef4444;">${data.sessionsRemaining} / ${data.sessionQuota}</td>
+                        </tr>
+                        <tr>
+                          <td style="padding: 8px 0; color: #9ca3af;">Pourcentage restant :</td>
+                          <td style="padding: 8px 0; text-align: right; font-weight: 600; color: ${data.percentageRemaining < 15 ? '#ef4444' : '#f97316'};">${data.percentageRemaining}%</td>
+                        </tr>
+                        <tr>
+                          <td style="padding: 8px 0; color: #9ca3af;">Date de fin :</td>
+                          <td style="padding: 8px 0; text-align: right; font-weight: 600; color: #d1d5db;">${new Date(data.endDate).toLocaleDateString('fr-FR')}</td>
+                        </tr>
+                      </table>
+                    </div>
+
+                    <div style="background: rgba(232, 149, 71, 0.1); border: 1px solid rgba(232, 149, 71, 0.3); border-radius: 8px; padding: 20px; margin: 30px 0;">
+                      <p style="margin: 0; color: #f4a261; font-size: 15px; line-height: 1.6;">
+                        💡 <strong style="color: #e89547;">Astuce :</strong> Pour continuer à profiter pleinement de nos installations, pensez à renouveler votre abonnement avant l'épuisement de votre quota !
+                      </p>
+                    </div>
+
+                    <div style="text-align: center; margin: 30px 0;">
+                      <p style="margin: 0 0 15px 0; color: #d1d5db; font-size: 15px;">Contactez-nous pour renouveler :</p>
+                      <a href="mailto:${process.env.SMTP_USER}" style="background: linear-gradient(135deg, #e89547 0%, #f59e0b 100%); color: #1a202c; padding: 16px 40px; text-decoration: none; border-radius: 12px; display: inline-block; font-size: 16px; font-weight: 700; box-shadow: 0 4px 12px rgba(232, 149, 71, 0.3); margin-right: 10px;">📧 Nous contacter</a>
+                    </div>
+
+                    <p style="color: #9ca3af; font-size: 14px; margin-top: 30px; text-align: center; line-height: 1.6;">
+                      Merci de votre confiance et à très bientôt à Team Fitness ! 💪
+                    </p>
+                  </td>
+                </tr>
+                <tr>
+                  <td style="background-color: rgba(0, 0, 0, 0.2); padding: 30px; text-align: center; border-top: 1px solid rgba(255, 255, 255, 0.1);">
+                    <p style="margin: 0; color: #9ca3af; font-size: 13px;">© ${new Date().getFullYear()} Team Fitness. Tous droits réservés.</p>
+                    <p style="margin: 10px 0 0 0; color: #6b7280; font-size: 12px;">Cet email est un rappel automatique pour votre confort.</p>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+        </table>
+      </body>
+      </html>
+    `,
+  };
+
+  try {
+    console.log(`🔄 Envoi email en cours...`);
+    await transporter.sendMail(mailOptions);
+    console.log(`✅ Email alerte quota envoyé avec succès à: ${email}`);
+    return { success: true };
+  } catch (error) {
+    console.error('💥 Erreur envoi email:', error);
+    throw new Error('Erreur lors de l\'envoi de l\'email');
+  }
+}
+
 module.exports = {
   sendPasswordResetEmail,
   sendAccountSetupEmail,
   sendBetaAccessEmail,
+  sendLowQuotaEmail,
 };

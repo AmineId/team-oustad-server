@@ -31,18 +31,19 @@ model Exercise {
 }
 
 model Gym {
-  id          Int           @id @default(autoincrement())
-  name        String
-  address     String
-  createdAt   DateTime      @default(now())
-  phone       String?
-  updatedAt   DateTime      @updatedAt
-  image       Bytes?
-  displayId   String        @unique
-  OpeningHour OpeningHour[]
-  User        User[]
-  Banner      Banner[]
-  GymCheckIn  GymCheckIn[]
+  id           Int            @id @default(autoincrement())
+  name         String
+  address      String
+  createdAt    DateTime       @default(now())
+  phone        String?
+  updatedAt    DateTime       @updatedAt
+  image        Bytes?
+  displayId    String         @unique
+  OpeningHour  OpeningHour[]
+  User         User[]
+  Banner       Banner[]
+  GymCheckIn   GymCheckIn[]
+  StoreProduct StoreProduct[]
 
   @@index([name])
 }
@@ -65,6 +66,7 @@ model Member {
   Planning                    Planning[]
   Subscription                Subscription[]
   GymCheckIn                  GymCheckIn[]
+  StoreReservation            StoreReservation[]
 }
 
 model MemberGoal {
@@ -220,23 +222,24 @@ model PlanningExercise {
 }
 
 model Subscription {
-  id                 Int              @id @default(autoincrement())
+  id                 Int                 @id @default(autoincrement())
   memberId           Int
   status             String
   startDate          DateTime
   endDate            DateTime?
-  autoRenew          Boolean          @default(true)
-  createdAt          DateTime         @default(now())
-  updatedAt            DateTime @updatedAt
+  autoRenew          Boolean             @default(true)
+  createdAt          DateTime            @default(now())
+  updatedAt          DateTime            @updatedAt
   subscriptionTypeId Int
-  paymentFrequency   Int              @default(12)
-  displayId          String           @unique
-  sessionsUsed       Int              @default(0) // Séances consommées
-  sessionQuota       Int?             // Quota copié du SubscriptionType au moment de la création
+  paymentFrequency   Int                 @default(12)
+  displayId          String              @unique
+  sessionsUsed       Int                 @default(0) // Séances consommées
+  sessionQuota       Int?                // Quota copié du SubscriptionType au moment de la création
   Payment            Payment[]
   GymCheckIn         GymCheckIn[]
-  Member             Member           @relation(fields: [memberId], references: [userId])
-  SubscriptionType   SubscriptionType @relation(fields: [subscriptionTypeId], references: [id])
+  QuotaNotification  QuotaNotification[]
+  Member             Member              @relation(fields: [memberId], references: [userId])
+  SubscriptionType   SubscriptionType    @relation(fields: [subscriptionTypeId], references: [id])
 
   @@index([memberId])
   @@index([status])
@@ -288,6 +291,7 @@ model User {
   Owner                Owner?
   PasswordResetToken   PasswordResetToken[]
   Planning             Planning[]
+  StoreProduct         StoreProduct[]
   Gym                  Gym                  @relation(fields: [gymId], references: [id])
 
   @@index([gymId])
@@ -405,4 +409,63 @@ model GymCheckIn {
   @@index([gymId])
   @@index([checkInTime])
   @@index([memberId, checkInTime])
+}
+
+model QuotaNotification {
+  id             Int          @id @default(autoincrement())
+  subscriptionId Int          @unique
+  sentAt         DateTime     @default(now())
+  Subscription   Subscription @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
+
+  @@index([subscriptionId])
+  @@index([sentAt])
+}
+
+model StoreProduct {
+  id                Int                 @id @default(autoincrement())
+  displayId         String              @unique
+  name              String
+  description       String?
+  imageUrl          String?
+  price             Float
+  stock             Int                 @default(0)
+  reservedStock     Int                 @default(0) // Stock réservé (en attente de retrait)
+  availableStock    Int                 @default(0) // Stock disponible (calculé: stock - reservedStock)
+  isActive          Boolean             @default(true)
+  category          String?
+  gymId             Int
+  createdBy         Int
+  createdAt         DateTime            @default(now())
+  updatedAt         DateTime            @updatedAt
+  Gym               Gym                 @relation(fields: [gymId], references: [id], onDelete: Cascade)
+  Creator           User                @relation(fields: [createdBy], references: [id])
+  StoreReservation  StoreReservation[]
+
+  @@index([gymId])
+  @@index([isActive])
+  @@index([category])
+  @@index([createdBy])
+}
+
+model StoreReservation {
+  id              Int           @id @default(autoincrement())
+  displayId       String        @unique
+  productId       Int
+  memberId        Int
+  quantity        Int           @default(1)
+  totalPrice      Float
+  status          String        @default("pending") // pending, completed, cancelled
+  reservedAt      DateTime      @default(now())
+  completedAt     DateTime?     // Date de retrait
+  cancelledAt     DateTime?
+  notes           String?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+  Product         StoreProduct  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  Member          Member        @relation(fields: [memberId], references: [userId], onDelete: Cascade)
+
+  @@index([productId])
+  @@index([memberId])
+  @@index([status])
+  @@index([reservedAt])
 }

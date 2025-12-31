@@ -78,6 +78,7 @@ const androidRoutes = require('./routes/android');
 const membersRoutes = require('./routes/members');
 const bannersRoutes = require('./routes/banners');
 const checkInRoutes = require('./routes/checkIn');
+const storeRoutes = require('./routes/store');
 
 // Use routes
 console.log('🔗 Configuration des routes API...');
@@ -91,7 +92,8 @@ app.use('/android', androidRoutes);
 app.use('/members', membersRoutes);
 app.use('/banners', bannersRoutes);
 app.use('/check-in', checkInRoutes);
-console.log('✅ Routes configurées: /gyms, /users, /auth, /plannings, /subscriptions, /subscription-types, /android, /members, /banners, /check-in');
+app.use('/store', storeRoutes);
+console.log('✅ Routes configurées: /gyms, /users, /auth, /plannings, /subscriptions, /subscription-types, /android, /members, /banners, /check-in, /store');
 
 // Redirection Beta Download vers Google Play Internal Testing
 app.get('/beta/download', (req, res) => {
@@ -223,6 +225,19 @@ cron.schedule('1 0 * * *', async () => {
   }
 });
 console.log('✅ Job d\'auto checkout: tous les jours à 00:01');
+
+// Job de vérification des quotas bas (tous les jours à 10h00)
+const { checkLowQuotaSubscriptions } = require('./jobs/lowQuotaNotification');
+cron.schedule('0 10 * * *', async () => {
+  console.log('🔍 Vérification des quotas de séances bas...');
+  try {
+    const result = await checkLowQuotaSubscriptions();
+    console.log(`✅ Vérification quotas terminée: ${result.notificationsSent} notifications, ${result.emailsSent} emails`);
+  } catch (error) {
+    console.error('❌ Erreur vérification quotas:', error);
+  }
+});
+console.log('✅ Job de vérification des quotas: tous les jours à 10h00');
 
 app.listen(PORT, HOST, () => {
   const localUrl = `http://localhost:${PORT}`;
