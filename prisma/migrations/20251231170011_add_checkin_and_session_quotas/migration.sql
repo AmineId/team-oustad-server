@@ -109,7 +109,7 @@ CREATE TABLE IF NOT EXISTS "BannerVariant" (
     "id" SERIAL NOT NULL,
     "bannerId" INTEGER NOT NULL,
     "displayId" TEXT NOT NULL,
-    "name" TEXT NOT NULL,
+    "variantName" TEXT NOT NULL,
     "title" JSONB NOT NULL,
     "description" JSONB,
     "imageUrl" TEXT,
