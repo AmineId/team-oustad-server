@@ -112,6 +112,11 @@ class BannerService {
   async createBanner(data) {
     const displayId = generateBannerId();
     
+    // Extraire action.type et action.data si présents
+    const actionType = data.action?.type || data.actionType || 'none';
+    const actionData = data.action?.data || data.actionData;
+    const actionParams = data.action?.params || data.actionParams || {};
+    
     const banner = await prisma.banner.create({
       data: {
         displayId,
@@ -128,9 +133,9 @@ class BannerService {
         type: data.type,
         startDate: new Date(data.startDate),
         endDate: new Date(data.endDate),
-        actionType: data.actionType || 'none',
-        actionData: data.actionData,
-        actionParams: data.actionParams || {},
+        actionType,
+        actionData,
+        actionParams,
         priority: data.priority || 0,
         isActive: data.isActive !== undefined ? data.isActive : true,
         gymId: data.gymId,
@@ -150,6 +155,13 @@ class BannerService {
    */
   async updateBanner(id, data) {
     const updateData = {};
+    
+    // Gérer l'objet action si présent
+    if (data.action) {
+      if (data.action.type) updateData.actionType = data.action.type;
+      if (data.action.data !== undefined) updateData.actionData = data.action.data;
+      if (data.action.params) updateData.actionParams = data.action.params;
+    }
     
     // Champs simples
     const fields = [
