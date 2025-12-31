@@ -194,3 +194,87 @@ BEGIN
         ALTER TABLE "BannerStats" ADD CONSTRAINT "BannerStats_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE;
     END IF;
 END $$;
+
+-- CreateTable: StoreProduct
+CREATE TABLE IF NOT EXISTS "StoreProduct" (
+    "id" SERIAL NOT NULL,
+    "displayId" TEXT NOT NULL,
+    "name" TEXT NOT NULL,
+    "description" TEXT,
+    "imagesBase64" TEXT[] DEFAULT ARRAY[]::TEXT[],
+    "price" DOUBLE PRECISION NOT NULL,
+    "stock" INTEGER NOT NULL DEFAULT 0,
+    "reservedStock" INTEGER NOT NULL DEFAULT 0,
+    "availableStock" INTEGER NOT NULL DEFAULT 0,
+    "isActive" BOOLEAN NOT NULL DEFAULT true,
+    "category" TEXT,
+    "gymId" INTEGER NOT NULL,
+    "createdBy" INTEGER NOT NULL,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "StoreProduct_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateIndex StoreProduct
+CREATE UNIQUE INDEX IF NOT EXISTS "StoreProduct_displayId_key" ON "StoreProduct"("displayId");
+CREATE INDEX IF NOT EXISTS "StoreProduct_gymId_idx" ON "StoreProduct"("gymId");
+CREATE INDEX IF NOT EXISTS "StoreProduct_isActive_idx" ON "StoreProduct"("isActive");
+CREATE INDEX IF NOT EXISTS "StoreProduct_category_idx" ON "StoreProduct"("category");
+CREATE INDEX IF NOT EXISTS "StoreProduct_createdBy_idx" ON "StoreProduct"("createdBy");
+
+-- AddForeignKey StoreProduct
+DO $$ 
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_constraint WHERE conname = 'StoreProduct_gymId_fkey'
+    ) THEN
+        ALTER TABLE "StoreProduct" ADD CONSTRAINT "StoreProduct_gymId_fkey" FOREIGN KEY ("gymId") REFERENCES "Gym"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+    END IF;
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_constraint WHERE conname = 'StoreProduct_createdBy_fkey'
+    ) THEN
+        ALTER TABLE "StoreProduct" ADD CONSTRAINT "StoreProduct_createdBy_fkey" FOREIGN KEY ("createdBy") REFERENCES "User"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+    END IF;
+END $$;
+
+-- CreateTable: StoreReservation
+CREATE TABLE IF NOT EXISTS "StoreReservation" (
+    "id" SERIAL NOT NULL,
+    "displayId" TEXT NOT NULL,
+    "productId" INTEGER NOT NULL,
+    "memberId" INTEGER NOT NULL,
+    "quantity" INTEGER NOT NULL DEFAULT 1,
+    "totalPrice" DOUBLE PRECISION NOT NULL,
+    "status" TEXT NOT NULL DEFAULT 'pending',
+    "reservedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "completedAt" TIMESTAMP(3),
+    "cancelledAt" TIMESTAMP(3),
+    "notes" TEXT,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "StoreReservation_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateIndex StoreReservation
+CREATE UNIQUE INDEX IF NOT EXISTS "StoreReservation_displayId_key" ON "StoreReservation"("displayId");
+CREATE INDEX IF NOT EXISTS "StoreReservation_productId_idx" ON "StoreReservation"("productId");
+CREATE INDEX IF NOT EXISTS "StoreReservation_memberId_idx" ON "StoreReservation"("memberId");
+CREATE INDEX IF NOT EXISTS "StoreReservation_status_idx" ON "StoreReservation"("status");
+CREATE INDEX IF NOT EXISTS "StoreReservation_reservedAt_idx" ON "StoreReservation"("reservedAt");
+
+-- AddForeignKey StoreReservation
+DO $$ 
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_constraint WHERE conname = 'StoreReservation_productId_fkey'
+    ) THEN
+        ALTER TABLE "StoreReservation" ADD CONSTRAINT "StoreReservation_productId_fkey" FOREIGN KEY ("productId") REFERENCES "StoreProduct"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+    END IF;
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_constraint WHERE conname = 'StoreReservation_memberId_fkey'
+    ) THEN
+        ALTER TABLE "StoreReservation" ADD CONSTRAINT "StoreReservation_memberId_fkey" FOREIGN KEY ("memberId") REFERENCES "Member"("userId") ON DELETE CASCADE ON UPDATE CASCADE;
+    END IF;
+END $$;

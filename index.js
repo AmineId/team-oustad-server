@@ -11,6 +11,9 @@ logger.info('🚀 Démarrage du serveur Team Fitness...');
 
 const app = express();
 
+// Trust proxy (nécessaire quand derrière nginx/reverse proxy)
+app.set('trust proxy', 1);
+
 logger.info('📦 Configuration Express...');
 
 // Security Middleware avec CSP personnalisée pour permettre Tailwind CDN
