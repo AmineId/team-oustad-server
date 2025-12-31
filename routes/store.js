@@ -16,10 +16,20 @@ const handleProductUpload = (req, res, next) => {
     fileFilter: (req, file, cb) => {
       const filetypes = /jpeg|jpg|png|webp/;
       const mimetype = filetypes.test(file.mimetype);
-      const extname = filetypes.test(path.extname(file.originalname).toLowerCase());
-      if (mimetype && extname) {
+      const extname = path.extname(file.originalname).toLowerCase();
+      const hasValidExtension = extname === '' || filetypes.test(extname);
+      
+      // Accepter si le MIME type est valide OU si l'extension est valide
+      if (mimetype || hasValidExtension) {
         return cb(null, true);
       }
+      
+      console.error('Fichier rejeté:', {
+        originalname: file.originalname,
+        mimetype: file.mimetype,
+        extname: extname
+      });
+      
       cb(new Error('Seules les images sont autorisées (jpeg, jpg, png, webp)'));
     }
   });
