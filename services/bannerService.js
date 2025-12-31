@@ -1,5 +1,5 @@
 const prisma = require('../utils/prismaClient');
-const { generateDisplayId } = require('../utils/idGenerator');
+const { generateBannerId, generateBannerVariantId } = require('../utils/idGenerator');
 
 /**
  * Service pour la gestion des bannières et événements
@@ -110,7 +110,7 @@ class BannerService {
    * Crée une nouvelle bannière
    */
   async createBanner(data) {
-    const displayId = generateDisplayId('BANNER');
+    const displayId = generateBannerId();
     
     const banner = await prisma.banner.create({
       data: {
@@ -215,7 +215,7 @@ class BannerService {
    * Crée une variante A/B
    */
   async createVariant(bannerId, data) {
-    const displayId = generateDisplayId('VARIANT');
+    const displayId = generateBannerVariantId();
     
     const variant = await prisma.bannerVariant.create({
       data: {

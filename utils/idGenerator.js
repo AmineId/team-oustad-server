@@ -111,6 +111,30 @@ function generateStoreReservationId() {
 }
 
 /**
+ * Génère un ID avec préfixe pour une bannière
+ * @returns {string} Format: BANNER-XXXXXXXXXXXXXXXX
+ */
+function generateBannerId() {
+  return `BANNER-${generateRandomHex()}`;
+}
+
+/**
+ * Génère un ID avec préfixe pour une variante de bannière
+ * @returns {string} Format: VARIANT-XXXXXXXXXXXXXXXX
+ */
+function generateBannerVariantId() {
+  return `VARIANT-${generateRandomHex()}`;
+}
+
+/**
+ * Génère un ID avec préfixe pour un check-in
+ * @returns {string} Format: CHECKIN-XXXXXXXXXXXXXXXX
+ */
+function generateCheckInId() {
+  return `CHECKIN-${generateRandomHex()}`;
+}
+
+/**
  * Génère un ID utilisateur basé sur le rôle
  * @param {string} role - 'member', 'admin', 'owner'
  * @returns {string} ID formaté selon le rôle
@@ -175,6 +199,9 @@ module.exports = {
   generateSubscriptionTypeId,
   generateStoreProductId,
   generateStoreReservationId,
+  generateBannerId,
+  generateBannerVariantId,
+  generateCheckInId,
   generateUserIdByRole,
   extractPrefix,
   isValidId
