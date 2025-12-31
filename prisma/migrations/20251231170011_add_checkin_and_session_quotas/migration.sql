@@ -65,22 +65,30 @@ ALTER TABLE "Payment" ALTER COLUMN "currency" SET DEFAULT 'MAD';
 CREATE TABLE IF NOT EXISTS "Banner" (
     "id" SERIAL NOT NULL,
     "displayId" TEXT NOT NULL,
-    "title" JSONB NOT NULL,
-    "description" JSONB,
+    "title" TEXT NOT NULL,
+    "titleEn" TEXT,
+    "titleAr" TEXT,
+    "description" TEXT,
+    "descriptionEn" TEXT,
+    "descriptionAr" TEXT,
     "imageUrl" TEXT,
+    "imageBase64" TEXT,
     "videoUrl" TEXT,
     "mediaType" TEXT NOT NULL DEFAULT 'image',
     "type" TEXT NOT NULL,
     "startDate" TIMESTAMP(3) NOT NULL,
-    "endDate" TIMESTAMP(3),
-    "actionType" TEXT NOT NULL,
-    "actionValue" TEXT,
+    "endDate" TIMESTAMP(3) NOT NULL,
+    "actionType" TEXT NOT NULL DEFAULT 'none',
+    "actionData" TEXT,
+    "actionParams" JSONB,
     "priority" INTEGER NOT NULL DEFAULT 0,
     "isActive" BOOLEAN NOT NULL DEFAULT true,
     "gymId" INTEGER,
-    "subscriptionTypes" TEXT[],
+    "backgroundColor" TEXT,
+    "textColor" TEXT,
+    "subscriptionTypes" INTEGER[],
     "maxViewsPerUser" INTEGER,
-    "isScheduled" BOOLEAN NOT NULL DEFAULT false,
+    "isScheduled" BOOLEAN NOT NULL DEFAULT true,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
 
@@ -93,6 +101,7 @@ CREATE INDEX IF NOT EXISTS "Banner_type_idx" ON "Banner"("type");
 CREATE INDEX IF NOT EXISTS "Banner_isActive_idx" ON "Banner"("isActive");
 CREATE INDEX IF NOT EXISTS "Banner_startDate_endDate_idx" ON "Banner"("startDate", "endDate");
 CREATE INDEX IF NOT EXISTS "Banner_gymId_idx" ON "Banner"("gymId");
+CREATE INDEX IF NOT EXISTS "Banner_priority_idx" ON "Banner"("priority");
 
 -- AddForeignKey
 DO $$ 
@@ -107,15 +116,22 @@ END $$;
 -- CreateTable: BannerVariant
 CREATE TABLE IF NOT EXISTS "BannerVariant" (
     "id" SERIAL NOT NULL,
-    "bannerId" INTEGER NOT NULL,
     "displayId" TEXT NOT NULL,
+    "bannerId" INTEGER NOT NULL,
     "variantName" TEXT NOT NULL,
-    "title" JSONB NOT NULL,
-    "description" JSONB,
+    "title" TEXT NOT NULL,
+    "titleEn" TEXT,
+    "titleAr" TEXT,
+    "description" TEXT,
+    "descriptionEn" TEXT,
+    "descriptionAr" TEXT,
     "imageUrl" TEXT,
+    "imageBase64" TEXT,
     "videoUrl" TEXT,
-    "weight" INTEGER NOT NULL DEFAULT 50,
+    "backgroundColor" TEXT,
+    "textColor" TEXT,
     "isActive" BOOLEAN NOT NULL DEFAULT true,
+    "weight" INTEGER NOT NULL DEFAULT 50,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
 
@@ -124,7 +140,8 @@ CREATE TABLE IF NOT EXISTS "BannerVariant" (
 
 -- CreateIndex
 CREATE UNIQUE INDEX IF NOT EXISTS "BannerVariant_displayId_key" ON "BannerVariant"("displayId");
-CREATE INDEX IF NOT EXISTS "BannerVariant_bannerId_idx" ON "BannerVariant"("bannerId");
+CREATE UNIQUE INDEX IF NOT EXISTS "BannerVariant_bannerId_variantName_key" ON "BannerVariant"("bannerId", "variantName");
+CREATE INDEX IF NOT EXISTS "BannerVariant_bannerId_isActive_idx" ON "BannerVariant"("bannerId", "isActive");
 
 -- AddForeignKey
 DO $$ 
