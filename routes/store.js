@@ -203,7 +203,7 @@ router.post('/products', authenticateToken, handleProductUpload, async (req, res
     }
 
     // Déterminer le gymId: depuis le body pour admin, depuis req.user pour owner
-    let finalGymId = gymId || req.user.gymId;
+    let finalGymId = gymId ? parseInt(gymId) : req.user.gymId;
     
     // Si pas de gymId, récupérer le gym lié au user
     if (!finalGymId) {
@@ -244,7 +244,7 @@ router.post('/products', authenticateToken, handleProductUpload, async (req, res
       price: parseFloat(price),
       stock: parseInt(stock),
       category,
-      gymId: finalGymId,
+      gymId: parseInt(finalGymId),
       createdBy: req.user.sub
     });
 
