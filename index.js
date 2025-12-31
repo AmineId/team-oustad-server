@@ -13,8 +13,35 @@ const app = express();
 
 logger.info('📦 Configuration Express...');
 
-// Security Middleware
-app.use(helmet());
+// Security Middleware avec CSP personnalisée pour permettre Tailwind CDN
+app.use(helmet({
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      scriptSrc: [
+        "'self'",
+        "'unsafe-inline'", // Nécessaire pour Tailwind CDN
+        "https://cdn.tailwindcss.com"
+      ],
+      styleSrc: [
+        "'self'",
+        "'unsafe-inline'", // Nécessaire pour les styles inline
+        "https://cdn.tailwindcss.com",
+        "https://fonts.googleapis.com"
+      ],
+      fontSrc: [
+        "'self'",
+        "https://fonts.gstatic.com"
+      ],
+      imgSrc: [
+        "'self'",
+        "data:",
+        "https:"
+      ],
+      connectSrc: ["'self'"]
+    }
+  }
+}));
 app.use(cors());
 app.use(compression());
 
@@ -49,6 +76,7 @@ const subscriptionsRoutes = require('./routes/subscriptions');
 const subscriptionTypesRoutes = require('./routes/subscriptionTypes');
 const androidRoutes = require('./routes/android');
 const membersRoutes = require('./routes/members');
+const bannersRoutes = require('./routes/banners');
 
 // Use routes
 console.log('🔗 Configuration des routes API...');
@@ -60,7 +88,8 @@ app.use('/subscriptions', subscriptionsRoutes);
 app.use('/subscription-types', subscriptionTypesRoutes);
 app.use('/android', androidRoutes);
 app.use('/members', membersRoutes);
-console.log('✅ Routes configurées: /gyms, /users, /auth, /plannings, /subscriptions, /subscription-types, /android, /members');
+app.use('/banners', bannersRoutes);
+console.log('✅ Routes configurées: /gyms, /users, /auth, /plannings, /subscriptions, /subscription-types, /android, /members, /banners');
 
 // Redirection Beta Download vers Google Play Internal Testing
 app.get('/beta/download', (req, res) => {
@@ -165,6 +194,20 @@ console.log('✅ Job de vérification des paiements: tous les jours à 23h00');
 const { dailyPlanningNotification } = require('./jobs/dailyPlanningNotification');
 dailyPlanningNotification.start();
 console.log('✅ Job de notification des plannings: tous les jours à 6h00');
+
+// Job de mise à jour automatique des bannières selon dates (toutes les heures)
+const cron = require('node-cron');
+const bannerService = require('./services/bannerService');
+cron.schedule('0 * * * *', async () => {
+  console.log('🔄 Mise à jour des bannières programmées...');
+  try {
+    await bannerService.updateScheduledBanners();
+    console.log('✅ Bannières programmées mises à jour');
+  } catch (error) {
+    console.error('❌ Erreur mise à jour bannières:', error);
+  }
+});
+console.log('✅ Job de mise à jour des bannières: toutes les heures');
 
 app.listen(PORT, HOST, () => {
   const localUrl = `http://localhost:${PORT}`;

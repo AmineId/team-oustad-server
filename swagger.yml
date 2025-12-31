@@ -567,6 +567,173 @@ components:
         - startDate
         - price
         - billingCycle
+
+    Banner:
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 1
+        displayId:
+          type: string
+          example: "BANNER-abc123"
+        title:
+          type: string
+          example: "Offre spéciale été"
+        titleEn:
+          type: string
+          example: "Summer special offer"
+        titleAr:
+          type: string
+          example: "عرض صيفي خاص"
+        description:
+          type: string
+          example: "Profitez de -30% sur tous les abonnements"
+        descriptionEn:
+          type: string
+        descriptionAr:
+          type: string
+        imageUrl:
+          type: string
+          format: uri
+          example: "https://example.com/banner.jpg"
+        imageBase64:
+          type: string
+          description: Image encodée en base64
+        videoUrl:
+          type: string
+          format: uri
+          example: "https://example.com/video.mp4"
+        mediaType:
+          type: string
+          enum: [image, video, gif]
+          example: "image"
+        type:
+          type: string
+          enum: [seasonal, event, promotion, info, announcement]
+          example: "seasonal"
+        startDate:
+          type: string
+          format: date-time
+        endDate:
+          type: string
+          format: date-time
+        actionType:
+          type: string
+          enum: [navigate, externalUrl, showDetails, none]
+          example: "none"
+        actionData:
+          type: string
+          example: "/subscriptions"
+        actionParams:
+          type: object
+          example: {"screen": "SubscriptionDetails", "id": 123}
+        priority:
+          type: integer
+          example: 10
+        isActive:
+          type: boolean
+          example: true
+        gymId:
+          type: integer
+          nullable: true
+        backgroundColor:
+          type: string
+          example: "#FF5733"
+        textColor:
+          type: string
+          example: "#FFFFFF"
+        maxViewsPerUser:
+          type: integer
+          example: 5
+          description: Limite d'affichage par utilisateur
+        isScheduled:
+          type: boolean
+          example: true
+        subscriptionTypes:
+          type: array
+          items:
+            type: integer
+          example: [1, 2, 3]
+          description: IDs des types d'abonnement ciblés
+        viewCount:
+          type: integer
+          example: 150
+        clickCount:
+          type: integer
+          example: 25
+        variants:
+          type: array
+          items:
+            $ref: '#/components/schemas/BannerVariant'
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    BannerVariant:
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 1
+        displayId:
+          type: string
+          example: "VARIANT-xyz789"
+        bannerId:
+          type: integer
+          example: 1
+        variantName:
+          type: string
+          example: "B"
+          description: Nom de la variante (A, B, C...)
+        title:
+          type: string
+          example: "Offre limitée"
+        titleEn:
+          type: string
+        titleAr:
+          type: string
+        description:
+          type: string
+        descriptionEn:
+          type: string
+        descriptionAr:
+          type: string
+        imageUrl:
+          type: string
+        imageBase64:
+          type: string
+        videoUrl:
+          type: string
+        backgroundColor:
+          type: string
+          example: "#3498db"
+        textColor:
+          type: string
+          example: "#FFFFFF"
+        isActive:
+          type: boolean
+          example: true
+        weight:
+          type: integer
+          example: 50
+          description: Pourcentage de distribution du trafic
+        viewCount:
+          type: integer
+          example: 75
+        clickCount:
+          type: integer
+          example: 12
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
 security:
   - bearerAuth: []
 
@@ -5070,5 +5237,736 @@ paths:
           description: Accès interdit
         '404':
           description: Membre non trouvé
+        '500':
+          description: Erreur serveur
+
+  # ==================== BANNERS API ====================
+  /banners:
+    get:
+      summary: Récupérer les bannières actives
+      description: Récupère la liste des bannières actives avec filtrage avancé
+      tags:
+        - Banners
+      parameters:
+        - in: query
+          name: type
+          schema:
+            type: string
+            enum: [seasonal, event, promotion, info, announcement]
+          description: Filtrer par type de bannière
+        - in: query
+          name: gymId
+          schema:
+            type: integer
+          description: Filtrer par ID de salle (optionnel)
+        - in: query
+          name: subscriptionTypeId
+          schema:
+            type: integer
+          description: Filtrer par type d'abonnement
+        - in: query
+          name: activeOnly
+          schema:
+            type: boolean
+            default: true
+          description: Afficher uniquement les bannières actives
+        - in: query
+          name: locale
+          schema:
+            type: string
+            enum: [fr, en, ar]
+            default: fr
+          description: Langue pour les traductions
+      responses:
+        '200':
+          description: Liste des bannières
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  banners:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Banner'
+        '500':
+          description: Erreur serveur
+    
+    post:
+      summary: Créer une nouvelle bannière
+      description: Créer une nouvelle bannière avec support multimédia et A/B testing (Admin/Owner uniquement)
+      tags:
+        - Banners
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - title
+                - type
+                - startDate
+                - endDate
+              properties:
+                title:
+                  type: string
+                  example: "Offre spéciale été"
+                titleEn:
+                  type: string
+                  example: "Summer special offer"
+                titleAr:
+                  type: string
+                  example: "عرض صيفي خاص"
+                description:
+                  type: string
+                  example: "Profitez de -30% sur tous les abonnements"
+                descriptionEn:
+                  type: string
+                descriptionAr:
+                  type: string
+                imageUrl:
+                  type: string
+                  format: uri
+                  example: "https://example.com/banner.jpg"
+                imageBase64:
+                  type: string
+                  description: Image encodée en base64 (optionnel)
+                videoUrl:
+                  type: string
+                  format: uri
+                  example: "https://example.com/video.mp4"
+                mediaType:
+                  type: string
+                  enum: [image, video, gif]
+                  default: image
+                type:
+                  type: string
+                  enum: [seasonal, event, promotion, info, announcement]
+                  example: "seasonal"
+                startDate:
+                  type: string
+                  format: date-time
+                  example: "2024-06-01T00:00:00Z"
+                endDate:
+                  type: string
+                  format: date-time
+                  example: "2024-08-31T23:59:59Z"
+                actionType:
+                  type: string
+                  enum: [navigate, externalUrl, showDetails, none]
+                  default: none
+                actionData:
+                  type: string
+                  example: "/subscriptions"
+                actionParams:
+                  type: object
+                  example: {"screen": "SubscriptionDetails", "id": 123}
+                priority:
+                  type: integer
+                  default: 0
+                  example: 10
+                isActive:
+                  type: boolean
+                  default: true
+                gymId:
+                  type: integer
+                  description: ID de la salle (null = toutes les salles)
+                backgroundColor:
+                  type: string
+                  example: "#FF5733"
+                textColor:
+                  type: string
+                  example: "#FFFFFF"
+                maxViewsPerUser:
+                  type: integer
+                  example: 5
+                  description: Limite d'affichage par utilisateur
+                isScheduled:
+                  type: boolean
+                  default: true
+                  description: Activation/désactivation automatique selon dates
+                subscriptionTypeIds:
+                  type: array
+                  items:
+                    type: integer
+                  example: [1, 2, 3]
+                  description: Types d'abonnement ciblés (vide = tous)
+      responses:
+        '201':
+          description: Bannière créée avec succès
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Banner'
+        '400':
+          description: Données invalides
+        '403':
+          description: Accès interdit
+        '500':
+          description: Erreur serveur
+
+  /banners/{id}:
+    get:
+      summary: Récupérer une bannière par ID
+      description: Récupère les détails d'une bannière spécifique avec ses variantes
+      tags:
+        - Banners
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+          description: ID de la bannière
+        - in: query
+          name: locale
+          schema:
+            type: string
+            enum: [fr, en, ar]
+            default: fr
+          description: Langue pour les traductions
+      responses:
+        '200':
+          description: Détails de la bannière
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Banner'
+        '404':
+          description: Bannière non trouvée
+        '500':
+          description: Erreur serveur
+
+    put:
+      summary: Mettre à jour une bannière
+      description: Mettre à jour les informations d'une bannière (Admin/Owner uniquement)
+      tags:
+        - Banners
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                title:
+                  type: string
+                titleEn:
+                  type: string
+                titleAr:
+                  type: string
+                description:
+                  type: string
+                descriptionEn:
+                  type: string
+                descriptionAr:
+                  type: string
+                imageUrl:
+                  type: string
+                imageBase64:
+                  type: string
+                videoUrl:
+                  type: string
+                mediaType:
+                  type: string
+                  enum: [image, video, gif]
+                type:
+                  type: string
+                  enum: [seasonal, event, promotion, info, announcement]
+                startDate:
+                  type: string
+                  format: date-time
+                endDate:
+                  type: string
+                  format: date-time
+                actionType:
+                  type: string
+                  enum: [navigate, externalUrl, showDetails, none]
+                actionData:
+                  type: string
+                actionParams:
+                  type: object
+                priority:
+                  type: integer
+                isActive:
+                  type: boolean
+                gymId:
+                  type: integer
+                backgroundColor:
+                  type: string
+                textColor:
+                  type: string
+                maxViewsPerUser:
+                  type: integer
+                isScheduled:
+                  type: boolean
+                subscriptionTypeIds:
+                  type: array
+                  items:
+                    type: integer
+      responses:
+        '200':
+          description: Bannière mise à jour
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Banner'
+        '400':
+          description: Données invalides
+        '403':
+          description: Accès interdit
+        '404':
+          description: Bannière non trouvée
+        '500':
+          description: Erreur serveur
+
+    delete:
+      summary: Supprimer une bannière
+      description: Supprimer une bannière et ses variantes (Admin/Owner uniquement)
+      tags:
+        - Banners
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Bannière supprimée
+        '403':
+          description: Accès interdit
+        '404':
+          description: Bannière non trouvée
+        '500':
+          description: Erreur serveur
+
+  /banners/{id}/variants:
+    get:
+      summary: Récupérer les variantes d'une bannière
+      description: Récupère toutes les variantes A/B d'une bannière
+      tags:
+        - Banners
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Liste des variantes
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  variants:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/BannerVariant'
+        '404':
+          description: Bannière non trouvée
+        '500':
+          description: Erreur serveur
+    
+    post:
+      summary: Créer une variante A/B
+      description: Créer une nouvelle variante pour A/B testing (Admin/Owner uniquement)
+      tags:
+        - Banners
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - variantName
+                - title
+              properties:
+                variantName:
+                  type: string
+                  example: "B"
+                  description: Nom de la variante (A, B, C...)
+                title:
+                  type: string
+                titleEn:
+                  type: string
+                titleAr:
+                  type: string
+                description:
+                  type: string
+                descriptionEn:
+                  type: string
+                descriptionAr:
+                  type: string
+                imageUrl:
+                  type: string
+                imageBase64:
+                  type: string
+                videoUrl:
+                  type: string
+                backgroundColor:
+                  type: string
+                textColor:
+                  type: string
+                weight:
+                  type: integer
+                  default: 50
+                  example: 30
+                  description: Pourcentage de distribution du trafic
+                isActive:
+                  type: boolean
+                  default: true
+      responses:
+        '201':
+          description: Variante créée
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BannerVariant'
+        '400':
+          description: Données invalides
+        '403':
+          description: Accès interdit
+        '404':
+          description: Bannière non trouvée
+        '500':
+          description: Erreur serveur
+
+  /banners/{id}/variants/{variantId}:
+    put:
+      summary: Mettre à jour une variante
+      description: Modifier une variante A/B existante (Admin/Owner uniquement)
+      tags:
+        - Banners
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+        - in: path
+          name: variantId
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                title:
+                  type: string
+                titleEn:
+                  type: string
+                titleAr:
+                  type: string
+                description:
+                  type: string
+                descriptionEn:
+                  type: string
+                descriptionAr:
+                  type: string
+                imageUrl:
+                  type: string
+                imageBase64:
+                  type: string
+                videoUrl:
+                  type: string
+                backgroundColor:
+                  type: string
+                textColor:
+                  type: string
+                weight:
+                  type: integer
+                isActive:
+                  type: boolean
+      responses:
+        '200':
+          description: Variante mise à jour
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BannerVariant'
+        '400':
+          description: Données invalides
+        '403':
+          description: Accès interdit
+        '404':
+          description: Variante non trouvée
+        '500':
+          description: Erreur serveur
+    
+    delete:
+      summary: Supprimer une variante
+      description: Supprimer une variante A/B (Admin/Owner uniquement)
+      tags:
+        - Banners
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+        - in: path
+          name: variantId
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Variante supprimée
+        '403':
+          description: Accès interdit
+        '404':
+          description: Variante non trouvée
+        '500':
+          description: Erreur serveur
+
+  /banners/{id}/track/view:
+    post:
+      summary: Tracker la vue d'une bannière
+      description: Enregistrer qu'une bannière a été vue (respecte maxViewsPerUser)
+      tags:
+        - Banners
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+        - in: query
+          name: variantId
+          schema:
+            type: integer
+          description: ID de la variante vue (pour A/B testing)
+        - in: query
+          name: userId
+          schema:
+            type: integer
+          description: ID de l'utilisateur (optionnel)
+      responses:
+        '200':
+          description: Vue enregistrée
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  tracked:
+                    type: boolean
+                  remainingViews:
+                    type: integer
+                    description: Vues restantes avant limite
+        '404':
+          description: Bannière non trouvée
+        '429':
+          description: Limite de vues atteinte
+        '500':
+          description: Erreur serveur
+
+  /banners/{id}/track/click:
+    post:
+      summary: Tracker le clic sur une bannière
+      description: Enregistrer qu'une bannière a été cliquée
+      tags:
+        - Banners
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+        - in: query
+          name: variantId
+          schema:
+            type: integer
+          description: ID de la variante cliquée (pour A/B testing)
+        - in: query
+          name: userId
+          schema:
+            type: integer
+          description: ID de l'utilisateur (optionnel)
+      responses:
+        '200':
+          description: Clic enregistré
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  tracked:
+                    type: boolean
+        '404':
+          description: Bannière non trouvée
+        '500':
+          description: Erreur serveur
+
+  /banners/{id}/stats:
+    get:
+      summary: Récupérer les statistiques d'une bannière
+      description: Récupère les statistiques globales et par variante (Admin/Owner uniquement)
+      tags:
+        - Banners
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+        - in: query
+          name: startDate
+          schema:
+            type: string
+            format: date-time
+          description: Date de début pour les statistiques
+        - in: query
+          name: endDate
+          schema:
+            type: string
+            format: date-time
+          description: Date de fin pour les statistiques
+      responses:
+        '200':
+          description: Statistiques de la bannière
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  bannerId:
+                    type: integer
+                  viewCount:
+                    type: integer
+                  clickCount:
+                    type: integer
+                  uniqueViewers:
+                    type: integer
+                  clickThroughRate:
+                    type: number
+                    format: float
+                    description: Taux de clic (CTR)
+                  lastViewed:
+                    type: string
+                    format: date-time
+                  lastClicked:
+                    type: string
+                    format: date-time
+                  variants:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        variantId:
+                          type: integer
+                        variantName:
+                          type: string
+                        viewCount:
+                          type: integer
+                        clickCount:
+                          type: integer
+                        ctr:
+                          type: number
+                          format: float
+        '403':
+          description: Accès interdit
+        '404':
+          description: Bannière non trouvée
+        '500':
+          description: Erreur serveur
+
+  /banners/stats/summary:
+    get:
+      summary: Résumé des statistiques de toutes les bannières
+      description: Vue d'ensemble des performances (Admin/Owner uniquement)
+      tags:
+        - Banners
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: query
+          name: gymId
+          schema:
+            type: integer
+          description: Filtrer par salle
+        - in: query
+          name: startDate
+          schema:
+            type: string
+            format: date-time
+        - in: query
+          name: endDate
+          schema:
+            type: string
+            format: date-time
+      responses:
+        '200':
+          description: Résumé des statistiques
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  totalBanners:
+                    type: integer
+                  activeBanners:
+                    type: integer
+                  totalViews:
+                    type: integer
+                  totalClicks:
+                    type: integer
+                  averageCTR:
+                    type: number
+                    format: float
+                  topPerformers:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        bannerId:
+                          type: integer
+                        title:
+                          type: string
+                        ctr:
+                          type: number
+                        views:
+                          type: integer
+                        clicks:
+                          type: integer
+        '403':
+          description: Accès interdit
         '500':
           description: Erreur serveur

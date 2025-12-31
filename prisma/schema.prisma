@@ -41,6 +41,7 @@ model Gym {
   displayId   String        @unique
   OpeningHour OpeningHour[]
   User        User[]
+  Banner      Banner[]
 
   @@index([name])
 }
@@ -284,4 +285,90 @@ model User {
   @@index([role])
   @@index([gymId, role])
   @@index([lastLoginAt])
+}
+
+model Banner {
+  id              Int             @id @default(autoincrement())
+  displayId       String          @unique
+  title           String
+  titleEn         String?
+  titleAr         String?
+  description     String?
+  descriptionEn   String?
+  descriptionAr   String?
+  imageUrl        String?
+  imageBase64     String?         @db.Text
+  videoUrl        String?
+  mediaType       String          @default("image") // image, video, gif
+  type            String          // seasonal, event, promotion, info, announcement
+  startDate       DateTime
+  endDate         DateTime
+  actionType      String          @default("none") // navigate, externalUrl, showDetails, none
+  actionData      String?
+  actionParams    Json?
+  priority        Int             @default(0)
+  isActive        Boolean         @default(true)
+  gymId           Int?
+  backgroundColor String?
+  textColor       String?
+  maxViewsPerUser Int?            // Limite d'affichage par utilisateur
+  isScheduled     Boolean         @default(true) // Auto-activation selon dates
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+  Gym             Gym?            @relation(fields: [gymId], references: [id], onDelete: Cascade)
+  BannerStats     BannerStats[]
+  BannerVariant   BannerVariant[]
+  subscriptionTypes Int[]         // IDs des types d'abonnement ciblés (vide = tous)
+
+  @@index([isActive, startDate, endDate])
+  @@index([gymId])
+  @@index([type])
+  @@index([priority])
+}
+
+model BannerVariant {
+  id              Int      @id @default(autoincrement())
+  displayId       String   @unique
+  bannerId        Int
+  variantName     String   // A, B, C...
+  title           String
+  titleEn         String?
+  titleAr         String?
+  description     String?
+  descriptionEn   String?
+  descriptionAr   String?
+  imageUrl        String?
+  imageBase64     String?  @db.Text
+  videoUrl        String?
+  backgroundColor String?
+  textColor       String?
+  isActive        Boolean  @default(true)
+  weight          Int      @default(50) // % de distribution du trafic
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  Banner          Banner   @relation(fields: [bannerId], references: [id], onDelete: Cascade)
+  BannerStats     BannerStats[]
+
+  @@unique([bannerId, variantName])
+  @@index([bannerId, isActive])
+}
+
+model BannerStats {
+  id              Int            @id @default(autoincrement())
+  bannerId        Int
+  variantId       Int?
+  userId          Int?           // Pour tracking par utilisateur
+  eventType       String         // view, click
+  viewedAt        DateTime?
+  clickedAt       DateTime?
+  userAgent       String?
+  ipAddress       String?
+  createdAt       DateTime       @default(now())
+  Banner          Banner         @relation(fields: [bannerId], references: [id], onDelete: Cascade)
+  BannerVariant   BannerVariant? @relation(fields: [variantId], references: [id], onDelete: Cascade)
+
+  @@index([bannerId, eventType])
+  @@index([bannerId, userId])
+  @@index([variantId, eventType])
+  @@index([createdAt])
 }
