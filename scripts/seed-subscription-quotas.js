@@ -1,6 +1,6 @@
 const { PrismaClient } = require('@prisma/client');
 const prisma = new PrismaClient();
-const { generateDisplayId } = require('../utils/idGenerator');
+const { generateSubscriptionTypeId } = require('../utils/idGenerator');
 
 async function seedSubscriptionTypesWithQuotas() {
   console.log('🌱 Ajout des types d\'abonnement avec quotas...');
@@ -72,7 +72,7 @@ async function seedSubscriptionTypesWithQuotas() {
   ];
 
   for (const subType of subscriptionTypes) {
-    const displayId = generateDisplayId('SUBTYPE');
+    const displayId = generateSubscriptionTypeId();
     
     const existing = await prisma.subscriptionType.findUnique({
       where: { name: subType.name }
