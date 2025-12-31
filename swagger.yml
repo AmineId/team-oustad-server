@@ -784,15 +784,14 @@ components:
         description:
           type: string
           example: "Protéine saveur vanille 1kg"
-        images:
+        imagesBase64:
           type: array
           items:
             type: string
           example: 
-            - "https://api.example.com/store/products/product-123-1.jpg"
-            - "https://api.example.com/store/products/product-123-2.jpg"
-            - "https://api.example.com/store/products/product-123-3.jpg"
-          description: "Tableau d'URLs des images du produit (max 5)"
+            - "data:image/jpeg;base64,/9j/4AAQSkZJRg..."
+            - "data:image/jpeg;base64,/9j/4AAQSkZJRg..."
+          description: "Tableau d'images en base64 (max 5, format: data:image/jpeg;base64,...)"
         price:
           type: number
           format: float
@@ -6394,7 +6393,9 @@ paths:
 
     post:
       summary: Créer un produit
-      description: Ajouter un nouveau produit (admin/owner uniquement)
+      description: |
+        Ajouter un nouveau produit (admin/owner uniquement).
+        Les images sont converties en base64 et stockées directement dans la base de données.
       tags:
         - Store
       security:
@@ -6432,7 +6433,9 @@ paths:
                     type: string
                     format: binary
                   maxItems: 5
-                  description: Images du produit (max 5, jpeg/jpg/png/webp, 5MB chacune)
+                  description: |
+                    Images du produit (max 5, jpeg/jpg/png/webp, 5MB chacune).
+                    Converties en base64 et stockées en BDD: data:image/jpeg;base64,...
       responses:
         '201':
           description: Produit créé
@@ -6486,7 +6489,9 @@ paths:
 
     put:
       summary: Modifier un produit
-      description: Met à jour un produit existant (admin/owner uniquement)
+      description: |
+        Met à jour un produit existant (admin/owner uniquement).
+        Les nouvelles images sont converties en base64 et ajoutées aux existantes.
       tags:
         - Store
       security:
@@ -6524,7 +6529,9 @@ paths:
                     type: string
                     format: binary
                   maxItems: 5
-                  description: Nouvelles images à ajouter (max 5 total, conserve les existantes)
+                  description: |
+                    Nouvelles images à ajouter (max 5 total incluant existantes).
+                    Converties en base64 et ajoutées en BDD.
       responses:
         '200':
           description: Produit mis à jour
@@ -6546,7 +6553,9 @@ paths:
 
     delete:
       summary: Supprimer un produit
-      description: Supprime un produit (admin/owner uniquement)
+      description: |
+        Supprime un produit (admin/owner uniquement).
+        Les images stockées en base64 sont automatiquement supprimées avec le produit.
       tags:
         - Store
       security:

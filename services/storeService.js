@@ -117,14 +117,14 @@ async function getProductById(productId) {
  * Créer un nouveau produit
  */
 async function createProduct(data) {
-  const displayId = generateStoreProductId();
+  const displayId = data.displayId || generateStoreProductId();
 
   const product = await prisma.storeProduct.create({
     data: {
       displayId,
       name: data.name,
       description: data.description,
-      imageUrl: data.imageUrl,
+      imagesBase64: data.imagesBase64 || [],
       price: data.price,
       stock: data.stock,
       category: data.category,

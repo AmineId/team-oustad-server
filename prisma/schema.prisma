@@ -426,7 +426,7 @@ model StoreProduct {
   displayId         String              @unique
   name              String
   description       String?
-  images            String[]            @default([])
+  imagesBase64      String[]            @default([])
   price             Float
   stock             Int                 @default(0)
   reservedStock     Int                 @default(0) // Stock réservé (en attente de retrait)
