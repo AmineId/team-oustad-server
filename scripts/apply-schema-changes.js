@@ -275,6 +275,141 @@ async function applySchemaChanges() {
     `);
     console.log('✅ Foreign keys BannerStats ajoutées\n');
 
+    // Étape 12: Créer la table QuotaNotification
+    await prisma.$executeRawUnsafe(`
+      CREATE TABLE IF NOT EXISTS "QuotaNotification" (
+          "id" SERIAL NOT NULL,
+          "subscriptionId" INTEGER NOT NULL,
+          "sentAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+          CONSTRAINT "QuotaNotification_pkey" PRIMARY KEY ("id")
+      );
+
+      CREATE UNIQUE INDEX IF NOT EXISTS "QuotaNotification_subscriptionId_key" ON "QuotaNotification"("subscriptionId");
+      CREATE INDEX IF NOT EXISTS "QuotaNotification_subscriptionId_idx" ON "QuotaNotification"("subscriptionId");
+      CREATE INDEX IF NOT EXISTS "QuotaNotification_sentAt_idx" ON "QuotaNotification"("sentAt");
+    `);
+    console.log('✅ Table QuotaNotification créée\n');
+
+    // Étape 13: Foreign key pour QuotaNotification
+    await prisma.$executeRawUnsafe(`
+      DO $$
+      BEGIN
+        IF NOT EXISTS (
+          SELECT 1 FROM pg_constraint WHERE conname = 'QuotaNotification_subscriptionId_fkey'
+        ) THEN
+          ALTER TABLE "QuotaNotification" ADD CONSTRAINT "QuotaNotification_subscriptionId_fkey" 
+            FOREIGN KEY ("subscriptionId") REFERENCES "Subscription"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+          RAISE NOTICE 'Foreign key QuotaNotification_subscriptionId_fkey ajoutée';
+        END IF;
+      END $$;
+    `);
+    console.log('✅ Foreign key QuotaNotification ajoutée\n');
+
+    // Étape 14: Créer la table StoreProduct
+    await prisma.$executeRawUnsafe(`
+      CREATE TABLE IF NOT EXISTS "StoreProduct" (
+          "id" SERIAL NOT NULL,
+          "displayId" TEXT NOT NULL,
+          "name" TEXT NOT NULL,
+          "description" TEXT,
+          "imageUrl" TEXT,
+          "price" DOUBLE PRECISION NOT NULL,
+          "stock" INTEGER NOT NULL DEFAULT 0,
+          "reservedStock" INTEGER NOT NULL DEFAULT 0,
+          "availableStock" INTEGER NOT NULL DEFAULT 0,
+          "isActive" BOOLEAN NOT NULL DEFAULT true,
+          "category" TEXT,
+          "gymId" INTEGER NOT NULL,
+          "createdBy" INTEGER NOT NULL,
+          "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+          "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+          CONSTRAINT "StoreProduct_pkey" PRIMARY KEY ("id")
+      );
+
+      CREATE UNIQUE INDEX IF NOT EXISTS "StoreProduct_displayId_key" ON "StoreProduct"("displayId");
+      CREATE INDEX IF NOT EXISTS "StoreProduct_gymId_idx" ON "StoreProduct"("gymId");
+      CREATE INDEX IF NOT EXISTS "StoreProduct_isActive_idx" ON "StoreProduct"("isActive");
+      CREATE INDEX IF NOT EXISTS "StoreProduct_category_idx" ON "StoreProduct"("category");
+      CREATE INDEX IF NOT EXISTS "StoreProduct_createdBy_idx" ON "StoreProduct"("createdBy");
+    `);
+    console.log('✅ Table StoreProduct créée\n');
+
+    // Étape 15: Foreign keys pour StoreProduct
+    await prisma.$executeRawUnsafe(`
+      DO $$
+      BEGIN
+        IF NOT EXISTS (
+          SELECT 1 FROM pg_constraint WHERE conname = 'StoreProduct_gymId_fkey'
+        ) THEN
+          ALTER TABLE "StoreProduct" ADD CONSTRAINT "StoreProduct_gymId_fkey" 
+            FOREIGN KEY ("gymId") REFERENCES "Gym"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+          RAISE NOTICE 'Foreign key StoreProduct_gymId_fkey ajoutée';
+        END IF;
+
+        IF NOT EXISTS (
+          SELECT 1 FROM pg_constraint WHERE conname = 'StoreProduct_createdBy_fkey'
+        ) THEN
+          ALTER TABLE "StoreProduct" ADD CONSTRAINT "StoreProduct_createdBy_fkey" 
+            FOREIGN KEY ("createdBy") REFERENCES "User"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+          RAISE NOTICE 'Foreign key StoreProduct_createdBy_fkey ajoutée';
+        END IF;
+      END $$;
+    `);
+    console.log('✅ Foreign keys StoreProduct ajoutées\n');
+
+    // Étape 16: Créer la table StoreReservation
+    await prisma.$executeRawUnsafe(`
+      CREATE TABLE IF NOT EXISTS "StoreReservation" (
+          "id" SERIAL NOT NULL,
+          "displayId" TEXT NOT NULL,
+          "productId" INTEGER NOT NULL,
+          "memberId" INTEGER NOT NULL,
+          "quantity" INTEGER NOT NULL DEFAULT 1,
+          "totalPrice" DOUBLE PRECISION NOT NULL,
+          "status" TEXT NOT NULL DEFAULT 'pending',
+          "reservedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+          "completedAt" TIMESTAMP(3),
+          "cancelledAt" TIMESTAMP(3),
+          "notes" TEXT,
+          "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+          "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+          CONSTRAINT "StoreReservation_pkey" PRIMARY KEY ("id")
+      );
+
+      CREATE UNIQUE INDEX IF NOT EXISTS "StoreReservation_displayId_key" ON "StoreReservation"("displayId");
+      CREATE INDEX IF NOT EXISTS "StoreReservation_productId_idx" ON "StoreReservation"("productId");
+      CREATE INDEX IF NOT EXISTS "StoreReservation_memberId_idx" ON "StoreReservation"("memberId");
+      CREATE INDEX IF NOT EXISTS "StoreReservation_status_idx" ON "StoreReservation"("status");
+      CREATE INDEX IF NOT EXISTS "StoreReservation_reservedAt_idx" ON "StoreReservation"("reservedAt");
+    `);
+    console.log('✅ Table StoreReservation créée\n');
+
+    // Étape 17: Foreign keys pour StoreReservation
+    await prisma.$executeRawUnsafe(`
+      DO $$
+      BEGIN
+        IF NOT EXISTS (
+          SELECT 1 FROM pg_constraint WHERE conname = 'StoreReservation_productId_fkey'
+        ) THEN
+          ALTER TABLE "StoreReservation" ADD CONSTRAINT "StoreReservation_productId_fkey" 
+            FOREIGN KEY ("productId") REFERENCES "StoreProduct"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+          RAISE NOTICE 'Foreign key StoreReservation_productId_fkey ajoutée';
+        END IF;
+
+        IF NOT EXISTS (
+          SELECT 1 FROM pg_constraint WHERE conname = 'StoreReservation_memberId_fkey'
+        ) THEN
+          ALTER TABLE "StoreReservation" ADD CONSTRAINT "StoreReservation_memberId_fkey" 
+            FOREIGN KEY ("memberId") REFERENCES "Member"("userId") ON DELETE CASCADE ON UPDATE CASCADE;
+          RAISE NOTICE 'Foreign key StoreReservation_memberId_fkey ajoutée';
+        END IF;
+      END $$;
+    `);
+    console.log('✅ Foreign keys StoreReservation ajoutées\n');
+
     console.log('✅ Tous les changements de schéma ont été appliqués avec succès!');
     console.log('\n📝 Prochaines étapes:');
     console.log('   1. npx prisma generate');

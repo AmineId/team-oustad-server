@@ -1,0 +1,327 @@
+const express = require('express');
+const router = express.Router();
+const authenticateToken = require('../middleware/auth');
+const storeService = require('../services/storeService');
+const { generateStoreProductId, generateStoreReservationId } = require('../utils/idGenerator');
+const multer = require('multer');
+const path = require('path');
+
+// Configuration multer pour upload d'images
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    cb(null, 'public/store/products/');
+  },
+  filename: (req, file, cb) => {
+    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+    cb(null, 'product-' + uniqueSuffix + path.extname(file.originalname));
+  }
+});
+
+const upload = multer({
+  storage: storage,
+  limits: { fileSize: 5 * 1024 * 1024 }, // 5MB max
+  fileFilter: (req, file, cb) => {
+    const filetypes = /jpeg|jpg|png|webp/;
+    const mimetype = filetypes.test(file.mimetype);
+    const extname = filetypes.test(path.extname(file.originalname).toLowerCase());
+    if (mimetype && extname) {
+      return cb(null, true);
+    }
+    cb(new Error('Seules les images sont autorisées (jpeg, jpg, png, webp)'));
+  }
+});
+
+// ============= ROUTES PUBLIQUES (tous les membres) =============
+
+/**
+ * @route GET /store/products
+ * @desc Récupérer tous les produits disponibles
+ */
+router.get('/products', authenticateToken, async (req, res) => {
+  try {
+    const { gymId, category, available } = req.query;
+    
+    const filters = {
+      gymId: gymId ? parseInt(gymId) : req.user.gymId,
+      category: category || undefined,
+      isActive: true
+    };
+
+    // Si available=true, filtrer seulement ceux avec stock disponible
+    if (available === 'true') {
+      filters.hasStock = true;
+    }
+
+    const products = await storeService.getProducts(filters);
+    res.json({ success: true, products });
+  } catch (error) {
+    console.error('Erreur récupération produits:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+/**
+ * @route GET /store/products/:id
+ * @desc Récupérer un produit spécifique
+ */
+router.get('/products/:id', authenticateToken, async (req, res) => {
+  try {
+    const product = await storeService.getProductById(req.params.id);
+    if (!product) {
+      return res.status(404).json({ success: false, error: 'Produit non trouvé' });
+    }
+    res.json({ success: true, product });
+  } catch (error) {
+    console.error('Erreur récupération produit:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+/**
+ * @route POST /store/reservations
+ * @desc Créer une réservation de produit
+ */
+router.post('/reservations', authenticateToken, async (req, res) => {
+  try {
+    const { productId, quantity, notes } = req.body;
+
+    if (!productId || !quantity) {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'productId et quantity sont requis' 
+      });
+    }
+
+    const memberId = req.user.role === 'member' ? req.user.id : req.body.memberId;
+    if (!memberId) {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'memberId requis pour les non-membres' 
+      });
+    }
+
+    const reservation = await storeService.createReservation({
+      productId: parseInt(productId),
+      memberId,
+      quantity: parseInt(quantity),
+      notes
+    });
+
+    res.status(201).json({ success: true, reservation });
+  } catch (error) {
+    console.error('Erreur création réservation:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+/**
+ * @route GET /store/reservations/my
+ * @desc Récupérer les réservations du membre connecté
+ */
+router.get('/reservations/my', authenticateToken, async (req, res) => {
+  try {
+    if (req.user.role !== 'member') {
+      return res.status(403).json({ 
+        success: false, 
+        error: 'Accessible uniquement aux membres' 
+      });
+    }
+
+    const { status } = req.query;
+    const reservations = await storeService.getMemberReservations(
+      req.user.id, 
+      status
+    );
+    res.json({ success: true, reservations });
+  } catch (error) {
+    console.error('Erreur récupération réservations:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+/**
+ * @route PATCH /store/reservations/:id/cancel
+ * @desc Annuler une réservation
+ */
+router.patch('/reservations/:id/cancel', authenticateToken, async (req, res) => {
+  try {
+    const reservation = await storeService.cancelReservation(
+      req.params.id,
+      req.user.id,
+      req.user.role
+    );
+    res.json({ success: true, reservation });
+  } catch (error) {
+    console.error('Erreur annulation réservation:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// ============= ROUTES STAFF (admin/owner) =============
+
+/**
+ * @route POST /store/products
+ * @desc Créer un nouveau produit
+ */
+router.post('/products', authenticateToken, upload.single('image'), async (req, res) => {
+  try {
+    // Vérifier que l'utilisateur est admin ou owner
+    if (!['admin', 'owner'].includes(req.user.role)) {
+      return res.status(403).json({ 
+        success: false, 
+        error: 'Accessible uniquement aux admin et owner' 
+      });
+    }
+
+    const { name, description, price, stock, category } = req.body;
+
+    if (!name || !price || stock === undefined) {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'name, price et stock sont requis' 
+      });
+    }
+
+    const imageUrl = req.file 
+      ? `${process.env.API_URL}/store/products/${req.file.filename}`
+      : null;
+
+    const product = await storeService.createProduct({
+      name,
+      description,
+      imageUrl,
+      price: parseFloat(price),
+      stock: parseInt(stock),
+      category,
+      gymId: req.user.gymId,
+      createdBy: req.user.id
+    });
+
+    res.status(201).json({ success: true, product });
+  } catch (error) {
+    console.error('Erreur création produit:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+/**
+ * @route PUT /store/products/:id
+ * @desc Mettre à jour un produit
+ */
+router.put('/products/:id', authenticateToken, upload.single('image'), async (req, res) => {
+  try {
+    if (!['admin', 'owner'].includes(req.user.role)) {
+      return res.status(403).json({ 
+        success: false, 
+        error: 'Accessible uniquement aux admin et owner' 
+      });
+    }
+
+    const updates = { ...req.body };
+    
+    if (req.file) {
+      updates.imageUrl = `${process.env.API_URL}/store/products/${req.file.filename}`;
+    }
+
+    if (updates.price) updates.price = parseFloat(updates.price);
+    if (updates.stock !== undefined) updates.stock = parseInt(updates.stock);
+
+    const product = await storeService.updateProduct(req.params.id, updates);
+    res.json({ success: true, product });
+  } catch (error) {
+    console.error('Erreur mise à jour produit:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+/**
+ * @route DELETE /store/products/:id
+ * @desc Supprimer un produit
+ */
+router.delete('/products/:id', authenticateToken, async (req, res) => {
+  try {
+    if (!['admin', 'owner'].includes(req.user.role)) {
+      return res.status(403).json({ 
+        success: false, 
+        error: 'Accessible uniquement aux admin et owner' 
+      });
+    }
+
+    await storeService.deleteProduct(req.params.id);
+    res.json({ success: true, message: 'Produit supprimé' });
+  } catch (error) {
+    console.error('Erreur suppression produit:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+/**
+ * @route GET /store/reservations
+ * @desc Récupérer toutes les réservations (staff)
+ */
+router.get('/reservations', authenticateToken, async (req, res) => {
+  try {
+    if (!['admin', 'owner'].includes(req.user.role)) {
+      return res.status(403).json({ 
+        success: false, 
+        error: 'Accessible uniquement aux admin et owner' 
+      });
+    }
+
+    const { status, productId } = req.query;
+    const reservations = await storeService.getAllReservations({
+      gymId: req.user.gymId,
+      status,
+      productId: productId ? parseInt(productId) : undefined
+    });
+
+    res.json({ success: true, reservations });
+  } catch (error) {
+    console.error('Erreur récupération réservations:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+/**
+ * @route PATCH /store/reservations/:id/complete
+ * @desc Marquer une réservation comme retirée
+ */
+router.patch('/reservations/:id/complete', authenticateToken, async (req, res) => {
+  try {
+    if (!['admin', 'owner'].includes(req.user.role)) {
+      return res.status(403).json({ 
+        success: false, 
+        error: 'Accessible uniquement aux admin et owner' 
+      });
+    }
+
+    const reservation = await storeService.completeReservation(req.params.id);
+    res.json({ success: true, reservation });
+  } catch (error) {
+    console.error('Erreur finalisation réservation:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+/**
+ * @route GET /store/stats
+ * @desc Statistiques du store
+ */
+router.get('/stats', authenticateToken, async (req, res) => {
+  try {
+    if (!['admin', 'owner'].includes(req.user.role)) {
+      return res.status(403).json({ 
+        success: false, 
+        error: 'Accessible uniquement aux admin et owner' 
+      });
+    }
+
+    const stats = await storeService.getStoreStats(req.user.gymId);
+    res.json({ success: true, stats });
+  } catch (error) {
+    console.error('Erreur récupération stats:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+module.exports = router;
