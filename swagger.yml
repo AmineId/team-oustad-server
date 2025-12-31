@@ -734,6 +734,42 @@ components:
           type: string
           format: date-time
 
+    CheckIn:
+      type: object
+      properties:
+        id:
+          type: integer
+        displayId:
+          type: string
+          example: "CHECKIN-abc123"
+        memberId:
+          type: integer
+        subscriptionId:
+          type: integer
+        gymId:
+          type: integer
+        checkInTime:
+          type: string
+          format: date-time
+        checkOutTime:
+          type: string
+          format: date-time
+          nullable: true
+        duration:
+          type: integer
+          description: Durée en minutes
+          nullable: true
+        isManual:
+          type: boolean
+        notes:
+          type: string
+        sessionsRemaining:
+          type: integer
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+
 security:
   - bearerAuth: []
 
@@ -5968,5 +6004,246 @@ paths:
                           type: integer
         '403':
           description: Accès interdit
+        '500':
+          description: Erreur serveur
+
+  # ==================== CHECK-IN API ====================
+  /check-in:
+    post:
+      summary: Enregistrer une entrée en salle
+      description: Check-in manuel par staff
+      tags:
+        - Check-In
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - memberId
+                - subscriptionId
+                - gymId
+              properties:
+                memberId:
+                  type: integer
+                subscriptionId:
+                  type: integer
+                gymId:
+                  type: integer
+                isManual:
+                  type: boolean
+                  default: true
+                notes:
+                  type: string
+      responses:
+        '201':
+          description: Check-in créé
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CheckIn'
+        '400':
+          description: Erreur (quota épuisé, déjà scanné aujourd'hui)
+        '500':
+          description: Erreur serveur
+
+  /check-in/scan:
+    post:
+      summary: Check-in via QR code
+      description: Scanner le QR code du membre (1 scan par jour)
+      tags:
+        - Check-In
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - qrCode
+                - gymId
+              properties:
+                qrCode:
+                  type: string
+                  example: "MEMBER-abc123"
+                gymId:
+                  type: integer
+      responses:
+        '201':
+          description: Check-in réussi
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CheckIn'
+        '400':
+          description: QR déjà scanné aujourd'hui ou quota épuisé
+        '500':
+          description: Erreur serveur
+
+  /check-in/member/{memberId}:
+    get:
+      summary: Historique des check-ins
+      description: Récupère l'historique des entrées d'un membre
+      tags:
+        - Check-In
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: memberId
+          required: true
+          schema:
+            type: integer
+        - in: query
+          name: startDate
+          schema:
+            type: string
+            format: date-time
+        - in: query
+          name: endDate
+          schema:
+            type: string
+            format: date-time
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            default: 50
+      responses:
+        '200':
+          description: Historique des check-ins
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  checkIns:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/CheckIn'
+        '500':
+          description: Erreur serveur
+
+  /check-in/subscription/{subscriptionId}/quota:
+    get:
+      summary: Informations de quota
+      description: Récupère les séances utilisées/restantes
+      tags:
+        - Check-In
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: subscriptionId
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Informations de quota
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  subscriptionId:
+                    type: integer
+                  displayId:
+                    type: string
+                  sessionQuota:
+                    type: integer
+                    nullable: true
+                  sessionsUsed:
+                    type: integer
+                  sessionsRemaining:
+                    type: integer
+                    nullable: true
+                  isUnlimited:
+                    type: boolean
+                  percentageUsed:
+                    type: integer
+                  canCheckIn:
+                    type: boolean
+        '404':
+          description: Abonnement non trouvé
+        '500':
+          description: Erreur serveur
+
+  /check-in/gym/{gymId}/today:
+    get:
+      summary: Membres présents aujourd'hui
+      description: Liste des membres qui ont scanné aujourd'hui
+      tags:
+        - Check-In
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: gymId
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Liste des présences
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  present:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/CheckIn'
+                  count:
+                    type: integer
+        '500':
+          description: Erreur serveur
+
+  /check-in/stats/gym/{gymId}:
+    get:
+      summary: Statistiques de fréquentation
+      description: Stats d'une salle sur une période
+      tags:
+        - Check-In
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: gymId
+          required: true
+          schema:
+            type: integer
+        - in: query
+          name: startDate
+          schema:
+            type: string
+            format: date-time
+        - in: query
+          name: endDate
+          schema:
+            type: string
+            format: date-time
+      responses:
+        '200':
+          description: Statistiques
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  totalCheckIns:
+                    type: integer
+                  uniqueMembers:
+                    type: integer
+                  avgCheckInsPerMember:
+                    type: number
+                  byDayOfWeek:
+                    type: object
         '500':
           description: Erreur serveur

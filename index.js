@@ -77,6 +77,7 @@ const subscriptionTypesRoutes = require('./routes/subscriptionTypes');
 const androidRoutes = require('./routes/android');
 const membersRoutes = require('./routes/members');
 const bannersRoutes = require('./routes/banners');
+const checkInRoutes = require('./routes/checkIn');
 
 // Use routes
 console.log('🔗 Configuration des routes API...');
@@ -89,7 +90,8 @@ app.use('/subscription-types', subscriptionTypesRoutes);
 app.use('/android', androidRoutes);
 app.use('/members', membersRoutes);
 app.use('/banners', bannersRoutes);
-console.log('✅ Routes configurées: /gyms, /users, /auth, /plannings, /subscriptions, /subscription-types, /android, /members, /banners');
+app.use('/check-in', checkInRoutes);
+console.log('✅ Routes configurées: /gyms, /users, /auth, /plannings, /subscriptions, /subscription-types, /android, /members, /banners, /check-in');
 
 // Redirection Beta Download vers Google Play Internal Testing
 app.get('/beta/download', (req, res) => {
@@ -208,6 +210,19 @@ cron.schedule('0 * * * *', async () => {
   }
 });
 console.log('✅ Job de mise à jour des bannières: toutes les heures');
+
+// Job d'auto checkout à minuit (00:01 tous les jours)
+const checkInService = require('./services/checkInService');
+cron.schedule('1 0 * * *', async () => {
+  console.log('🔄 Auto checkout des check-ins de la veille...');
+  try {
+    const count = await checkInService.autoCheckOutYesterday();
+    console.log(`✅ ${count} check-ins de la veille fermés automatiquement`);
+  } catch (error) {
+    console.error('❌ Erreur auto checkout:', error);
+  }
+});
+console.log('✅ Job d\'auto checkout: tous les jours à 00:01');
 
 app.listen(PORT, HOST, () => {
   const localUrl = `http://localhost:${PORT}`;
