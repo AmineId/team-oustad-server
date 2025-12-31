@@ -193,12 +193,40 @@ router.post('/products', authenticateToken, handleProductUpload, async (req, res
       });
     }
 
-    const { name, description, price, stock, category } = req.body;
+    const { name, description, price, stock, category, gymId } = req.body;
 
     if (!name || !price || stock === undefined) {
       return res.status(400).json({ 
         success: false, 
         error: 'name, price et stock sont requis' 
+      });
+    }
+
+    // Déterminer le gymId: depuis le body pour admin, depuis req.user pour owner
+    let finalGymId = gymId || req.user.gymId;
+    
+    // Si pas de gymId, récupérer le gym lié au user
+    if (!finalGymId) {
+      const user = await prisma.user.findUnique({
+        where: { id: req.user.sub },
+        include: { Gym: true }
+      });
+      
+      if (user?.Gym?.id) {
+        finalGymId = user.Gym.id;
+      } else {
+        return res.status(400).json({ 
+          success: false, 
+          error: 'Impossible de déterminer le gym. Veuillez fournir un gymId.' 
+        });
+      }
+    }
+    
+    // Pour les owners, imposer leur propre gym
+    if (req.user.type === 'owner' && finalGymId !== req.user.gymId) {
+      return res.status(403).json({ 
+        success: false, 
+        error: 'Un owner ne peut créer des produits que pour sa propre salle' 
       });
     }
 
@@ -216,7 +244,7 @@ router.post('/products', authenticateToken, handleProductUpload, async (req, res
       price: parseFloat(price),
       stock: parseInt(stock),
       category,
-      gymId: req.user.gymId,
+      gymId: finalGymId,
       createdBy: req.user.sub
     });
 

@@ -119,6 +119,11 @@ async function getProductById(productId) {
 async function createProduct(data) {
   const displayId = data.displayId || generateStoreProductId();
 
+  // Valider que gymId est fourni
+  if (!data.gymId) {
+    throw new Error('gymId est requis pour créer un produit');
+  }
+
   const product = await prisma.storeProduct.create({
     data: {
       displayId,
