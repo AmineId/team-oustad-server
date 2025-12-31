@@ -36,19 +36,16 @@ async function cleanupOldSubscriptions() {
     console.log('⚠️  Les nouveaux types MAD avec quotas seront créés par le script seed\n');
 
     // Pour la sécurité, on ne supprime que ceux sans abonnements actifs
-    const eurSubscriptionTypes = allSubscriptionTypes.filter(st => st._count.subscriptions === 0);
+    const typesToDelete = allSubscriptionTypes.filter(st => st._count.subscriptions === 0);
 
-    // Pour la sécurité, on ne supprime que ceux sans abonnements actifs
-    const eurSubscriptionTypes = allSubscriptionTypes.filter(st => st._count.subscriptions === 0);
-
-    if (eurSubscriptionTypes.length === 0) {
+    if (typesToDelete.length === 0) {
       console.log('✅ Aucun type d\'abonnement à supprimer (tous ont des abonnements actifs)');
       return;
     }
 
-    console.log(`\n🗑️  ${eurSubscriptionTypes.length} type(s) d'abonnement seront supprimés:\n`);
+    console.log(`\n🗑️  ${typesToDelete.length} type(s) d'abonnement seront supprimés:\n`);
     
-    for (const subType of eurSubscriptionTypes) {
+    for (const subType of typesToDelete) {
       console.log(`   - ${subType.name} (${subType.displayId})`);
       
       // Supprimer le type d'abonnement
