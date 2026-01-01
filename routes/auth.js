@@ -551,10 +551,21 @@ router.post('/scan-qr', auth, async (req, res) => {
 
     // Vérifier l'abonnement actif pour les membres
     if (member.role === 'member') {
+      // Debug: vérifier ce qui est récupéré
+      logger.info(`🔍 Debug member.Member: ${JSON.stringify(member.Member ? { userId: member.Member.userId, subscriptions: member.Member.Subscription?.length } : 'NULL')}`);
+      
+      if (!member.Member) {
+        logger.error(`❌ Membre ${getFullName(member)} n'a pas de profil Member en base`);
+        return res.status(500).json({
+          error: 'Member profile not found in database',
+          message: 'Please contact support'
+        });
+      }
+
       const activeSubscription = getActiveSubscription(member.Member);
 
       if (!activeSubscription) {
-        logger.warn(`❌ Membre ${getFullName(member)} n'a pas d'abonnement actif`);
+        logger.warn(`❌ Membre ${getFullName(member)} n'a pas d'abonnement actif - Subscriptions: ${member.Member.Subscription?.length || 0}`);
         return res.status(403).json({
           error: 'Accès refusé - Aucun abonnement actif',
           reason: 'no_active_subscription',
