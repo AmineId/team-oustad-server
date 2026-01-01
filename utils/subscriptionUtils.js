@@ -37,7 +37,10 @@ function isSubscriptionActive(subscription) {
   }
 
   // 3. Vérifier qu'il y a des paiements
-  if (!subscription.payments || subscription.payments.length === 0) {
+  // Support à la fois Payment (Prisma) et payments (minuscule)
+  const payments = subscription.Payment || subscription.payments;
+  
+  if (!payments || payments.length === 0) {
     return {
       isActive: false,
       reason: 'no_payments',
@@ -46,7 +49,7 @@ function isSubscriptionActive(subscription) {
   }
 
   // 4. Vérifier le dernier paiement
-  const lastPayment = subscription.payments[0]; // Les paiements sont triés par date décroissante
+  const lastPayment = payments[0]; // Les paiements sont triés par date décroissante
 
   if (lastPayment.status !== 'completed') {
     return {
@@ -99,12 +102,19 @@ function isSubscriptionActive(subscription) {
  * @returns {Object|null} - L'abonnement actif ou null si aucun abonnement actif
  */
 function getActiveSubscription(member) {
-  if (!member || !member.subscriptions) {
+  if (!member) {
+    return null;
+  }
+
+  // Support à la fois Subscription (Prisma) et subscriptions (minuscule)
+  const subscriptions = member.Subscription || member.subscriptions;
+  
+  if (!subscriptions || subscriptions.length === 0) {
     return null;
   }
 
   // Chercher tous les abonnements actifs
-  const activeSubscriptions = member.subscriptions.filter(sub => sub.status === 'active');
+  const activeSubscriptions = subscriptions.filter(sub => sub.status === 'active');
 
   if (activeSubscriptions.length === 0) {
     return null;
@@ -130,11 +140,18 @@ function getActiveSubscription(member) {
  * @returns {Array} - Liste des abonnements avec leur statut
  */
 function getSubscriptionsWithStatus(member) {
-  if (!member || !member.subscriptions) {
+  if (!member) {
     return [];
   }
 
-  return member.subscriptions.map(subscription => ({
+  // Support à la fois Subscription (Prisma) et subscriptions (minuscule)
+  const subscriptions = member.Subscription || member.subscriptions;
+  
+  if (!subscriptions || subscriptions.length === 0) {
+    return [];
+  }
+
+  return subscriptions.map(subscription => ({
     ...subscription,
     activeCheck: isSubscriptionActive(subscription)
   }));
