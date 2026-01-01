@@ -11,6 +11,23 @@ const {
   generateSubscriptionTypeId
 } = require('../utils/idGenerator');
 
+/**
+ * SEED DATABASE - Données de test cohérentes
+ * 
+ * ⚠️ RÈGLES DE COHÉRENCE :
+ * - Tout abonnement ACTIF doit avoir AU MOINS 1 paiement COMPLETED
+ * - Les abonnements PENDING peuvent avoir des paiements PENDING
+ * - Les abonnements EXPIRED/CANCELLED peuvent avoir divers statuts de paiement
+ * - Les dates doivent être cohérentes (startDate < endDate, paiement ≤ startDate)
+ * 
+ * 📊 STATUTS D'ABONNEMENTS :
+ * - active: Abonnement en cours avec paiement completed
+ * - pending: En attente du premier paiement
+ * - paused: Suspendu (problème paiement, congés, etc.)
+ * - expired: Date de fin dépassée ou quota épuisé
+ * - cancelled: Annulé par le membre ou l'admin
+ */
+
 async function main() {
   console.log('🌱 Début du seed de la base de données...\n');
 
@@ -826,20 +843,20 @@ async function main() {
     monthNumber: 1
   });
 
-  // Emma - 36 Séances PAUSÉ: paiement unique avec problème
+  // Emma - 36 Séances PAUSÉ: paiement initial completed, puis problème
   paymentsData.push({
     displayId: generatePaymentId(),
     memberId: emmaMember.userId,
     subscriptionId: emmaSubscription.id,
     amount: type36Seances.monthlyPrice,
     currency: 'MAD',
-    status: 'overdue',
+    status: 'completed', // Premier paiement complété avant la pause
     type: 'subscription',
-    paymentMethod: null,
-    transactionId: null,
-    description: `Paiement - 36 Séances (pausé - problème paiement)`,
+    paymentMethod: 'card',
+    transactionId: 'txn_emma_1',
+    description: `Paiement - 36 Séances (initial avant pause)`,
     dueDate: emmaStartDate,
-    paidAt: null,
+    paidAt: emmaStartDate,
     monthNumber: 1
   });
 
