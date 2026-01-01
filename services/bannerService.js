@@ -29,9 +29,10 @@ class BannerService {
       ];
     }
     
-    // Filtrage par statut actif
+    // Filtrage par statut actif (toujours filtrer isActive, dates seulement si activeOnly)
+    where.isActive = true;
+    
     if (activeOnly) {
-      where.isActive = true;
       where.startDate = { lte: now };
       where.endDate = { gte: now };
     }

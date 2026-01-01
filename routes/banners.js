@@ -12,7 +12,7 @@ const bannerService = require('../services/bannerService');
  */
 router.get('/', async (req, res) => {
   try {
-    const { type, gymId, subscriptionTypeId, activeOnly = 'true', locale = 'fr' } = req.query;
+    const { type, gymId, subscriptionTypeId, activeOnly = 'false', locale = 'fr' } = req.query;
     
     const filters = {
       type,
