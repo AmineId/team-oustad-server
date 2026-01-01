@@ -274,7 +274,8 @@ router.post('/login', authLimiter, async (req, res) => {
       sub: user.id,
       email: user.email,
       phoneNumber: user.phoneNumber,
-      type: user.role
+      type: user.role,
+      gymId: user.gymId // Ajouter gymId dans le token
     }, JWT_SECRET, { expiresIn: '30d' });
 
     logger.debug(`🎫 Token JWT généré pour: ${user.email}`);
@@ -467,14 +468,26 @@ router.post('/login', authLimiter, async (req, res) => {
  */
 // Protected: scan QR code for access
 router.post('/scan-qr', auth, async (req, res) => {
-  const { qrCode } = req.body;
-  logger.info(`📱 Scan QR - User ID: ${req.user?.sub}, Email: ${req.user?.email}, QR Code: ${qrCode}`);
+  // Support à la fois qrCode et qrData pour rétrocompatibilité
+  const qrCode = req.body.qrCode || req.body.qrData;
+  logger.info(`📱 Scan QR - User ID: ${req.user?.sub}, Email: ${req.user?.email}, GymID: ${req.user?.gymId}, QR Code: ${qrCode}`);
 
   try {
+    if (!qrCode) {
+      logger.warn(`❌ QR code manquant dans la requête`);
+      return res.status(400).json({ error: 'QR code is required', field: 'qrCode or qrData' });
+    }
+
     // Vérifier que l'utilisateur est un admin
     if (req.user.type !== 'admin') {
       logger.warn(`❌ Accès refusé: utilisateur ${req.user.email} n'est pas admin (type: ${req.user.type})`);
       return res.status(403).json({ error: 'Only admins can scan QR codes' });
+    }
+
+    // Vérifier que l'admin a un gymId
+    if (!req.user.gymId) {
+      logger.error(`❌ Admin ${req.user.email} n'a pas de gymId configuré`);
+      return res.status(403).json({ error: 'Admin account not properly configured - missing gymId' });
     }
 
     // Trouver l'utilisateur par son displayId
@@ -546,6 +559,45 @@ router.post('/scan-qr', auth, async (req, res) => {
       }
     });
 
+    // Récupérer le quota complet de l'abonnement actif
+    const activeSubscription = getActiveSubscription(member.Member);
+    let quota = null;
+    
+    if (activeSubscription) {
+      const checkInService = require('../services/checkInService');
+      try {
+        quota = await checkInService.getSubscriptionQuota(activeSubscription.id);
+      } catch (error) {
+        logger.error(`❌ Erreur lors de la récupération du quota:`, error);
+      }
+    }
+
+    // Récupérer le dernier check-in du membre
+    const lastCheckIn = await prisma.gymCheckIn.findFirst({
+      where: { memberId: member.userId },
+      orderBy: { checkInTime: 'desc' },
+      include: { 
+        Gym: {
+          select: {
+            id: true,
+            name: true
+          }
+        }
+      }
+    });
+
+    // Générer un message contextuel
+    let message = 'Accès autorisé';
+    if (quota) {
+      if (quota.isUnlimited) {
+        message = 'Accès autorisé - Séances illimitées';
+      } else if (quota.canCheckIn) {
+        message = `Accès autorisé - ${quota.sessionsRemaining} séance(s) restante(s)`;
+      } else {
+        message = 'Quota épuisé - Renouvellement nécessaire';
+      }
+    }
+
     const responseData = {
       success: true,
       member: {
@@ -553,12 +605,25 @@ router.post('/scan-qr', auth, async (req, res) => {
         fullName: getFullName(member),
         email: member.email,
         displayId: member.displayId,
-        subscription: member.role === 'member' ? getActiveSubscription(member.Member) : null
+        profileImageUrl: member.profileImage || null,
+        subscription: activeSubscription
       },
-      message: 'Access granted'
+      quota: quota ? {
+        sessionQuota: quota.sessionQuota,
+        sessionsUsed: quota.sessionsUsed,
+        sessionsRemaining: quota.sessionsRemaining,
+        isUnlimited: quota.isUnlimited,
+        percentageUsed: quota.percentageUsed,
+        canCheckIn: quota.canCheckIn
+      } : null,
+      lastCheckIn: lastCheckIn ? {
+        checkInTime: lastCheckIn.checkInTime,
+        gymName: lastCheckIn.Gym?.name || 'N/A'
+      } : null,
+      message
     };
 
-    logger.info(`📤 Réponse scan-qr: succès`);
+    logger.info(`📤 Réponse scan-qr: succès - ${message}`);
     res.json(responseData);
 
   } catch (e) {

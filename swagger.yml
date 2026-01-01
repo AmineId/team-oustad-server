@@ -1475,17 +1475,71 @@ paths:
               schema:
                 type: object
                 properties:
-                  valid:
+                  success:
                     type: boolean
                     example: true
                   message:
                     type: string
-                    example: "Accès autorisé"
-                  user:
-                    $ref: '#/components/schemas/User'
-                  accessGranted:
-                    type: boolean
-                    example: true
+                    example: "Accès autorisé - 7 séance(s) restante(s)"
+                  member:
+                    type: object
+                    properties:
+                      id:
+                        type: integer
+                        example: 1
+                      fullName:
+                        type: string
+                        example: "John Doe"
+                      email:
+                        type: string
+                        example: "john@example.com"
+                      displayId:
+                        type: string
+                        example: "MEMBER-a8f3d9e2b1c4f567"
+                      profileImageUrl:
+                        type: string
+                        nullable: true
+                        example: "https://example.com/profile.jpg"
+                      subscription:
+                        type: object
+                        description: "Active subscription details"
+                  quota:
+                    type: object
+                    nullable: true
+                    properties:
+                      sessionQuota:
+                        type: integer
+                        nullable: true
+                        example: 12
+                        description: "Total sessions in subscription (null if unlimited)"
+                      sessionsUsed:
+                        type: integer
+                        example: 5
+                      sessionsRemaining:
+                        type: integer
+                        nullable: true
+                        example: 7
+                        description: "Remaining sessions (null if unlimited)"
+                      isUnlimited:
+                        type: boolean
+                        example: false
+                      percentageUsed:
+                        type: integer
+                        example: 42
+                      canCheckIn:
+                        type: boolean
+                        example: true
+                  lastCheckIn:
+                    type: object
+                    nullable: true
+                    properties:
+                      checkInTime:
+                        type: string
+                        format: date-time
+                        example: "2025-12-31T10:30:00.000Z"
+                      gymName:
+                        type: string
+                        example: "Team Fitness Downtown"
         '400':
           description: Invalid QR code or access denied
           content:
@@ -6177,7 +6231,64 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/CheckIn'
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: "Check-in effectué - 6 séance(s) restante(s)"
+                  checkIn:
+                    $ref: '#/components/schemas/CheckIn'
+                  member:
+                    type: object
+                    properties:
+                      id:
+                        type: integer
+                        example: 1
+                      displayId:
+                        type: string
+                        example: "MEMBER-abc123"
+                      firstName:
+                        type: string
+                        example: "John"
+                      lastName:
+                        type: string
+                        example: "Doe"
+                      fullName:
+                        type: string
+                        example: "John Doe"
+                      profileImageUrl:
+                        type: string
+                        nullable: true
+                        example: "https://example.com/profile.jpg"
+                  quota:
+                    type: object
+                    properties:
+                      sessionQuota:
+                        type: integer
+                        nullable: true
+                        example: 12
+                        description: "Total sessions (null if unlimited)"
+                      sessionsUsed:
+                        type: integer
+                        example: 6
+                        description: "Sessions used after this check-in"
+                      sessionsRemaining:
+                        type: integer
+                        nullable: true
+                        example: 6
+                        description: "Remaining sessions (null if unlimited)"
+                      isUnlimited:
+                        type: boolean
+                        example: false
+                      percentageUsed:
+                        type: integer
+                        example: 50
+                      canCheckIn:
+                        type: boolean
+                        example: true
         '400':
           description: QR déjà scanné aujourd'hui ou quota épuisé
         '500':
