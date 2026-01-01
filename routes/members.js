@@ -20,11 +20,15 @@ function notFound(res, entity, id) {
 const canAccessMemberProfile = async (req, res, next) => {
   try {
     const memberId = Number(req.params.id);
+    logger.info(`🔐 Vérification accès membre - MemberID: ${memberId}, RequesterID: ${req.user?.sub}, RequesterRole: ${req.user?.type}`);
     
     const requester = await prisma.user.findUnique({ where: { id: req.user.sub } });
     if (!requester) {
+      logger.warn(`❌ Requester non trouvé - ID: ${req.user.sub}`);
       return res.status(403).json({ error: 'Forbidden' });
     }
+
+    logger.info(`👤 Requester: ${getFullName(requester)} (${requester.role}, GymID: ${requester.gymId})`);
 
     const memberUser = await prisma.user.findUnique({
       where: { id: memberId },
@@ -32,30 +36,37 @@ const canAccessMemberProfile = async (req, res, next) => {
     });
 
     if (!memberUser || !memberUser.Member) {
+      logger.warn(`❌ Membre non trouvé - ID: ${memberId}`);
       return notFound(res, 'Member', memberId);
     }
 
+    logger.info(`👤 Membre cible: ${getFullName(memberUser)} (GymID: ${memberUser.gymId})`);
+
     // Owner peut tout modifier
     if (requester.role === 'owner') {
+      logger.info(`✅ Accès autorisé: Owner`);
       req.targetMember = memberUser;
       return next();
     }
 
     // Admin peut modifier les membres de sa salle
     if (requester.role === 'admin' && memberUser.gymId === requester.gymId) {
+      logger.info(`✅ Accès autorisé: Admin de la même salle`);
       req.targetMember = memberUser;
       return next();
     }
 
     // Member peut modifier son propre profil
     if (requester.role === 'member' && memberId === req.user.sub) {
+      logger.info(`✅ Accès autorisé: Membre accède à son propre profil`);
       req.targetMember = memberUser;
       return next();
     }
 
+    logger.warn(`❌ Accès refusé: Requester ${requester.role} ne peut pas accéder au membre ${memberId}`);
     return res.status(403).json({ error: 'Vous n\'avez pas les permissions pour accéder à ce profil' });
   } catch (error) {
-    logger.error('Erreur middleware canAccessMemberProfile:', error);
+    logger.error('❌ Erreur middleware canAccessMemberProfile:', error);
     return res.status(500).json({ error: error.message });
   }
 };

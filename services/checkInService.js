@@ -126,6 +126,9 @@ class CheckInService {
    * Check-in via QR code
    */
   async checkInByQR(qrCode, gymId) {
+    console.log(`\n📱 Check-in via QR - GymID: ${gymId}`);
+    console.log(`📥 QR Code reçu (type: ${typeof qrCode}):`, typeof qrCode === 'string' ? qrCode.substring(0, 100) : qrCode);
+    
     // Parser le QR code si c'est un JSON string ou un objet
     let qrData;
     let displayId;
@@ -134,17 +137,22 @@ class CheckInService {
       try {
         qrData = JSON.parse(qrCode);
         displayId = qrData.displayId || qrCode; // Utiliser displayId du JSON ou le string brut
+        console.log(`✅ QR parsé en JSON - DisplayID extrait: ${displayId}`);
       } catch (e) {
         displayId = qrCode; // Si ce n'est pas du JSON, utiliser tel quel
+        console.log(`ℹ️  QR n'est pas du JSON - Utilisation directe: ${displayId}`);
       }
     } else if (typeof qrCode === 'object') {
       qrData = qrCode;
       displayId = qrData.displayId;
+      console.log(`✅ QR est un objet - DisplayID: ${displayId}`);
     } else {
       displayId = String(qrCode);
+      console.log(`⚠️  QR type inattendu - Conversion en string: ${displayId}`);
     }
 
     // Trouver l'utilisateur via son displayId
+    console.log(`🔍 Recherche utilisateur avec displayId: ${displayId}`);
     const user = await prisma.user.findFirst({
       where: {
         displayId: displayId // Utiliser displayId au lieu de uniqueCode
@@ -170,16 +178,27 @@ class CheckInService {
     });
 
     if (!user || !user.Member) {
+      console.error(`❌ Membre non trouvé - DisplayID: ${displayId}`);
+      console.log(`🔍 Debug: user=${!!user}, user.Member=${user?.Member ? 'exists' : 'null'}`);
       throw new Error('Member not found');
     }
+
+    console.log(`✅ Utilisateur trouvé: ${user.firstName} ${user.lastName} (ID: ${user.id})`);
+    console.log(`📊 Profil Member: userId=${user.Member.userId}`);
+    console.log(`📦 Abonnements actifs: ${user.Member.Subscription?.length || 0}`);
 
     const activeSubscription = user.Member.Subscription[0];
 
     if (!activeSubscription) {
+      console.error(`❌ Aucun abonnement actif trouvé pour ${user.firstName} ${user.lastName}`);
       throw new Error('No active subscription found');
     }
 
+    console.log(`✅ Abonnement actif trouvé: ${activeSubscription.SubscriptionType.name} (ID: ${activeSubscription.id})`);
+    console.log(`📊 Quota: ${activeSubscription.sessionsUsed}/${activeSubscription.SubscriptionType.sessionQuota || '∞'}`);
+
     // Effectuer le check-in
+    console.log(`🔄 Création du check-in...`);
     const checkInResult = await this.createCheckIn({
       memberId: user.id,
       subscriptionId: activeSubscription.id,
@@ -189,8 +208,13 @@ class CheckInService {
       notes: 'Check-in via QR code'
     });
 
+    console.log(`✅ Check-in créé: ${checkInResult.displayId}`);
+
     // Récupérer le quota mis à jour après le check-in
+    console.log(`🔄 Récupération du quota mis à jour...`);
     const updatedQuota = await this.getSubscriptionQuota(activeSubscription.id);
+
+    console.log(`📊 Quota après check-in: ${updatedQuota.sessionsUsed}/${updatedQuota.sessionQuota || '∞'} (${updatedQuota.sessionsRemaining || '∞'} restantes)`);
 
     // Générer un message contextuel
     let message = 'Check-in effectué avec succès';
@@ -199,6 +223,8 @@ class CheckInService {
     } else {
       message = `Check-in effectué - ${updatedQuota.sessionsRemaining} séance(s) restante(s)`;
     }
+
+    console.log(`✅ ${message}\n`);
 
     return {
       success: true,
