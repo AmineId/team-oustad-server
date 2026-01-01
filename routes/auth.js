@@ -632,6 +632,8 @@ router.post('/scan-qr', auth, async (req, res) => {
       success: true,
       member: {
         id: member.userId,
+        firstName: member.firstName,
+        lastName: member.lastName,
         fullName: getFullName(member),
         email: member.email,
         displayId: member.displayId,
