@@ -432,6 +432,7 @@ async function getSubscriptionStatus(subscriptionId) {
   const subscription = await prisma.subscription.findUnique({
     where: { id: subscriptionId },
     include: {
+      SubscriptionType: true,
       Payment: {
         orderBy: { monthNumber: 'asc' }
       },
