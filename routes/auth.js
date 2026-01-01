@@ -552,7 +552,13 @@ router.post('/scan-qr', auth, async (req, res) => {
     // Vérifier l'abonnement actif pour les membres
     if (member.role === 'member') {
       // Debug: vérifier ce qui est récupéré
-      logger.info(`🔍 Debug member.Member: ${JSON.stringify(member.Member ? { userId: member.Member.userId, subscriptions: member.Member.Subscription?.length } : 'NULL')}`);
+      logger.info(`🔍 Debug member.Member: ${JSON.stringify({
+        userId: member.Member?.userId,
+        hasSubscription: !!member.Member?.Subscription,
+        hasSubscriptions: !!member.Member?.subscriptions,
+        SubscriptionLength: member.Member?.Subscription?.length,
+        subscriptionsLength: member.Member?.subscriptions?.length
+      })}`);
       
       if (!member.Member) {
         logger.error(`❌ Membre ${getFullName(member)} n'a pas de profil Member en base`);
