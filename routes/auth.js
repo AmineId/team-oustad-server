@@ -588,15 +588,6 @@ router.post('/scan-qr', auth, async (req, res) => {
 
     logger.info(`✅ Accès autorisé pour ${getFullName(member)}`);
 
-    // Enregistrer l'accès
-    await prisma.accessLog.create({
-      data: {
-        memberId: member.Member.userId,
-        adminId: req.user.sub,
-        gymId: req.user.gymId,
-        accessType: 'qr_scan'
-      }
-    });
 
     // Récupérer le quota complet de l'abonnement actif
     const activeSubscription = getActiveSubscription(member.Member);
