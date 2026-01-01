@@ -14,7 +14,7 @@ async function getProducts(filters = {}) {
   
   // Filtrer seulement les produits avec stock disponible
   if (filters.hasStock) {
-    where.stock = { gt: 0 };
+    where.availableStock = { gt: 0 };
   }
 
   const products = await prisma.storeProduct.findMany({
