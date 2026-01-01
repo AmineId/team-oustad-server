@@ -5,37 +5,124 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Politique de Confidentialité - Team Fitness</title>
     <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
         body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
             line-height: 1.6;
-            max-width: 800px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 40px 20px;
+        }
+
+        .container {
+            max-width: 900px;
             margin: 0 auto;
-            padding: 20px;
-            color: #333;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+            padding: 50px;
         }
+
         h1 {
-            color: #2c3e50;
-            border-bottom: 3px solid #3498db;
-            padding-bottom: 10px;
+            color: #333;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            border-bottom: 3px solid #667eea;
+            padding-bottom: 15px;
+            margin-bottom: 10px;
+            font-size: 36px;
         }
+
         h2 {
-            color: #34495e;
-            margin-top: 30px;
+            color: #667eea;
+            margin-top: 35px;
+            margin-bottom: 15px;
+            font-size: 24px;
         }
+
+        h3 {
+            color: #764ba2;
+            margin-top: 20px;
+            margin-bottom: 10px;
+            font-size: 18px;
+        }
+
+        p {
+            color: #555;
+            margin-bottom: 15px;
+        }
+
+        ul {
+            margin-left: 20px;
+            margin-bottom: 15px;
+        }
+
+        li {
+            color: #555;
+            margin-bottom: 8px;
+        }
+
         .last-updated {
-            color: #7f8c8d;
+            color: #999;
             font-style: italic;
             margin-bottom: 30px;
+            font-size: 14px;
         }
+
         .contact {
-            background: #ecf0f1;
-            padding: 15px;
-            border-radius: 5px;
+            background: linear-gradient(135deg, rgba(102, 126, 234, 0.1) 0%, rgba(118, 75, 162, 0.1) 100%);
+            padding: 25px;
+            border-radius: 10px;
             margin-top: 30px;
+            border-left: 4px solid #667eea;
+        }
+
+        .contact p {
+            margin-bottom: 10px;
+        }
+
+        strong {
+            color: #667eea;
+            font-weight: 600;
+        }
+
+        hr {
+            margin-top: 50px;
+            border: none;
+            border-top: 2px solid #e1e8ed;
+        }
+
+        .footer {
+            text-align: center;
+            color: #999;
+            font-size: 14px;
+            margin-top: 20px;
+        }
+
+        @media (max-width: 768px) {
+            .container {
+                padding: 30px 20px;
+            }
+
+            h1 {
+                font-size: 28px;
+            }
+
+            h2 {
+                font-size: 20px;
+            }
         }
     </style>
 </head>
 <body>
+    <div class="container">
     <h1>Politique de Confidentialité</h1>
     <p class="last-updated">Dernière mise à jour : 1er janvier 2026</p>
 
@@ -174,8 +261,9 @@
     </div>
 
     <hr style="margin-top: 50px; border: none; border-top: 1px solid #ddd;">
-    <p style="text-align: center; color: #7f8c8d; font-size: 0.9em;">
+    <p class="footer">
         © 2026 Team Fitness. Tous droits réservés.
     </p>
+    </div>
 </body>
 </html>
