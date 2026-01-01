@@ -153,6 +153,11 @@ router.post('/:id/track/click', async (req, res) => {
 router.post('/', authenticateToken, requireAdminOrOwner, async (req, res) => {
   try {
     const bannerData = req.body;
+    
+    // Assigner automatiquement le gymId de l'admin/owner si non fourni
+    if (!bannerData.gymId && req.user.gymId) {
+      bannerData.gymId = req.user.gymId;
+    }
 
     const banner = await bannerService.createBanner(bannerData);
     
