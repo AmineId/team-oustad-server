@@ -161,7 +161,8 @@ class CheckInService {
       throw new Error('No active subscription found');
     }
 
-    return this.createCheckIn({
+    // Effectuer le check-in
+    const checkInResult = await this.createCheckIn({
       memberId: user.id,
       subscriptionId: activeSubscription.id,
       gymId,
@@ -169,6 +170,39 @@ class CheckInService {
       createdBy: null,
       notes: 'Check-in via QR code'
     });
+
+    // Récupérer le quota mis à jour après le check-in
+    const updatedQuota = await this.getSubscriptionQuota(activeSubscription.id);
+
+    // Générer un message contextuel
+    let message = 'Check-in effectué avec succès';
+    if (updatedQuota.isUnlimited) {
+      message = 'Check-in effectué - Séances illimitées';
+    } else {
+      message = `Check-in effectué - ${updatedQuota.sessionsRemaining} séance(s) restante(s)`;
+    }
+
+    return {
+      success: true,
+      message,
+      checkIn: checkInResult,
+      member: {
+        id: user.id,
+        displayId: user.displayId,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        fullName: `${user.firstName} ${user.lastName}`,
+        profileImageUrl: user.profileImage || null
+      },
+      quota: {
+        sessionQuota: updatedQuota.sessionQuota,
+        sessionsUsed: updatedQuota.sessionsUsed,
+        sessionsRemaining: updatedQuota.sessionsRemaining,
+        isUnlimited: updatedQuota.isUnlimited,
+        percentageUsed: updatedQuota.percentageUsed,
+        canCheckIn: updatedQuota.canCheckIn
+      }
+    };
   }
 
   /**
