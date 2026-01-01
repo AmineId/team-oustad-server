@@ -293,214 +293,198 @@ async function main() {
   });
   console.log(`✅ Member: ${emmaUser.firstName} ${emmaUser.lastName}\n`);
 
-  // Créer les types d'abonnements
-  console.log('🏷️  Création des types d\'abonnements...');
+  // Créer les types d'abonnements avec quotas de séances
+  console.log('🏷️  Création des types d\'abonnements avec quotas...');
   
-  const basicType = await prisma.subscriptionType.create({
+  const type12Seances = await prisma.subscriptionType.create({
     data: {
       displayId: generateSubscriptionTypeId(),
-      name: 'Basic',
-      description: 'Accès essentiel à la salle de sport',
-      monthlyPrice: 29.99,
-      features: ['Accès salle 7j/7', 'Vestiaires', 'Casiers'],
+      name: '12 Séances',
+      description: 'Abonnement de 12 séances valable 1 mois',
+      monthlyPrice: 150,
+      sessionQuota: 12,
+      sessionType: 'limited',
+      durationMonths: 1,
+      features: [
+        '12 séances de fitness',
+        'Accès à tous les équipements',
+        'Valable 1 mois',
+        'Suivi de progression'
+      ],
       isActive: true
     }
   });
-  console.log(`✅ Type créé: ${basicType.name} - ${basicType.monthlyPrice}€/mois`);
+  console.log(`✅ Type créé: ${type12Seances.name} - ${type12Seances.monthlyPrice} MAD (${type12Seances.sessionQuota} séances)`);
 
-  const standardType = await prisma.subscriptionType.create({
+  const type18Seances = await prisma.subscriptionType.create({
     data: {
       displayId: generateSubscriptionTypeId(),
-      name: 'Standard',
-      description: 'Formule équilibrée avec cours collectifs',
-      monthlyPrice: 49.99,
-      features: ['Tout Basic +', 'Cours collectifs illimités', 'Douches', 'Accès Wi-Fi'],
+      name: '18 Séances',
+      description: 'Abonnement de 18 séances valable 1 mois',
+      monthlyPrice: 200,
+      sessionQuota: 18,
+      sessionType: 'limited',
+      durationMonths: 1,
+      features: [
+        '18 séances de fitness',
+        'Accès à tous les équipements',
+        'Valable 1 mois',
+        'Suivi de progression',
+        '1 séance de coaching offerte'
+      ],
       isActive: true
     }
   });
-  console.log(`✅ Type créé: ${standardType.name} - ${standardType.monthlyPrice}€/mois`);
+  console.log(`✅ Type créé: ${type18Seances.name} - ${type18Seances.monthlyPrice} MAD (${type18Seances.sessionQuota} séances)`);
 
-  const premiumType = await prisma.subscriptionType.create({
+  const type36Seances = await prisma.subscriptionType.create({
     data: {
       displayId: generateSubscriptionTypeId(),
-      name: 'Premium',
-      description: 'Formule complète avec coaching personnel',
-      monthlyPrice: 79.99,
-      features: ['Tout Standard +', '2 séances coach/mois', 'Planning personnalisé', 'Bilan nutritionnel', 'Accès prioritaire'],
+      name: '36 Séances',
+      description: 'Abonnement de 36 séances valable 2 mois',
+      monthlyPrice: 350,
+      sessionQuota: 36,
+      sessionType: 'limited',
+      durationMonths: 2,
+      features: [
+        '36 séances de fitness',
+        'Accès à tous les équipements',
+        'Valable 2 mois',
+        'Suivi de progression personnalisé',
+        '2 séances de coaching offertes',
+        'Programme d\'entraînement personnalisé'
+      ],
       isActive: true
     }
   });
-  console.log(`✅ Type créé: ${premiumType.name} - ${premiumType.monthlyPrice}€/mois`);
+  console.log(`✅ Type créé: ${type36Seances.name} - ${type36Seances.monthlyPrice} MAD (${type36Seances.sessionQuota} séances)`);
 
-  const vipType = await prisma.subscriptionType.create({
+  const typeAnnuelIllimite = await prisma.subscriptionType.create({
     data: {
       displayId: generateSubscriptionTypeId(),
-      name: 'VIP',
-      description: 'Formule exclusive tout compris',
-      monthlyPrice: 129.99,
-      features: ['Tout Premium +', 'Accès 24/7', 'Coach dédié', 'Spa & Sauna', 'Massage mensuel', 'Salle privée', 'Parking réservé'],
+      name: 'Annuel Illimité',
+      description: 'Abonnement annuel avec accès illimité',
+      monthlyPrice: 1500,
+      sessionQuota: null, // null = illimité
+      sessionType: 'unlimited',
+      durationMonths: 12,
+      features: [
+        'Accès illimité 7j/7',
+        'Tous les équipements',
+        'Valable 1 an',
+        'Coaching personnalisé mensuel',
+        'Suivi nutritionnel',
+        'Programme d\'entraînement sur mesure',
+        'Accès aux cours collectifs',
+        'Priorité sur les réservations'
+      ],
       isActive: true
     }
   });
-  console.log(`✅ Type créé: ${vipType.name} - ${vipType.monthlyPrice}€/mois`);
-
-  const studentType = await prisma.subscriptionType.create({
-    data: {
-      displayId: generateSubscriptionTypeId(),
-      name: 'Étudiant',
-      description: 'Tarif préférentiel pour étudiants (-25 ans)',
-      monthlyPrice: 24.99,
-      features: ['Accès salle en journée', 'Vestiaires', 'Cours collectifs limités', 'Justificatif requis'],
-      isActive: true
-    }
-  });
-  console.log(`✅ Type créé: ${studentType.name} - ${studentType.monthlyPrice}€/mois`);
-
-  const seniorType = await prisma.subscriptionType.create({
-    data: {
-      displayId: generateSubscriptionTypeId(),
-      name: 'Senior',
-      description: 'Formule adaptée aux seniors (+60 ans)',
-      monthlyPrice: 34.99,
-      features: ['Accès salle adapté', 'Cours seniors', 'Suivi médical', 'Vestiaires adaptés'],
-      isActive: true
-    }
-  });
-  console.log(`✅ Type créé: ${seniorType.name} - ${seniorType.monthlyPrice}€/mois`);
-
-  const corporateType = await prisma.subscriptionType.create({
-    data: {
-      displayId: generateSubscriptionTypeId(),
-      name: 'Corporate',
-      description: 'Abonnement entreprise pour groupes',
-      monthlyPrice: 89.99,
-      features: ['Accès 24/7', 'Cours collectifs', 'Coaching', 'Facturation entreprise', 'Tarif dégressif dès 10 personnes'],
-      isActive: true
-    }
-  });
-  console.log(`✅ Type créé: ${corporateType.name} - ${corporateType.monthlyPrice}€/mois`);
-
-  const trialType = await prisma.subscriptionType.create({
-    data: {
-      displayId: generateSubscriptionTypeId(),
-      name: 'Découverte',
-      description: 'Offre d\'essai 1 mois',
-      monthlyPrice: 19.99,
-      features: ['Accès salle 1 mois', '1 séance découverte', 'Sans engagement'],
-      isActive: true
-    }
-  });
-  console.log(`✅ Type créé: ${trialType.name} - ${trialType.monthlyPrice}€/mois`);
-
-  const inactiveType = await prisma.subscriptionType.create({
-    data: {
-      displayId: generateSubscriptionTypeId(),
-      name: 'Bronze (Ancien)',
-      description: 'Ancien type d\'abonnement - plus disponible',
-      monthlyPrice: 39.99,
-      features: ['Type désactivé'],
-      isActive: false
-    }
-  });
-  console.log(`✅ Type créé (inactif): ${inactiveType.name}\n`);
+  console.log(`✅ Type créé: ${typeAnnuelIllimite.name} - ${typeAnnuelIllimite.monthlyPrice} MAD (illimité)\n`);
 
   // Créer des abonnements pour les membres avec les types
   console.log('💳 Création des abonnements...');
   
-  // Bob - Premium actif avec 12 paiements (système annuel)
+  // Bob - 36 Séances actif (a déjà utilisé 10 séances)
   const bobStartDate = new Date();
-  bobStartDate.setMonth(bobStartDate.getMonth() - 2); // Commencé il y a 2 mois
+  bobStartDate.setMonth(bobStartDate.getMonth() - 1); // Commencé il y a 1 mois
   const bobEndDate = new Date(bobStartDate);
-  bobEndDate.setFullYear(bobEndDate.getFullYear() + 1);
+  bobEndDate.setMonth(bobEndDate.getMonth() + 2); // Valable 2 mois
   
   const bobSubscription = await prisma.subscription.create({
     data: {
       displayId: generateSubscriptionId(),
       memberId: bobMember.userId,
-      subscriptionTypeId: premiumType.id,
+      subscriptionTypeId: type36Seances.id,
       status: 'active',
       startDate: bobStartDate,
       endDate: bobEndDate,
       autoRenew: true,
+      sessionsUsed: 10, // 10 séances utilisées sur 36
     },
   });
-  console.log(`✅ Abonnement ${premiumType.name} pour ${bobUser.firstName} ${bobUser.lastName}`);
+  console.log(`✅ Abonnement ${type36Seances.name} pour ${bobUser.firstName} ${bobUser.lastName} (10/${type36Seances.sessionQuota} séances utilisées)`);
 
-  // Charlie - Basic actif récent
+  // Charlie - 12 Séances actif récent (3 séances utilisées)
   const charlieStartDate = new Date();
   charlieStartDate.setDate(charlieStartDate.getDate() - 10); // Commencé il y a 10 jours
   const charlieEndDate = new Date(charlieStartDate);
-  charlieEndDate.setFullYear(charlieEndDate.getFullYear() + 1);
+  charlieEndDate.setMonth(charlieEndDate.getMonth() + 1); // Valable 1 mois
   
   const charlieSubscription = await prisma.subscription.create({
     data: {
       displayId: generateSubscriptionId(),
       memberId: charlieMember.userId,
-      subscriptionTypeId: basicType.id,
+      subscriptionTypeId: type12Seances.id,
       status: 'active',
       startDate: charlieStartDate,
       endDate: charlieEndDate,
       autoRenew: true,
+      sessionsUsed: 3, // 3 séances utilisées sur 12
     },
   });
-  console.log(`✅ Abonnement ${basicType.name} pour ${charlieUser.firstName} ${charlieUser.lastName}`);
+  console.log(`✅ Abonnement ${type12Seances.name} pour ${charlieUser.firstName} ${charlieUser.lastName} (3/${type12Seances.sessionQuota} séances utilisées)`);
 
-  // Alice - VIP actif de longue date
+  // Alice - Annuel Illimité actif de longue date
   const aliceStartDate = new Date();
   aliceStartDate.setMonth(aliceStartDate.getMonth() - 6); // Commencé il y a 6 mois
   const aliceEndDate = new Date(aliceStartDate);
-  aliceEndDate.setFullYear(aliceEndDate.getFullYear() + 1);
+  aliceEndDate.setFullYear(aliceEndDate.getFullYear() + 1); // Valable 1 an
   
   const aliceSubscription = await prisma.subscription.create({
     data: {
       displayId: generateSubscriptionId(),
       memberId: aliceMember.userId,
-      subscriptionTypeId: vipType.id,
+      subscriptionTypeId: typeAnnuelIllimite.id,
       status: 'active',
       startDate: aliceStartDate,
       endDate: aliceEndDate,
       autoRenew: true,
+      sessionsUsed: 45, // 45 séances (illimité donc pas de limite)
     },
   });
-  console.log(`✅ Abonnement ${vipType.name} pour ${aliceUser.firstName} ${aliceUser.lastName}`);
+  console.log(`✅ Abonnement ${typeAnnuelIllimite.name} pour ${aliceUser.firstName} ${aliceUser.lastName} (illimité)`);
 
-  // David - Standard actif
+  // David - 18 Séances actif (quota presque épuisé)
   const davidStartDate = new Date();
   davidStartDate.setDate(davidStartDate.getDate() - 20);
   const davidEndDate = new Date(davidStartDate);
-  davidEndDate.setFullYear(davidEndDate.getFullYear() + 1);
+  davidEndDate.setMonth(davidEndDate.getMonth() + 1); // Valable 1 mois
   
   const davidSubscription = await prisma.subscription.create({
     data: {
       displayId: generateSubscriptionId(),
       memberId: davidMember.userId,
-      subscriptionTypeId: standardType.id,
+      subscriptionTypeId: type18Seances.id,
       status: 'active',
       startDate: davidStartDate,
       endDate: davidEndDate,
       autoRenew: false,
+      sessionsUsed: 16, // 16 séances utilisées sur 18 (presque épuisé!)
     },
   });
-  console.log(`✅ Abonnement ${standardType.name} pour ${davidUser.firstName} ${davidUser.lastName}`);
+  console.log(`✅ Abonnement ${type18Seances.name} pour ${davidUser.firstName} ${davidUser.lastName} (16/${type18Seances.sessionQuota} séances utilisées - quota bas!)`);
 
-  // Emma - Corporate pausé (problème de paiement)
+  // Emma - 36 Séances pausé (problème de paiement)
   const emmaStartDate = new Date();
-  emmaStartDate.setMonth(emmaStartDate.getMonth() - 3);
+  emmaStartDate.setMonth(emmaStartDate.getMonth() - 1);
   const emmaEndDate = new Date(emmaStartDate);
-  emmaEndDate.setFullYear(emmaEndDate.getFullYear() + 1);
+  emmaEndDate.setMonth(emmaEndDate.getMonth() + 2); // Valable 2 mois
   
   const emmaSubscription = await prisma.subscription.create({
     data: {
       displayId: generateSubscriptionId(),
       memberId: emmaMember.userId,
-      subscriptionTypeId: corporateType.id,
+      subscriptionTypeId: type36Seances.id,
       status: 'paused',
       startDate: emmaStartDate,
       endDate: emmaEndDate,
       autoRenew: false,
+      sessionsUsed: 5, // 5 séances avant la pause
     },
   });
-  console.log(`✅ Abonnement ${corporateType.name} (pausé) pour ${emmaUser.firstName} ${emmaUser.lastName}`);
+  console.log(`✅ Abonnement ${type36Seances.name} (pausé) pour ${emmaUser.firstName} ${emmaUser.lastName}`);
 
   // Créer 2 membres supplémentaires pour plus de cas de tests
   const testMember1User = await prisma.user.create({
@@ -524,24 +508,25 @@ async function main() {
     }
   });
   
-  // Frank - Étudiant actif
+  // Frank - 12 Séances actif nouveau
   const frankStartDate = new Date();
   frankStartDate.setDate(frankStartDate.getDate() - 5);
   const frankEndDate = new Date(frankStartDate);
-  frankEndDate.setFullYear(frankEndDate.getFullYear() + 1);
+  frankEndDate.setMonth(frankEndDate.getMonth() + 1); // Valable 1 mois
   
   const frankSubscription = await prisma.subscription.create({
     data: {
       displayId: generateSubscriptionId(),
       memberId: testMember1.userId,
-      subscriptionTypeId: studentType.id,
+      subscriptionTypeId: type12Seances.id,
       status: 'active',
       startDate: frankStartDate,
       endDate: frankEndDate,
       autoRenew: true,
+      sessionsUsed: 2, // 2 séances utilisées
     },
   });
-  console.log(`✅ Abonnement ${studentType.name} pour ${testMember1User.firstName} ${testMember1User.lastName}`);
+  console.log(`✅ Abonnement ${type12Seances.name} pour ${testMember1User.firstName} ${testMember1User.lastName} (2/${type12Seances.sessionQuota} séances utilisées)`);
 
   const testMember2User = await prisma.user.create({
     data: {
@@ -564,24 +549,25 @@ async function main() {
     }
   });
   
-  // Grace - Découverte (essai) actif
+  // Grace - 18 Séances actif tout neuf
   const graceStartDate = new Date();
   graceStartDate.setDate(graceStartDate.getDate() - 2);
   const graceEndDate = new Date(graceStartDate);
-  graceEndDate.setFullYear(graceEndDate.getFullYear() + 1);
+  graceEndDate.setMonth(graceEndDate.getMonth() + 1); // Valable 1 mois
   
   const graceSubscription = await prisma.subscription.create({
     data: {
       displayId: generateSubscriptionId(),
       memberId: testMember2.userId,
-      subscriptionTypeId: trialType.id,
+      subscriptionTypeId: type18Seances.id,
       status: 'active',
       startDate: graceStartDate,
       endDate: graceEndDate,
       autoRenew: false,
+      sessionsUsed: 1, // 1 séance utilisée
     },
   });
-  console.log(`✅ Abonnement ${trialType.name} pour ${testMember2User.firstName} ${testMember2User.lastName}`);
+  console.log(`✅ Abonnement ${type18Seances.name} pour ${testMember2User.firstName} ${testMember2User.lastName} (1/${type18Seances.sessionQuota} séances utilisées)`);
 
   // Créer un abonnement expiré pour tester
   const testMember3User = await prisma.user.create({
@@ -605,24 +591,25 @@ async function main() {
     }
   });
   
-  // Henry - Senior expiré
+  // Henry - 12 Séances expiré (quota épuisé)
   const henryStartDate = new Date();
-  henryStartDate.setFullYear(henryStartDate.getFullYear() - 2); // Commencé il y a 2 ans
+  henryStartDate.setMonth(henryStartDate.getMonth() - 2); // Commencé il y a 2 mois
   const henryEndDate = new Date(henryStartDate);
-  henryEndDate.setFullYear(henryEndDate.getFullYear() + 1); // Expiré il y a 1 an
+  henryEndDate.setMonth(henryEndDate.getMonth() + 1); // Expiré il y a 1 mois
   
   const henrySubscription = await prisma.subscription.create({
     data: {
       displayId: generateSubscriptionId(),
       memberId: testMember3.userId,
-      subscriptionTypeId: seniorType.id,
+      subscriptionTypeId: type12Seances.id,
       status: 'expired',
       startDate: henryStartDate,
       endDate: henryEndDate,
       autoRenew: false,
+      sessionsUsed: 12, // Quota complètement épuisé
     },
   });
-  console.log(`✅ Abonnement ${seniorType.name} (expiré) pour ${testMember3User.firstName} ${testMember3User.lastName}`);
+  console.log(`✅ Abonnement ${type12Seances.name} (expiré - quota épuisé) pour ${testMember3User.firstName} ${testMember3User.lastName}`);
 
   // Créer un abonnement annulé
   const testMember4User = await prisma.user.create({
@@ -646,24 +633,25 @@ async function main() {
     }
   });
   
-  // Iris - Basic annulé
+  // Iris - 18 Séances annulé
   const irisStartDate = new Date();
   irisStartDate.setMonth(irisStartDate.getMonth() - 1);
   const irisEndDate = new Date(irisStartDate);
-  irisEndDate.setFullYear(irisEndDate.getFullYear() + 1);
+  irisEndDate.setMonth(irisEndDate.getMonth() + 1);
   
   const irisSubscription = await prisma.subscription.create({
     data: {
       displayId: generateSubscriptionId(),
       memberId: testMember4.userId,
-      subscriptionTypeId: basicType.id,
+      subscriptionTypeId: type18Seances.id,
       status: 'cancelled',
       startDate: irisStartDate,
       endDate: irisEndDate,
       autoRenew: false,
+      sessionsUsed: 7, // 7 séances avant annulation
     },
   });
-  console.log(`✅ Abonnement ${basicType.name} (annulé) pour ${testMember4User.firstName} ${testMember4User.lastName}`);
+  console.log(`✅ Abonnement ${type18Seances.name} (annulé) pour ${testMember4User.firstName} ${testMember4User.lastName}`);
 
   // Créer un abonnement avec l'ancien type inactif (pour tester la persistance)
   const testMember5User = await prisma.user.create({
@@ -687,7 +675,7 @@ async function main() {
     }
   });
   
-  // Jack - Type inactif mais abonnement toujours actif
+  // Jack - Annuel Illimité mais en attente (ancien membre qui renouvelle)
   const jackStartDate = new Date();
   jackStartDate.setMonth(jackStartDate.getMonth() - 4);
   const jackEndDate = new Date(jackStartDate);
@@ -697,14 +685,15 @@ async function main() {
     data: {
       displayId: generateSubscriptionId(),
       memberId: testMember5.userId,
-      subscriptionTypeId: inactiveType.id,
+      subscriptionTypeId: typeAnnuelIllimite.id,
       status: 'active',
       startDate: jackStartDate,
       endDate: jackEndDate,
       autoRenew: false,
+      sessionsUsed: 30, // 30 séances (illimité)
     },
   });
-  console.log(`✅ Abonnement ${inactiveType.name} (type inactif, abonnement actif) pour ${testMember5User.firstName} ${testMember5User.lastName}\n`);
+  console.log(`✅ Abonnement ${typeAnnuelIllimite.name} pour ${testMember5User.firstName} ${testMember5User.lastName} (illimité)\n`);
 
   // Abonnement EN ATTENTE - Pour tester l'acquittement de paiement
   // Olivia - Nouvel abonnement Découverte en attente de premier paiement
@@ -732,20 +721,21 @@ async function main() {
 
   const oliviaStartDate = new Date(); // Commence aujourd'hui
   const oliviaEndDate = new Date(oliviaStartDate);
-  oliviaEndDate.setFullYear(oliviaEndDate.getFullYear() + 1);
+  oliviaEndDate.setMonth(oliviaEndDate.getMonth() + 1); // Valable 1 mois
 
   const oliviaSubscription = await prisma.subscription.create({
     data: {
       displayId: generateSubscriptionId(),
       memberId: oliviaMember.userId,
-      subscriptionTypeId: trialType.id, // Type Découverte
+      subscriptionTypeId: type12Seances.id, // Type 12 Séances
       status: 'pending', // EN ATTENTE du premier paiement
       startDate: oliviaStartDate,
       endDate: oliviaEndDate,
       autoRenew: true,
+      sessionsUsed: 0,
     },
   });
-  console.log(`✅ Abonnement ${trialType.name} (EN ATTENTE) pour ${oliviaUser.firstName} ${oliviaUser.lastName} - À activer via /acknowledge\n`);
+  console.log(`✅ Abonnement ${type12Seances.name} (EN ATTENTE) pour ${oliviaUser.firstName} ${oliviaUser.lastName} - À activer via /acknowledge\n`);
 
   // Créer des paiements pour les abonnements
   console.log('💰 Création des paiements...');
@@ -753,127 +743,63 @@ async function main() {
   const now = new Date();
   const paymentsData = [];
 
-  // Bob - Premium: 12 paiements mensuels (2 complétés, 1 en attente, 9 futurs)
-  for (let i = 0; i < 12; i++) {
-    const dueDate = new Date(bobStartDate);
-    dueDate.setMonth(dueDate.getMonth() + i);
-    
-    let status = 'pending';
-    let paidAt = null;
-    let transactionId = null;
-    let paymentMethod = null;
-    
-    if (i === 0) {
-      status = 'completed';
-      paidAt = new Date(dueDate);
-      paidAt.setDate(paidAt.getDate() + 2);
-      transactionId = `txn_bob_${i + 1}`;
-      paymentMethod = 'card';
-    } else if (i === 1) {
-      status = 'completed';
-      paidAt = new Date(dueDate);
-      paidAt.setDate(paidAt.getDate() + 1);
-      transactionId = `txn_bob_${i + 1}`;
-      paymentMethod = 'card';
-    } else if (dueDate < now && i === 2) {
-      // Paiement en retard de quelques jours mais pas encore overdue (< 7 jours)
-      status = 'pending';
-    } else if (dueDate < now) {
-      status = 'pending';
-    }
-    
-    paymentsData.push({
-      displayId: generatePaymentId(),
-      memberId: bobMember.userId,
-      subscriptionId: bobSubscription.id,
-      amount: premiumType.monthlyPrice,
-      currency: 'EUR',
-      status,
-      type: 'subscription',
-      paymentMethod,
-      transactionId,
-      description: `Paiement mensuel ${i + 1}/12 - Premium`,
-      dueDate,
-      paidAt,
-      monthNumber: i + 1
-    });
-  }
+  // Bob - 36 Séances: paiement unique
+  paymentsData.push({
+    displayId: generatePaymentId(),
+    memberId: bobMember.userId,
+    subscriptionId: bobSubscription.id,
+    amount: type36Seances.monthlyPrice,
+    currency: 'MAD',
+    status: 'completed',
+    type: 'subscription',
+    paymentMethod: 'card',
+    transactionId: 'txn_bob_1',
+    description: `Paiement - 36 Séances`,
+    dueDate: bobStartDate,
+    paidAt: bobStartDate,
+    monthNumber: 1
+  });
 
-  // Charlie - Basic: 12 paiements (1 complété, 11 futurs)
-  for (let i = 0; i < 12; i++) {
-    const dueDate = new Date(charlieStartDate);
-    dueDate.setMonth(dueDate.getMonth() + i);
-    
-    let status = 'pending';
-    let paidAt = null;
-    let transactionId = null;
-    let paymentMethod = null;
-    
-    if (i === 0) {
-      status = 'completed';
-      paidAt = new Date(dueDate);
-      transactionId = `txn_charlie_${i + 1}`;
-      paymentMethod = 'paypal';
-    }
-    
-    paymentsData.push({
-      displayId: generatePaymentId(),
-      memberId: charlieMember.userId,
-      subscriptionId: charlieSubscription.id,
-      amount: basicType.monthlyPrice,
-      currency: 'EUR',
-      status,
-      type: 'subscription',
-      paymentMethod,
-      transactionId,
-      description: `Paiement mensuel ${i + 1}/12 - Basic`,
-      dueDate,
-      paidAt,
-      monthNumber: i + 1
-    });
-  }
+  // Charlie - 12 Séances: paiement unique
+  paymentsData.push({
+    displayId: generatePaymentId(),
+    memberId: charlieMember.userId,
+    subscriptionId: charlieSubscription.id,
+    amount: type12Seances.monthlyPrice,
+    currency: 'MAD',
+    status: 'completed',
+    type: 'subscription',
+    paymentMethod: 'paypal',
+    transactionId: 'txn_charlie_1',
+    description: `Paiement - 12 Séances`,
+    dueDate: charlieStartDate,
+    paidAt: charlieStartDate,
+    monthNumber: 1
+  });
 
-  // Alice - VIP: 12 paiements (6 complétés, 6 futurs)
-  for (let i = 0; i < 12; i++) {
-    const dueDate = new Date(aliceStartDate);
-    dueDate.setMonth(dueDate.getMonth() + i);
-    
-    let status = 'pending';
-    let paidAt = null;
-    let transactionId = null;
-    let paymentMethod = null;
-    
-    if (i < 6) { // 6 premiers mois payés
-      status = 'completed';
-      paidAt = new Date(dueDate);
-      paidAt.setDate(paidAt.getDate() + Math.floor(Math.random() * 5)); // Payé dans les 5 jours
-      transactionId = `txn_alice_${i + 1}`;
-      paymentMethod = 'card';
-    }
-    
-    paymentsData.push({
-      displayId: generatePaymentId(),
-      memberId: aliceMember.userId,
-      subscriptionId: aliceSubscription.id,
-      amount: vipType.monthlyPrice,
-      currency: 'EUR',
-      status,
-      type: 'subscription',
-      paymentMethod,
-      transactionId,
-      description: `Paiement mensuel ${i + 1}/12 - VIP`,
-      dueDate,
-      paidAt,
-      monthNumber: i + 1
-    });
-  }
+  // Alice - Annuel Illimité: paiement unique annuel
+  paymentsData.push({
+    displayId: generatePaymentId(),
+    memberId: aliceMember.userId,
+    subscriptionId: aliceSubscription.id,
+    amount: typeAnnuelIllimite.monthlyPrice,
+    currency: 'MAD',
+    status: 'completed',
+    type: 'subscription',
+    paymentMethod: 'card',
+    transactionId: 'txn_alice_1',
+    description: `Paiement - Annuel Illimité`,
+    dueDate: aliceStartDate,
+    paidAt: aliceStartDate,
+    monthNumber: 1
+  });
 
   // Paiement one-time pour Alice (massage supplémentaire)
   paymentsData.push({
     displayId: generatePaymentId(),
     memberId: aliceMember.userId,
-    amount: 50.00,
-    currency: 'EUR',
+    amount: 500,
+    currency: 'MAD',
     status: 'completed',
     type: 'one-time',
     paymentMethod: 'card',
@@ -883,240 +809,131 @@ async function main() {
     paidAt: new Date(Date.now() - 10 * 24 * 60 * 60 * 1000)
   });
 
-  // David - Standard: 12 paiements (1 complété, 11 futurs)
-  for (let i = 0; i < 12; i++) {
-    const dueDate = new Date(davidStartDate);
-    dueDate.setMonth(dueDate.getMonth() + i);
-    
-    let status = 'pending';
-    let paidAt = null;
-    let transactionId = null;
-    let paymentMethod = null;
-    
-    if (i === 0) {
-      status = 'completed';
-      paidAt = new Date(dueDate);
-      transactionId = `txn_david_${i + 1}`;
-      paymentMethod = 'bank_transfer';
-    }
-    
-    paymentsData.push({
-      displayId: generatePaymentId(),
-      memberId: davidMember.userId,
-      subscriptionId: davidSubscription.id,
-      amount: standardType.monthlyPrice,
-      currency: 'EUR',
-      status,
-      type: 'subscription',
-      paymentMethod,
-      transactionId,
-      description: `Paiement mensuel ${i + 1}/12 - Standard`,
-      dueDate,
-      paidAt,
-      monthNumber: i + 1
-    });
-  }
+  // David - 18 Séances: paiement unique
+  paymentsData.push({
+    displayId: generatePaymentId(),
+    memberId: davidMember.userId,
+    subscriptionId: davidSubscription.id,
+    amount: type18Seances.monthlyPrice,
+    currency: 'MAD',
+    status: 'completed',
+    type: 'subscription',
+    paymentMethod: 'bank_transfer',
+    transactionId: 'txn_david_1',
+    description: `Paiement - 18 Séances`,
+    dueDate: davidStartDate,
+    paidAt: davidStartDate,
+    monthNumber: 1
+  });
 
-  // Emma - Corporate PAUSÉ: 12 paiements (3 complétés, 1 overdue qui a causé la pause, 8 futurs)
-  for (let i = 0; i < 12; i++) {
-    const dueDate = new Date(emmaStartDate);
-    dueDate.setMonth(dueDate.getMonth() + i);
-    
-    let status = 'pending';
-    let paidAt = null;
-    let transactionId = null;
-    let paymentMethod = null;
-    
-    if (i < 3) {
-      status = 'completed';
-      paidAt = new Date(dueDate);
-      paidAt.setDate(paidAt.getDate() + 3);
-      transactionId = `txn_emma_${i + 1}`;
-      paymentMethod = 'paypal';
-    } else if (i === 3) {
-      // Paiement en retard de plus de 7 jours - cause de la pause
-      const overdueDate = new Date(dueDate);
-      overdueDate.setDate(overdueDate.getDate() - 8);
-      if (overdueDate < now) {
-        status = 'overdue';
-      }
-    }
-    
-    paymentsData.push({
-      displayId: generatePaymentId(),
-      memberId: emmaMember.userId,
-      subscriptionId: emmaSubscription.id,
-      amount: corporateType.monthlyPrice,
-      currency: 'EUR',
-      status,
-      type: 'subscription',
-      paymentMethod,
-      transactionId,
-      description: `Paiement mensuel ${i + 1}/12 - Corporate`,
-      dueDate,
-      paidAt,
-      monthNumber: i + 1
-    });
-  }
+  // Emma - 36 Séances PAUSÉ: paiement unique avec problème
+  paymentsData.push({
+    displayId: generatePaymentId(),
+    memberId: emmaMember.userId,
+    subscriptionId: emmaSubscription.id,
+    amount: type36Seances.monthlyPrice,
+    currency: 'MAD',
+    status: 'overdue',
+    type: 'subscription',
+    paymentMethod: null,
+    transactionId: null,
+    description: `Paiement - 36 Séances (pausé - problème paiement)`,
+    dueDate: emmaStartDate,
+    paidAt: null,
+    monthNumber: 1
+  });
 
-  // Frank - Étudiant: 12 paiements (1 complété, 11 futurs)
-  for (let i = 0; i < 12; i++) {
-    const dueDate = new Date(frankStartDate);
-    dueDate.setMonth(dueDate.getMonth() + i);
-    
-    let status = 'pending';
-    let paidAt = null;
-    let transactionId = null;
-    let paymentMethod = null;
-    
-    if (i === 0) {
-      status = 'completed';
-      paidAt = new Date(dueDate);
-      transactionId = `txn_frank_${i + 1}`;
-      paymentMethod = 'card';
-    }
-    
-    paymentsData.push({
-      displayId: generatePaymentId(),
-      memberId: testMember1.userId,
-      subscriptionId: frankSubscription.id,
-      amount: studentType.monthlyPrice,
-      currency: 'EUR',
-      status,
-      type: 'subscription',
-      paymentMethod,
-      transactionId,
-      description: `Paiement mensuel ${i + 1}/12 - Étudiant`,
-      dueDate,
-      paidAt,
-      monthNumber: i + 1
-    });
-  }
+  // Frank - 12 Séances: paiement unique
+  paymentsData.push({
+    displayId: generatePaymentId(),
+    memberId: testMember1.userId,
+    subscriptionId: frankSubscription.id,
+    amount: type12Seances.monthlyPrice,
+    currency: 'MAD',
+    status: 'completed',
+    type: 'subscription',
+    paymentMethod: 'card',
+    transactionId: 'txn_frank_1',
+    description: `Paiement - 12 Séances`,
+    dueDate: frankStartDate,
+    paidAt: frankStartDate,
+    monthNumber: 1
+  });
 
-  // Grace - Découverte: 12 paiements (tous pending car très récent)
-  for (let i = 0; i < 12; i++) {
-    const dueDate = new Date(graceStartDate);
-    dueDate.setMonth(dueDate.getMonth() + i);
-    
-    paymentsData.push({
-      displayId: generatePaymentId(),
-      memberId: testMember2.userId,
-      subscriptionId: graceSubscription.id,
-      amount: trialType.monthlyPrice,
-      currency: 'EUR',
-      status: 'pending',
-      type: 'subscription',
-      paymentMethod: null,
-      transactionId: null,
-      description: `Paiement mensuel ${i + 1}/12 - Découverte`,
-      dueDate,
-      paidAt: null,
-      monthNumber: i + 1
-    });
-  }
+  // Grace - 18 Séances: paiement unique
+  paymentsData.push({
+    displayId: generatePaymentId(),
+    memberId: testMember2.userId,
+    subscriptionId: graceSubscription.id,
+    amount: type18Seances.monthlyPrice,
+    currency: 'MAD',
+    status: 'completed',
+    type: 'subscription',
+    paymentMethod: 'cash',
+    transactionId: 'txn_grace_1',
+    description: `Paiement - 18 Séances`,
+    dueDate: graceStartDate,
+    paidAt: graceStartDate,
+    monthNumber: 1
+  });
 
-  // Henry - Senior EXPIRÉ: 12 paiements (10 complétés, 2 failed qui ont causé l'expiration)
-  for (let i = 0; i < 12; i++) {
-    const dueDate = new Date(henryStartDate);
-    dueDate.setMonth(dueDate.getMonth() + i);
-    
-    let status = 'completed';
-    let paidAt = new Date(dueDate);
-    paidAt.setDate(paidAt.getDate() + 2);
-    let transactionId = `txn_henry_${i + 1}`;
-    let paymentMethod = 'card';
-    
-    if (i >= 10) {
-      status = 'failed';
-      paidAt = null;
-      transactionId = null;
-      paymentMethod = null;
-    }
-    
-    paymentsData.push({
-      displayId: generatePaymentId(),
-      memberId: testMember3.userId,
-      subscriptionId: henrySubscription.id,
-      amount: seniorType.monthlyPrice,
-      currency: 'EUR',
-      status,
-      type: 'subscription',
-      paymentMethod,
-      transactionId,
-      description: `Paiement mensuel ${i + 1}/12 - Senior`,
-      dueDate,
-      paidAt,
-      monthNumber: i + 1
-    });
-  }
+  // Henry - 12 Séances EXPIRÉ: quota épuisé
+  paymentsData.push({
+    displayId: generatePaymentId(),
+    memberId: testMember3.userId,
+    subscriptionId: henrySubscription.id,
+    amount: type12Seances.monthlyPrice,
+    currency: 'MAD',
+    status: 'completed',
+    type: 'subscription',
+    paymentMethod: 'card',
+    transactionId: 'txn_henry_1',
+    description: `Paiement - 12 Séances (expiré - quota épuisé)`,
+    dueDate: henryStartDate,
+    paidAt: henryStartDate,
+    monthNumber: 1
+  });
 
-  // Iris - Basic ANNULÉ: 12 paiements (1 complété, puis annulation)
-  for (let i = 0; i < 12; i++) {
-    const dueDate = new Date(irisStartDate);
-    dueDate.setMonth(dueDate.getMonth() + i);
-    
-    let status = i === 0 ? 'completed' : 'refunded';
-    let paidAt = i === 0 ? new Date(dueDate) : null;
-    let transactionId = i === 0 ? `txn_iris_${i + 1}` : null;
-    let paymentMethod = i === 0 ? 'card' : null;
-    
-    paymentsData.push({
-      displayId: generatePaymentId(),
-      memberId: testMember4.userId,
-      subscriptionId: irisSubscription.id,
-      amount: basicType.monthlyPrice,
-      currency: 'EUR',
-      status,
-      type: 'subscription',
-      paymentMethod,
-      transactionId,
-      description: `Paiement mensuel ${i + 1}/12 - Basic`,
-      dueDate,
-      paidAt,
-      monthNumber: i + 1
-    });
-  }
+  // Iris - 18 Séances ANNULÉ: remboursé
+  paymentsData.push({
+    displayId: generatePaymentId(),
+    memberId: testMember4.userId,
+    subscriptionId: irisSubscription.id,
+    amount: type18Seances.monthlyPrice,
+    currency: 'MAD',
+    status: 'refunded',
+    type: 'subscription',
+    paymentMethod: 'card',
+    transactionId: 'txn_iris_1',
+    description: `Paiement - 18 Séances (remboursé)`,
+    dueDate: irisStartDate,
+    paidAt: irisStartDate,
+    monthNumber: 1
+  });
 
-  // Jack - Bronze (ancien type): 12 paiements (4 complétés, 8 futurs)
-  for (let i = 0; i < 12; i++) {
-    const dueDate = new Date(jackStartDate);
-    dueDate.setMonth(dueDate.getMonth() + i);
-    
-    let status = 'pending';
-    let paidAt = null;
-    let transactionId = null;
-    let paymentMethod = null;
-    
-    if (i < 4) {
-      status = 'completed';
-      paidAt = new Date(dueDate);
-      transactionId = `txn_jack_${i + 1}`;
-      paymentMethod = 'card';
-    }
-    
-    paymentsData.push({
-      displayId: generatePaymentId(),
-      memberId: testMember5.userId,
-      subscriptionId: jackSubscription.id,
-      amount: inactiveType.monthlyPrice,
-      currency: 'EUR',
-      status,
-      type: 'subscription',
-      paymentMethod,
-      transactionId,
-      description: `Paiement mensuel ${i + 1}/12 - Bronze (Ancien)`,
-      dueDate,
-      paidAt,
-      monthNumber: i + 1
-    });
-  }
+  // Jack - Annuel Illimité: paiement unique
+  paymentsData.push({
+    displayId: generatePaymentId(),
+    memberId: testMember5.userId,
+    subscriptionId: jackSubscription.id,
+    amount: typeAnnuelIllimite.monthlyPrice,
+    currency: 'MAD',
+    status: 'completed',
+    type: 'subscription',
+    paymentMethod: 'card',
+    transactionId: 'txn_jack_1',
+    description: `Paiement - Annuel Illimité`,
+    dueDate: jackStartDate,
+    paidAt: jackStartDate,
+    monthNumber: 1
+  });
 
   // Paiements one-time supplémentaires pour diversité
   paymentsData.push({
     displayId: generatePaymentId(),
     memberId: bobMember.userId,
-    amount: 35.00,
-    currency: 'EUR',
+    amount: 350,
+    currency: 'MAD',
     status: 'completed',
     type: 'one-time',
     paymentMethod: 'card',
@@ -1129,8 +946,8 @@ async function main() {
   paymentsData.push({
     displayId: generatePaymentId(),
     memberId: davidMember.userId,
-    amount: 15.00,
-    currency: 'EUR',
+    amount: 150,
+    currency: 'MAD',
     status: 'completed',
     type: 'one-time',
     paymentMethod: 'cash',
@@ -1140,27 +957,22 @@ async function main() {
     paidAt: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000)
   });
 
-  // Olivia - Découverte EN ATTENTE: 12 paiements (tous pending, en attente d'acquittement)
-  for (let i = 0; i < 12; i++) {
-    const dueDate = new Date(oliviaStartDate);
-    dueDate.setMonth(dueDate.getMonth() + i);
-    
-    paymentsData.push({
-      displayId: generatePaymentId(),
-      memberId: oliviaMember.userId,
-      subscriptionId: oliviaSubscription.id,
-      amount: trialType.monthlyPrice,
-      currency: 'EUR',
-      status: 'pending',
-      type: 'subscription',
-      paymentMethod: null, // Sera rempli lors de l'acquittement
-      transactionId: null,
-      description: `Paiement mensuel ${i + 1}/12 - Découverte (À acquitter)`,
-      dueDate,
-      paidAt: null,
-      monthNumber: i + 1
-    });
-  }
+  // Olivia - 12 Séances EN ATTENTE: paiement pending
+  paymentsData.push({
+    displayId: generatePaymentId(),
+    memberId: oliviaMember.userId,
+    subscriptionId: oliviaSubscription.id,
+    amount: type12Seances.monthlyPrice,
+    currency: 'MAD',
+    status: 'pending',
+    type: 'subscription',
+    paymentMethod: null, // Sera rempli lors de l'acquittement
+    transactionId: null,
+    description: `Paiement - 12 Séances (À acquitter)`,
+    dueDate: oliviaStartDate,
+    paidAt: null,
+    monthNumber: 1
+  });
 
   // Peter - Standard NOUVEAU: 12 paiements (TOUS PENDING - Fraîchement créé aujourd'hui)
   const peterUser = await prisma.user.create({
@@ -1186,42 +998,38 @@ async function main() {
   
   const peterStartDate = new Date(); // Aujourd'hui
   const peterEndDate = new Date(peterStartDate);
-  peterEndDate.setFullYear(peterEndDate.getFullYear() + 1);
+  peterEndDate.setMonth(peterEndDate.getMonth() + 1); // Valable 1 mois
   
   const peterSubscription = await prisma.subscription.create({
     data: {
       displayId: generateSubscriptionId(),
       memberId: peterMember.userId,
-      subscriptionTypeId: standardType.id,
+      subscriptionTypeId: type18Seances.id,
       status: 'active',
       startDate: peterStartDate,
       endDate: peterEndDate,
       autoRenew: true,
+      sessionsUsed: 0,
     },
   });
-  console.log(`✅ Abonnement ${standardType.name} NOUVEAU pour ${peterUser.firstName} ${peterUser.lastName}`);
+  console.log(`✅ Abonnement ${type18Seances.name} NOUVEAU pour ${peterUser.firstName} ${peterUser.lastName}`);
 
-  // Tous les paiements en PENDING - C'est le cas idéal d'un abonnement qui vient d'être créé
-  for (let i = 0; i < 12; i++) {
-    const dueDate = new Date(peterStartDate);
-    dueDate.setMonth(dueDate.getMonth() + i);
-    
-    paymentsData.push({
-      displayId: generatePaymentId(),
-      memberId: peterMember.userId,
-      subscriptionId: peterSubscription.id,
-      amount: standardType.monthlyPrice,
-      currency: 'EUR',
-      status: 'pending',
-      type: 'subscription',
-      paymentMethod: null,
-      transactionId: null,
-      description: `Paiement mensuel ${i + 1}/12 - Standard (NOUVEAU)`,
-      dueDate,
-      paidAt: null,
-      monthNumber: i + 1
-    });
-  }
+  // Paiement unique - PENDING
+  paymentsData.push({
+    displayId: generatePaymentId(),
+    memberId: peterMember.userId,
+    subscriptionId: peterSubscription.id,
+    amount: type18Seances.monthlyPrice,
+    currency: 'MAD',
+    status: 'pending',
+    type: 'subscription',
+    paymentMethod: null,
+    transactionId: null,
+    description: `Paiement - 18 Séances (NOUVEAU)`,
+    dueDate: peterStartDate,
+    paidAt: null,
+    monthNumber: 1
+  });
 
   // Mary - Premium NOUVEAU: 3 paiements (trimestriel - TOUS PENDING)
   const maryUser = await prisma.user.create({
@@ -1247,43 +1055,38 @@ async function main() {
   
   const maryStartDate = new Date();
   const maryEndDate = new Date(maryStartDate);
-  maryEndDate.setFullYear(maryEndDate.getFullYear() + 1);
+  maryEndDate.setMonth(maryEndDate.getMonth() + 2); // Valable 2 mois
   
   const marySubscription = await prisma.subscription.create({
     data: {
       displayId: generateSubscriptionId(),
       memberId: maryMember.userId,
-      subscriptionTypeId: premiumType.id,
+      subscriptionTypeId: type36Seances.id,
       status: 'active',
       startDate: maryStartDate,
       endDate: maryEndDate,
       autoRenew: true,
-      paymentFrequency: 3 // Trimestriel
+      sessionsUsed: 0,
     },
   });
-  console.log(`✅ Abonnement ${premiumType.name} TRIMESTRIEL pour ${maryUser.firstName} ${maryUser.lastName}`);
+  console.log(`✅ Abonnement ${type36Seances.name} NOUVEAU pour ${maryUser.firstName} ${maryUser.lastName}`);
 
-  // 4 paiements trimestriels (tous les 3 mois) - TOUS PENDING
-  for (let i = 0; i < 4; i++) {
-    const dueDate = new Date(maryStartDate);
-    dueDate.setMonth(dueDate.getMonth() + (i * 3)); // +3 mois à chaque fois
-    
-    paymentsData.push({
-      displayId: generatePaymentId(),
-      memberId: maryMember.userId,
-      subscriptionId: marySubscription.id,
-      amount: premiumType.monthlyPrice * 3, // 3 mois à la fois
-      currency: 'EUR',
-      status: 'pending',
-      type: 'subscription',
-      paymentMethod: null,
-      transactionId: null,
-      description: `Paiement ${i + 1}/4 (trimestre ${i + 1}) - Premium`,
-      dueDate,
-      paidAt: null,
-      monthNumber: (i * 3) + 1
-    });
-  }
+  // Paiement unique - PENDING
+  paymentsData.push({
+    displayId: generatePaymentId(),
+    memberId: maryMember.userId,
+    subscriptionId: marySubscription.id,
+    amount: type36Seances.monthlyPrice,
+    currency: 'MAD',
+    status: 'pending',
+    type: 'subscription',
+    paymentMethod: null,
+    transactionId: null,
+    description: `Paiement - 36 Séances (NOUVEAU)`,
+    dueDate: maryStartDate,
+    paidAt: null,
+    monthNumber: 1
+  });
 
   // Nathan - VIP NOUVEAU: 2 paiements (semestriel - TOUS PENDING)
   const nathanUser = await prisma.user.create({
@@ -1309,43 +1112,38 @@ async function main() {
   
   const nathanStartDate = new Date();
   const nathanEndDate = new Date(nathanStartDate);
-  nathanEndDate.setFullYear(nathanEndDate.getFullYear() + 1);
+  nathanEndDate.setFullYear(nathanEndDate.getFullYear() + 1); // Valable 1 an
   
   const nathanSubscription = await prisma.subscription.create({
     data: {
       displayId: generateSubscriptionId(),
       memberId: nathanMember.userId,
-      subscriptionTypeId: vipType.id,
+      subscriptionTypeId: typeAnnuelIllimite.id,
       status: 'active',
       startDate: nathanStartDate,
       endDate: nathanEndDate,
       autoRenew: true,
-      paymentFrequency: 6 // Semestriel
+      sessionsUsed: 0,
     },
   });
-  console.log(`✅ Abonnement ${vipType.name} SEMESTRIEL pour ${nathanUser.firstName} ${nathanUser.lastName}`);
+  console.log(`✅ Abonnement ${typeAnnuelIllimite.name} NOUVEAU pour ${nathanUser.firstName} ${nathanUser.lastName}`);
 
-  // 2 paiements semestriels (tous les 6 mois) - TOUS PENDING
-  for (let i = 0; i < 2; i++) {
-    const dueDate = new Date(nathanStartDate);
-    dueDate.setMonth(dueDate.getMonth() + (i * 6)); // +6 mois à chaque fois
-    
-    paymentsData.push({
-      displayId: generatePaymentId(),
-      memberId: nathanMember.userId,
-      subscriptionId: nathanSubscription.id,
-      amount: vipType.monthlyPrice * 6, // 6 mois à la fois
-      currency: 'EUR',
-      status: 'pending',
-      type: 'subscription',
-      paymentMethod: null,
-      transactionId: null,
-      description: `Paiement ${i + 1}/2 (semestre ${i + 1}) - VIP`,
-      dueDate,
-      paidAt: null,
-      monthNumber: (i * 6) + 1
-    });
-  }
+  // Paiement unique annuel - PENDING
+  paymentsData.push({
+    displayId: generatePaymentId(),
+    memberId: nathanMember.userId,
+    subscriptionId: nathanSubscription.id,
+    amount: typeAnnuelIllimite.monthlyPrice,
+    currency: 'MAD',
+    status: 'pending',
+    type: 'subscription',
+    paymentMethod: null,
+    transactionId: null,
+    description: `Paiement - Annuel Illimité (NOUVEAU)`,
+    dueDate: nathanStartDate,
+    paidAt: null,
+    monthNumber: 1
+  });
 
   // Sarah - Corporate NOUVEAU: 1 paiement (oneshot annuel - PENDING)
   const sarahUser = await prisma.user.create({
@@ -1371,48 +1169,48 @@ async function main() {
   
   const sarahStartDate = new Date();
   const sarahEndDate = new Date(sarahStartDate);
-  sarahEndDate.setFullYear(sarahEndDate.getFullYear() + 1);
+  sarahEndDate.setFullYear(sarahEndDate.getFullYear() + 1); // Valable 1 an
   
   const sarahSubscription = await prisma.subscription.create({
     data: {
       displayId: generateSubscriptionId(),
       memberId: sarahMember.userId,
-      subscriptionTypeId: corporateType.id,
+      subscriptionTypeId: typeAnnuelIllimite.id,
       status: 'active',
       startDate: sarahStartDate,
       endDate: sarahEndDate,
       autoRenew: false,
-      paymentFrequency: 1 // Oneshot annuel
+      sessionsUsed: 0,
     },
   });
-  console.log(`✅ Abonnement ${corporateType.name} ONESHOT ANNUEL pour ${sarahUser.firstName} ${sarahUser.lastName}`);
+  console.log(`✅ Abonnement ${typeAnnuelIllimite.name} ANNUEL pour ${sarahUser.firstName} ${sarahUser.lastName}`);
 
   // 1 seul paiement pour toute l'année - PENDING
   paymentsData.push({
     displayId: generatePaymentId(),
     memberId: sarahMember.userId,
     subscriptionId: sarahSubscription.id,
-    amount: corporateType.monthlyPrice * 12, // Année complète
-    currency: 'EUR',
+    amount: typeAnnuelIllimite.monthlyPrice,
+    currency: 'MAD',
     status: 'pending',
     type: 'subscription',
     paymentMethod: null,
     transactionId: null,
-    description: `Paiement annuel - Corporate`,
+    description: `Paiement - Annuel Illimité`,
     dueDate: sarahStartDate,
     paidAt: null,
     monthNumber: 1
   });
 
   const payments = await prisma.payment.createMany({ data: paymentsData });
-  console.log(`✅ ${payments.count} paiements créés (mensuels + one-time + pending)\n`);
+  console.log(`✅ ${payments.count} paiements créés\n`);
   
   console.log('📊 NOUVEAUX ABONNEMENTS (tous paiements PENDING):');
-  console.log('   - Peter Parker: Standard, 12 paiements mensuels');
-  console.log('   - Mary Jane: Premium, 4 paiements trimestriels');
-  console.log('   - Nathan Drake: VIP, 2 paiements semestriels');
-  console.log('   - Sarah Connor: Corporate, 1 paiement annuel');
-  console.log('   - Olivia Martinez: Découverte, 12 paiements (abonnement PENDING)\n');
+  console.log('   - Peter Parker: 18 Séances');
+  console.log('   - Mary Jane: 36 Séances');
+  console.log('   - Nathan Drake: Annuel Illimité');
+  console.log('   - Sarah Connor: Annuel Illimité');
+  console.log('   - Olivia Martinez: 12 Séances (abonnement PENDING)\n');
 
   // Ajouter des exercices complets
   console.log('💪 Création des exercices...');
@@ -1983,34 +1781,29 @@ async function main() {
   console.log('     - Email: admin2@teamfitness.com');
   console.log('     - Password: admin123\n');
   console.log('   Members (avec historique):');
-  console.log('     - bob@example.com (Premium actif, 2 mois, 2 paiements complétés, Gym 1)');
-  console.log('     - charlie@example.com (Basic actif, 10 jours, 1 paiement complété, Gym 1)');
-  console.log('     - alice@example.com (VIP actif, 6 mois, 6 paiements complétés, Gym 1)');
-  console.log('     - david@example.com (Standard actif, 20 jours, 1 paiement complété, Gym 2)');
-  console.log('     - emma@example.com (Corporate PAUSÉ, 3 complétés + 1 overdue, Gym 2)');
-  console.log('     - frank@example.com (Étudiant actif, 5 jours, 1 paiement complété, Gym 1)');
-  console.log('     - grace@example.com (Découverte actif, 2 jours, tous pending, Gym 2)');
-  console.log('     - henry@example.com (Senior EXPIRÉ, 10 complétés + 2 failed, Gym 1)');
-  console.log('     - iris@example.com (Basic ANNULÉ, 1 complété + 11 refunded, Gym 2)');
-  console.log('     - jack@example.com (Bronze ancien type, 4 complétés + 8 pending, Gym 1)');
-  console.log('     - olivia@example.com (Découverte PENDING, tous paiements pending, Gym 1)');
+  console.log('     - bob@example.com (36 Séances actif, 10/36 utilisées, Gym 1)');
+  console.log('     - charlie@example.com (12 Séances actif, 3/12 utilisées, Gym 1)');
+  console.log('     - alice@example.com (Annuel Illimité actif, 45 séances, Gym 1)');
+  console.log('     - david@example.com (18 Séances actif, 16/18 utilisées - quota bas!, Gym 2)');
+  console.log('     - emma@example.com (36 Séances PAUSÉ, 5/36, Gym 2)');
+  console.log('     - frank@example.com (12 Séances actif, 2/12, Gym 1)');
+  console.log('     - grace@example.com (18 Séances actif, 1/18, Gym 2)');
+  console.log('     - henry@example.com (12 Séances EXPIRÉ, 12/12 quota épuisé, Gym 1)');
+  console.log('     - iris@example.com (18 Séances ANNULÉ, remboursé, Gym 2)');
+  console.log('     - jack@example.com (Annuel Illimité actif, 30 séances, Gym 1)');
+  console.log('     - olivia@example.com (12 Séances PENDING, 0/12, Gym 1)');
   console.log('   \n   Members NOUVEAUX (tous paiements PENDING):');
-  console.log('     - peter@example.com (Standard, 12 mensuels, NOUVEAU, Gym 1)');
-  console.log('     - mary@example.com (Premium, 4 trimestriels, NOUVEAU, Gym 1)');
-  console.log('     - nathan@example.com (VIP, 2 semestriels, NOUVEAU, Gym 2)');
-  console.log('     - sarah@example.com (Corporate, 1 annuel oneshot, NOUVEAU, Gym 2)');
+  console.log('     - peter@example.com (18 Séances, NOUVEAU, Gym 1)');
+  console.log('     - mary@example.com (36 Séances, NOUVEAU, Gym 1)');
+  console.log('     - nathan@example.com (Annuel Illimité, NOUVEAU, Gym 2)');
+  console.log('     - sarah@example.com (Annuel Illimité, NOUVEAU, Gym 2)');
   console.log('     - Password pour tous: member123\n');
   
   console.log('📊 Types d\'abonnements disponibles:');
-  console.log('   - Basic (29.99€/mois): Accès essentiel');
-  console.log('   - Standard (49.99€/mois): + Cours collectifs');
-  console.log('   - Premium (79.99€/mois): + Coaching personnel');
-  console.log('   - VIP (129.99€/mois): Formule exclusive tout compris');
-  console.log('   - Étudiant (24.99€/mois): Tarif préférentiel -25 ans');
-  console.log('   - Senior (34.99€/mois): Formule adaptée +60 ans');
-  console.log('   - Corporate (89.99€/mois): Abonnement entreprise');
-  console.log('   - Découverte (19.99€/mois): Offre d\'essai');
-  console.log('   - Bronze (39.99€/mois): INACTIF - ancien type\n');
+  console.log('   - 12 Séances (150 MAD): 12 séances valable 1 mois');
+  console.log('   - 18 Séances (200 MAD): 18 séances valable 1 mois');
+  console.log('   - 36 Séances (350 MAD): 36 séances valable 2 mois');
+  console.log('   - Annuel Illimité (1500 MAD): Accès illimité 7j/7 pendant 1 an\n');
   
   console.log('✅ Seed terminé avec succès! 🎉');
 }
