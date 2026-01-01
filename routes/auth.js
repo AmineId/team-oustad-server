@@ -469,14 +469,33 @@ router.post('/login', authLimiter, async (req, res) => {
 // Protected: scan QR code for access
 router.post('/scan-qr', auth, async (req, res) => {
   // Support à la fois qrCode et qrData pour rétrocompatibilité
-  const qrCode = req.body.qrCode || req.body.qrData;
-  logger.info(`📱 Scan QR - User ID: ${req.user?.sub}, Email: ${req.user?.email}, GymID: ${req.user?.gymId}, QR Code: ${qrCode}`);
-
+  let qrCodeRaw = req.body.qrCode || req.body.qrData;
+  
   try {
-    if (!qrCode) {
+    if (!qrCodeRaw) {
       logger.warn(`❌ QR code manquant dans la requête`);
       return res.status(400).json({ error: 'QR code is required', field: 'qrCode or qrData' });
     }
+
+    // Parser le QR code si c'est un JSON string ou un objet
+    let qrData;
+    let displayId;
+
+    if (typeof qrCodeRaw === 'string') {
+      try {
+        qrData = JSON.parse(qrCodeRaw);
+        displayId = qrData.displayId || qrCodeRaw; // Utiliser displayId du JSON ou le string brut
+      } catch (e) {
+        displayId = qrCodeRaw; // Si ce n'est pas du JSON, utiliser tel quel
+      }
+    } else if (typeof qrCodeRaw === 'object') {
+      qrData = qrCodeRaw;
+      displayId = qrData.displayId;
+    } else {
+      displayId = String(qrCodeRaw);
+    }
+
+    logger.info(`📱 Scan QR - User ID: ${req.user?.sub}, Email: ${req.user?.email}, GymID: ${req.user?.gymId}, DisplayID: ${displayId}`);
 
     // Vérifier que l'utilisateur est un admin
     if (req.user.type !== 'admin') {
@@ -486,13 +505,16 @@ router.post('/scan-qr', auth, async (req, res) => {
 
     // Vérifier que l'admin a un gymId
     if (!req.user.gymId) {
-      logger.error(`❌ Admin ${req.user.email} n'a pas de gymId configuré`);
-      return res.status(403).json({ error: 'Admin account not properly configured - missing gymId' });
+      logger.error(`❌ Admin ${req.user.email} n'a pas de gymId configuré - Token doit être régénéré`);
+      return res.status(403).json({ 
+        error: 'Admin account not properly configured - missing gymId',
+        message: 'Please log in again to get a new token with gymId'
+      });
     }
 
     // Trouver l'utilisateur par son displayId
     const member = await prisma.user.findFirst({
-      where: { displayId: qrCode },
+      where: { displayId },
       include: {
         Member: {
           include: {
@@ -512,8 +534,8 @@ router.post('/scan-qr', auth, async (req, res) => {
     });
 
     if (!member) {
-      logger.warn(`❌ Membre non trouvé avec QR code: ${qrCode}`);
-      return res.status(404).json({ error: 'Member not found' });
+      logger.warn(`❌ Membre non trouvé avec displayId: ${displayId}`);
+      return res.status(404).json({ error: 'Member not found', displayId });
     }
 
     if (member.role !== 'member') {
