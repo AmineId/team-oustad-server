@@ -126,10 +126,28 @@ class CheckInService {
    * Check-in via QR code
    */
   async checkInByQR(qrCode, gymId) {
-    // Trouver l'utilisateur via son QR code
+    // Parser le QR code si c'est un JSON string ou un objet
+    let qrData;
+    let displayId;
+
+    if (typeof qrCode === 'string') {
+      try {
+        qrData = JSON.parse(qrCode);
+        displayId = qrData.displayId || qrCode; // Utiliser displayId du JSON ou le string brut
+      } catch (e) {
+        displayId = qrCode; // Si ce n'est pas du JSON, utiliser tel quel
+      }
+    } else if (typeof qrCode === 'object') {
+      qrData = qrCode;
+      displayId = qrData.displayId;
+    } else {
+      displayId = String(qrCode);
+    }
+
+    // Trouver l'utilisateur via son displayId
     const user = await prisma.user.findFirst({
       where: {
-        uniqueCode: qrCode // Le QR code contient le uniqueCode
+        displayId: displayId // Utiliser displayId au lieu de uniqueCode
       },
       include: {
         Member: {
