@@ -15,6 +15,7 @@ async function cleanDatabase() {
   await prisma.memberMeasurement.deleteMany({});
   await prisma.memberGoal.deleteMany({});
   await prisma.subscription.deleteMany({});
+  await prisma.storeProduct.deleteMany({}); // Delete store products before users
   await prisma.member.deleteMany({});
   await prisma.admin.deleteMany({});
   await prisma.owner.deleteMany({});
