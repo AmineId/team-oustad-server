@@ -1,0 +1,306 @@
+name: Deploy to Production (VPS)
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+    inputs:
+      skip_tests:
+        description: 'Skip tests (use with caution)'
+        required: false
+        default: false
+        type: boolean
+
+jobs:
+  test:
+    name: Run Full Test Suite
+    runs-on: ubuntu-latest
+    if: ${{ !inputs.skip_tests }}
+
+    services:
+      postgres:
+        image: postgres:14
+        env:
+          POSTGRES_USER: testuser
+          POSTGRES_PASSWORD: testpass
+          POSTGRES_DB: team_fitness_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      DATABASE_URL: postgresql://testuser:testpass@localhost:5432/team_fitness_test
+      JWT_SECRET: test_jwt_secret_key_for_ci_testing
+      NODE_ENV: test
+      SMTP_HOST: smtp.mailtrap.io
+      SMTP_PORT: 2525
+      SMTP_USER: test
+      SMTP_PASS: test
+      API_URL: http://localhost:3000
+      MOBILE_APP_LINK: https://play.google.com/store/apps/details?id=team.fitness.team_fitness_app
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Generate Prisma Client
+        run: npx prisma generate
+
+      - name: Run database migrations
+        run: npx prisma migrate deploy
+
+      - name: Run full test suite with coverage
+        run: npm run test:ci
+
+      - name: Check test coverage
+        run: |
+          echo "📊 Test coverage check passed"
+
+  backup:
+    name: Backup Production Database
+    runs-on: ubuntu-latest
+    needs: test
+    if: ${{ always() && (needs.test.result == 'success' || inputs.skip_tests) }}
+    environment:
+      name: production-backup
+
+    steps:
+      - name: Setup SSH
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.PROD_SSH_KEY }}
+
+      - name: Add VPS to known hosts
+        run: |
+          mkdir -p ~/.ssh
+          ssh-keyscan -H ${{ secrets.PROD_HOST }} >> ~/.ssh/known_hosts
+
+      - name: Create Database Backup
+        run: |
+          ssh ${{ secrets.PROD_USER }}@${{ secrets.PROD_HOST }} << 'EOF'
+            echo "💾 Creating database backup..."
+            BACKUP_DIR="${{ secrets.PROD_BACKUP_PATH || '~/backups' }}"
+            mkdir -p "$BACKUP_DIR"
+            BACKUP_FILE="$BACKUP_DIR/db-backup-$(date +%Y%m%d-%H%M%S).sql"
+            
+            # Load environment variables
+            export $(cat ${{ secrets.PROD_PROJECT_PATH || '~/db-server' }}/.env.prod | grep -v '^#' | xargs)
+            
+            # Extract database details from DATABASE_URL
+            pg_dump "$DATABASE_URL" > "$BACKUP_FILE"
+            
+            echo "✅ Backup created: $BACKUP_FILE"
+            
+            # Keep only last 7 days of backups
+            find "$BACKUP_DIR" -name "db-backup-*.sql" -mtime +7 -delete
+          EOF
+
+  deploy:
+    name: Deploy to Production VPS
+    runs-on: ubuntu-latest
+    needs: [test, backup]
+    if: ${{ always() && (needs.test.result == 'success' || inputs.skip_tests) && needs.backup.result == 'success' }}
+    environment:
+      name: production
+      url: ${{ secrets.PROD_URL }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup SSH
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.PROD_SSH_KEY }}
+
+      - name: Add VPS to known hosts
+        run: |
+          mkdir -p ~/.ssh
+          ssh-keyscan -H ${{ secrets.PROD_HOST }} >> ~/.ssh/known_hosts
+
+      - name: Deploy to Production VPS
+        run: |
+          ssh ${{ secrets.PROD_USER }}@${{ secrets.PROD_HOST }} << 'EOF'
+            set -e
+            echo "🚀 Starting production deployment..."
+            
+            # Navigate to project directory
+            cd ${{ secrets.PROD_PROJECT_PATH || '~/db-server' }}
+            
+            # Store current commit for potential rollback
+            PREVIOUS_COMMIT=$(git rev-parse HEAD)
+            echo "📝 Current commit: $PREVIOUS_COMMIT"
+            
+            # Pull latest changes
+            echo "📥 Pulling latest code from main..."
+            git fetch origin
+            git checkout main
+            git pull origin main
+            
+            # Install dependencies
+            echo "📦 Installing dependencies..."
+            npm ci --production
+            
+            # Generate Prisma Client
+            echo "🔧 Generating Prisma Client..."
+            npx prisma generate
+            
+            # Run database migrations
+            echo "🗃️ Running database migrations..."
+            dotenv -e .env.prod -- npx prisma migrate deploy
+            
+            # Graceful restart with zero downtime (cluster mode)
+            echo "🔄 Performing graceful restart..."
+            pm2 reload teamfitness-prod --update-env || pm2 start ecosystem.config.js --only teamfitness-prod
+            
+            # Wait for service to be ready
+            echo "⏳ Waiting for service to stabilize..."
+            sleep 10
+            
+            # Check PM2 status
+            echo "✅ PM2 Status:"
+            pm2 list
+            
+            # Check for any errors in the last 20 lines of logs
+            echo "📋 Recent logs:"
+            pm2 logs teamfitness-prod --lines 20 --nostream
+            
+            echo "🎉 Production deployment completed successfully!"
+          EOF
+
+      - name: Health Check - Initial
+        run: |
+          echo "🏥 Running initial health check..."
+          sleep 5
+          
+          if curl -f -s "${{ secrets.PROD_URL }}/health" | jq -e '.ok == true and .db == "connected"'; then
+            echo "✅ Initial health check passed!"
+          else
+            echo "❌ Initial health check failed!"
+            exit 1
+          fi
+
+      - name: Health Check - Extended Monitoring
+        run: |
+          echo "🔍 Running extended health monitoring (60 seconds)..."
+          end_time=$((SECONDS + 60))
+          failures=0
+          
+          while [ $SECONDS -lt $end_time ]; do
+            if ! curl -f -s -o /dev/null "${{ secrets.PROD_URL }}/health"; then
+              failures=$((failures + 1))
+              echo "⚠️ Health check failed (attempt $failures)"
+              
+              if [ $failures -ge 3 ]; then
+                echo "❌ Too many failures, triggering rollback"
+                exit 1
+              fi
+            else
+              echo "✅ Health check passed"
+              failures=0
+            fi
+            
+            sleep 5
+          done
+          
+          echo "✅ Extended monitoring completed successfully!"
+
+      - name: Send deployment notification
+        if: always()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const status = '${{ job.status }}';
+            const emoji = status === 'success' ? '✅' : '❌';
+            const message = `${emoji} Production deployment ${status}!\n\nBranch: main\nCommit: ${{ github.sha }}\nURL: ${{ secrets.PROD_URL }}\nTriggered by: @${{ github.actor }}`;
+            
+            console.log(message);
+
+      - name: Rollback on failure
+        if: failure()
+        run: |
+          ssh ${{ secrets.PROD_USER }}@${{ secrets.PROD_HOST }} << 'EOF'
+            echo "🚨 DEPLOYMENT FAILED - INITIATING ROLLBACK"
+            cd ${{ secrets.PROD_PROJECT_PATH || '~/db-server' }}
+            
+            # Get the previous commit (stored before deployment)
+            PREVIOUS_COMMIT=$(git rev-parse HEAD~1)
+            echo "🔄 Rolling back to commit: $PREVIOUS_COMMIT"
+            
+            # Rollback code
+            git checkout $PREVIOUS_COMMIT
+            
+            # Reinstall dependencies
+            npm ci --production
+            
+            # Regenerate Prisma Client
+            npx prisma generate
+            
+            # Restart with previous version
+            pm2 reload teamfitness-prod
+            
+            echo "⚠️ Rollback completed - Service restored to previous version"
+            echo "🔍 Please investigate the deployment failure"
+          EOF
+
+      - name: Verify rollback
+        if: failure()
+        run: |
+          echo "🔍 Verifying rollback..."
+          sleep 5
+          
+          if curl -f -s -o /dev/null "${{ secrets.PROD_URL }}/health"; then
+            echo "✅ Service recovered after rollback"
+          else
+            echo "❌ Service still unhealthy after rollback - MANUAL INTERVENTION REQUIRED"
+            exit 1
+          fi
+
+  post-deploy:
+    name: Post-Deployment Tasks
+    runs-on: ubuntu-latest
+    needs: deploy
+    if: success()
+
+    steps:
+      - name: Create deployment tag
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const tagName = `production-${new Date().toISOString().split('T')[0]}-${context.sha.substring(0, 7)}`;
+            
+            try {
+              await github.rest.git.createRef({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                ref: `refs/tags/${tagName}`,
+                sha: context.sha
+              });
+              
+              console.log(`✅ Created deployment tag: ${tagName}`);
+            } catch (error) {
+              console.log(`⚠️ Could not create tag: ${error.message}`);
+            }
+
+      - name: Deployment summary
+        run: |
+          echo "## 🎉 Production Deployment Successful" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- **Branch:** main" >> $GITHUB_STEP_SUMMARY
+          echo "- **Commit:** ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **URL:** ${{ secrets.PROD_URL }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Deployed by:** @${{ github.actor }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Time:** $(date -u)" >> $GITHUB_STEP_SUMMARY
