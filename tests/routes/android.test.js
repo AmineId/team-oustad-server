@@ -4,8 +4,7 @@ const androidRoutes = require('../../routes/android');
 const {
   cleanDatabase,
   disconnectDatabase,
-  createTestGym,
-  prisma
+  createTestGym
 } = require('../helpers/testHelpers');
 
 // Create express app for testing
