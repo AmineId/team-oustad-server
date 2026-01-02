@@ -1,4 +1,5 @@
 const prisma = require('../../utils/prismaClient');
+const bcrypt = require('bcryptjs');
 const JWT_SECRET = process.env.JWT_SECRET || 'test_jwt_secret_key_for_testing_purposes';
 
 /**
