@@ -36,6 +36,7 @@ describe('Check-In Routes', () => {
     // Clean up before each test
     await prisma.checkIn.deleteMany({});
     await prisma.subscription.deleteMany({});
+    await prisma.passwordResetToken.deleteMany({});
     await prisma.member.deleteMany({});
     await prisma.admin.deleteMany({});
     await prisma.user.deleteMany({});

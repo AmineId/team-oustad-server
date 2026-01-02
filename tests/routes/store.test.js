@@ -34,6 +34,7 @@ describe('Store Routes', () => {
   beforeEach(async () => {
     // Clean up before each test
     await prisma.product.deleteMany({});
+    await prisma.passwordResetToken.deleteMany({});
     await prisma.member.deleteMany({});
     await prisma.admin.deleteMany({});
     await prisma.user.deleteMany({});

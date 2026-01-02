@@ -49,12 +49,11 @@ describe('Subscriptions Routes', () => {
       password: 'member123'
     });
 
-    testSubscriptionType = await createTestSubscriptionType(testGym.id, {
+    testSubscriptionType = await createTestSubscriptionType({
       name: 'Basic Monthly',
-      price: 50.00,
-      duration: 30,
-      plan: 'basic',
-      membership: 'individual'
+      monthlyPrice: 50.00,
+      durationMonths: 1,
+      sessionType: 'unlimited'
     });
   });
 
@@ -409,11 +408,10 @@ describe('Subscriptions Routes', () => {
         // Create another gym with member and payment
         const otherGym = await createTestGym({ name: 'Other Gym' });
         const otherMember = await createTestMember(otherGym.id);
-        const otherSubType = await createTestSubscriptionType(otherGym.id);
+        const otherSubType = await createTestSubscriptionType();
         const otherSub = await createTestSubscription(otherMember.id, otherSubType.id);
         await createTestPayment(otherMember.id, otherSub.id, {
-          status: 'completed',
-          isAcknowledged: false
+          status: 'completed'
         });
 
         const response = await request(app)
@@ -531,7 +529,7 @@ describe('Subscriptions Routes', () => {
     it('should only show payments from correct gym for admin', async () => {
       const otherGym = await createTestGym({ name: 'Other Gym' });
       const otherMember = await createTestMember(otherGym.id);
-      const otherSubType = await createTestSubscriptionType(otherGym.id);
+      const otherSubType = await createTestSubscriptionType();
       const otherSub = await createTestSubscription(otherMember.id, otherSubType.id);
       await createTestPayment(otherMember.id, otherSub.id, { status: 'pending' });
 

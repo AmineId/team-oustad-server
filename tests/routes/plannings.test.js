@@ -38,6 +38,7 @@ describe('Plannings Routes', () => {
     await prisma.planningDay.deleteMany({});
     await prisma.exercise.deleteMany({});
     await prisma.planning.deleteMany({});
+    await prisma.passwordResetToken.deleteMany({});
     await prisma.member.deleteMany({});
     await prisma.admin.deleteMany({});
     await prisma.user.deleteMany({});

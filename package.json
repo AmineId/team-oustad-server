@@ -20,6 +20,8 @@
     "db:reset": "npx prisma migrate reset --force",
     "db:up": "docker compose -f config/docker-compose.yml up -d",
     "db:down": "docker compose -f config/docker-compose.yml down",
+    "db:test:up": "docker compose -f config/docker-compose.test.yml up -d",
+    "db:test:down": "docker compose -f config/docker-compose.test.yml down",
     "test": "cross-env NODE_ENV=test jest --runInBand",
     "test:watch": "cross-env NODE_ENV=test jest --watch --runInBand",
     "test:coverage": "cross-env NODE_ENV=test jest --coverage --runInBand",

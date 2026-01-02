@@ -32,7 +32,8 @@ describe('Authentication Routes', () => {
   });
 
   beforeEach(async () => {
-    // Clean up users before each test
+    // Clean up users and related data before each test
+    await prisma.passwordResetToken.deleteMany({});
     await prisma.member.deleteMany({});
     await prisma.admin.deleteMany({});
     await prisma.user.deleteMany({});

@@ -444,7 +444,7 @@ describe('Members Routes', () => {
       const response = await request(app)
         .put(`/members/${testMember.id}/preferred-training-days`)
         .set('Authorization', authHeader(testAdmin))
-        .send({ preferredTrainingDays: ['tuesday', 'thursday'] });
+        .send({ preferredTrainingDays: [2, 4] }); // 2=Tuesday, 4=Thursday
 
       expect(response.status).toBe(200);
     });
@@ -453,7 +453,7 @@ describe('Members Routes', () => {
       const response = await request(app)
         .put(`/members/${otherMember.id}/preferred-training-days`)
         .set('Authorization', authHeader(testMember))
-        .send({ preferredTrainingDays: ['monday'] });
+        .send({ preferredTrainingDays: [1] }); // 1=Monday
 
       expect(response.status).toBe(403);
     });

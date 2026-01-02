@@ -34,6 +34,7 @@ describe('Banners Routes', () => {
   beforeEach(async () => {
     // Clean up before each test
     await prisma.banner.deleteMany({});
+    await prisma.passwordResetToken.deleteMany({});
     await prisma.member.deleteMany({});
     await prisma.admin.deleteMany({});
     await prisma.user.deleteMany({});

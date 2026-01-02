@@ -1,5 +1,6 @@
 const prisma = require('../../utils/prismaClient');
 const bcrypt = require('bcryptjs');
+const jwt = require('jsonwebtoken');
 const JWT_SECRET = process.env.JWT_SECRET || 'test_jwt_secret_key_for_testing_purposes';
 
 /**
@@ -8,15 +9,21 @@ const JWT_SECRET = process.env.JWT_SECRET || 'test_jwt_secret_key_for_testing_pu
 async function cleanDatabase() {
   // Delete in order to respect foreign key constraints
   await prisma.passwordResetToken.deleteMany({});
+  await prisma.bannerStats.deleteMany({});
+  await prisma.bannerVariant.deleteMany({});
+  await prisma.banner.deleteMany({});
+  await prisma.quotaNotification.deleteMany({});
+  await prisma.storeReservation.deleteMany({});
+  await prisma.storeProduct.deleteMany({});
+  await prisma.gymCheckIn.deleteMany({});
   await prisma.payment.deleteMany({});
   await prisma.planningExercise.deleteMany({});
   await prisma.planningDay.deleteMany({});
-  await prisma.exercise.deleteMany({});
   await prisma.planning.deleteMany({});
+  await prisma.exercise.deleteMany({});
   await prisma.memberMeasurement.deleteMany({});
   await prisma.memberGoal.deleteMany({});
   await prisma.subscription.deleteMany({});
-  await prisma.storeProduct.deleteMany({}); // Delete store products before users
   await prisma.member.deleteMany({});
   await prisma.admin.deleteMany({});
   await prisma.owner.deleteMany({});
@@ -53,6 +60,7 @@ async function createTestGym(data = {}) {
  */
 async function createTestOwner(gymId, data = {}) {
   const password = await bcrypt.hash(data.password || 'password123', 10);
+  const uniqueCode = data.uniqueCode || `OWN${Date.now().toString().slice(-6)}`;
   
   const user = await prisma.user.create({
     data: {
@@ -60,6 +68,7 @@ async function createTestOwner(gymId, data = {}) {
       email: data.email || `owner${Date.now()}@test.com`,
       phoneNumber: data.phoneNumber || `+33${Date.now().toString().slice(-9)}`,
       password: password,
+      uniqueCode: uniqueCode,
       firstName: data.firstName || 'Test',
       lastName: data.lastName || 'Owner',
       role: 'owner',
@@ -87,6 +96,7 @@ async function createTestOwner(gymId, data = {}) {
  */
 async function createTestAdmin(gymId, data = {}) {
   const password = await bcrypt.hash(data.password || 'password123', 10);
+  const uniqueCode = data.uniqueCode || `ADM${Date.now().toString().slice(-6)}`;
   
   const user = await prisma.user.create({
     data: {
@@ -94,14 +104,13 @@ async function createTestAdmin(gymId, data = {}) {
       email: data.email || `admin${Date.now()}@test.com`,
       phoneNumber: data.phoneNumber || `+33${Date.now().toString().slice(-9)}`,
       password: password,
+      uniqueCode: uniqueCode,
       firstName: data.firstName || 'Test',
       lastName: data.lastName || 'Admin',
       role: 'admin',
       gymId: gymId,
       Admin: {
-        create: {
-          position: data.position || 'Coach'
-        }
+        create: {}
       }
     },
     include: {
@@ -118,6 +127,7 @@ async function createTestAdmin(gymId, data = {}) {
  */
 async function createTestMember(gymId, data = {}) {
   const password = await bcrypt.hash(data.password || 'password123', 10);
+  const uniqueCode = data.uniqueCode || `MEM${Date.now().toString().slice(-6)}`;
   
   const user = await prisma.user.create({
     data: {
@@ -125,18 +135,20 @@ async function createTestMember(gymId, data = {}) {
       email: data.email || `member${Date.now()}@test.com`,
       phoneNumber: data.phoneNumber || `+33${Date.now().toString().slice(-9)}`,
       password: password,
+      uniqueCode: uniqueCode,
       firstName: data.firstName || 'Test',
       lastName: data.lastName || 'Member',
       role: 'member',
       gymId: gymId,
       Member: {
         create: {
+          uniqueCode: uniqueCode,
           onboarding: data.onboarding !== undefined ? data.onboarding : false,
           birthDate: data.birthDate || new Date('1990-01-01'),
           phone: data.phone || '+1234567890',
           profession: data.profession || 'Actif',
           fitnessLevel: data.fitnessLevel || 'intermediaire',
-          preferredTrainingDays: data.preferredTrainingDays || ['monday', 'wednesday', 'friday'],
+          preferredTrainingDays: data.preferredTrainingDays || [1, 3, 5], // 1=Monday, 3=Wednesday, 5=Friday
           joinedAt: data.joinedAt || new Date()
         }
       }
@@ -153,18 +165,18 @@ async function createTestMember(gymId, data = {}) {
 /**
  * Create a test subscription type
  */
-async function createTestSubscriptionType(gymId, data = {}) {
+async function createTestSubscriptionType(data = {}) {
   return await prisma.subscriptionType.create({
     data: {
-      displayId: data.displayId || `SUB${Date.now()}`,
-      name: data.name || 'Test Subscription',
+      displayId: data.displayId || `SUBT${Date.now()}`,
+      name: data.name || `Test Subscription ${Date.now()}`,
       description: data.description || 'Test subscription description',
-      duration: data.duration || 30,
-      price: data.price || 50.00,
-      plan: data.plan || 'basic',
-      membership: data.membership || 'individual',
-      advantages: data.advantages || ['Access to gym', 'Locker'],
-      gymId: gymId,
+      monthlyPrice: data.monthlyPrice || data.price || 50.00,
+      features: data.features || ['Access to gym', 'Locker'],
+      isActive: data.isActive !== undefined ? data.isActive : true,
+      sessionQuota: data.sessionQuota || null,
+      sessionType: data.sessionType || 'unlimited',
+      durationMonths: data.durationMonths || 1,
       ...data
     }
   });
@@ -179,14 +191,16 @@ async function createTestSubscription(memberId, subscriptionTypeId, data = {}) {
 
   return await prisma.subscription.create({
     data: {
-      displayId: data.displayId || `SUB${Date.now()}`,
+      displayId: data.displayId || `SUBS${Date.now()}`,
       memberId: memberId,
       subscriptionTypeId: subscriptionTypeId,
-      plan: data.plan || 'basic',
-      membership: data.membership || 'individual',
       startDate: startDate,
       endDate: endDate,
       status: data.status || 'active',
+      autoRenew: data.autoRenew !== undefined ? data.autoRenew : true,
+      paymentFrequency: data.paymentFrequency || 12,
+      sessionsUsed: data.sessionsUsed || 0,
+      sessionQuota: data.sessionQuota || null,
       ...data
     },
     include: {
@@ -206,10 +220,15 @@ async function createTestPayment(memberId, subscriptionId, data = {}) {
       memberId: memberId,
       subscriptionId: subscriptionId,
       amount: data.amount || 50.00,
-      method: data.method || 'cash',
+      currency: data.currency || 'MAD',
       status: data.status || 'completed',
-      paidAt: data.paidAt || new Date(),
-      isAcknowledged: data.isAcknowledged !== undefined ? data.isAcknowledged : false,
+      type: data.type || 'subscription',
+      paymentMethod: data.paymentMethod || data.method || 'cash',
+      transactionId: data.transactionId || `TXN${Date.now()}`,
+      description: data.description || null,
+      dueDate: data.dueDate || new Date(),
+      monthNumber: data.monthNumber || null,
+      paidAt: data.paidAt || (data.status === 'completed' ? new Date() : null),
       ...data
     }
   });
@@ -228,7 +247,6 @@ async function createTestPlanning(coachId, memberId, data = {}) {
       description: data.description || 'Test planning description',
       startDate: data.startDate || new Date(),
       endDate: data.endDate || new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
-      frequency: data.frequency || 'weekly',
       status: data.status || 'active',
       ...data
     }
@@ -238,7 +256,7 @@ async function createTestPlanning(coachId, memberId, data = {}) {
 /**
  * Create a test exercise
  */
-async function createTestExercise(gymId, data = {}) {
+async function createTestExercise(data = {}) {
   return await prisma.exercise.create({
     data: {
       displayId: data.displayId || `EXE${Date.now()}`,
@@ -246,9 +264,9 @@ async function createTestExercise(gymId, data = {}) {
       description: data.description || 'Test exercise description',
       category: data.category || 'strength',
       muscleGroup: data.muscleGroup || ['chest', 'arms'],
+      equipment: data.equipment || ['none'],
       difficulty: data.difficulty || 'beginner',
-      equipmentNeeded: data.equipmentNeeded || ['none'],
-      gymId: gymId,
+      instructions: data.instructions || null,
       ...data
     }
   });
