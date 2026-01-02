@@ -705,6 +705,34 @@ Les contributions sont les bienvenues ! Consultez [CONTRIBUTING.md](CONTRIBUTING
 
 ---
 
+## ⚙️ CI/CD et Déploiement Automatisé
+
+Le projet dispose d'une infrastructure CI/CD complète avec GitHub Actions :
+
+### 🧪 Tests Automatiques
+- ✅ Tests de toutes les routes API (auth, gyms, members, subscriptions, etc.)
+- ✅ Tests des services (email, notifications push - mockés)
+- ✅ Coverage de code automatique
+- ✅ Exécution à chaque push et PR
+
+### 🚀 Déploiement Preprod (staging branch)
+- ✅ Tests automatiques avant déploiement
+- ✅ Déploiement automatique sur VPS preprod
+- ✅ Redémarrage PM2 automatique
+- ✅ Health checks et rollback automatique
+
+### 🏭 Déploiement Production (main branch)
+- ✅ Tests complets avec coverage
+- ✅ Backup automatique de la base de données
+- ✅ Déploiement zero-downtime (cluster mode)
+- ✅ Monitoring étendu (60s)
+- ✅ Rollback automatique en cas d'erreur
+- ✅ Tags de déploiement automatiques
+
+**📖 Documentation complète** : [CI_CD_SETUP.md](docs/CI_CD_SETUP.md)
+
+---
+
 ## 📝 License
 
 MIT © Team Fitness
@@ -714,9 +742,10 @@ MIT © Team Fitness
 ## 💡 Support
 
 - **Documentation** : `/api-docs`
+- **CI/CD Setup** : [docs/CI_CD_SETUP.md](docs/CI_CD_SETUP.md)
 - **Email** : support@teamfitness.com
 - **Issues** : [GitHub Issues](https://github.com/teamfitness/db-server/issues)
 
 ---
 
-**Dernière mise à jour** : 11 novembre 2025
+**Dernière mise à jour** : Janvier 2026

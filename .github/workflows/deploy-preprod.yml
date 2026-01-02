@@ -1,0 +1,185 @@
+name: Deploy to Preprod (VPS)
+
+on:
+  push:
+    branches: [ staging ]
+  workflow_dispatch:
+
+jobs:
+  test:
+    name: Run Tests Before Deployment
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:14
+        env:
+          POSTGRES_USER: testuser
+          POSTGRES_PASSWORD: testpass
+          POSTGRES_DB: team_fitness_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      DATABASE_URL: postgresql://testuser:testpass@localhost:5432/team_fitness_test
+      JWT_SECRET: test_jwt_secret_key_for_ci_testing
+      NODE_ENV: test
+      SMTP_HOST: smtp.mailtrap.io
+      SMTP_PORT: 2525
+      SMTP_USER: test
+      SMTP_PASS: test
+      API_URL: http://localhost:3000
+      MOBILE_APP_LINK: https://play.google.com/store/apps/details?id=team.fitness.team_fitness_app
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Generate Prisma Client
+        run: npx prisma generate
+
+      - name: Run database migrations
+        run: npx prisma migrate deploy
+
+      - name: Run tests
+        run: npm run test:ci
+
+  deploy:
+    name: Deploy to Preprod VPS
+    runs-on: ubuntu-latest
+    needs: test
+    environment:
+      name: preprod
+      url: ${{ secrets.PREPROD_URL }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup SSH
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.PREPROD_SSH_KEY }}
+
+      - name: Add VPS to known hosts
+        run: |
+          mkdir -p ~/.ssh
+          ssh-keyscan -H ${{ secrets.PREPROD_HOST }} >> ~/.ssh/known_hosts
+
+      - name: Deploy to VPS
+        run: |
+          ssh ${{ secrets.PREPROD_USER }}@${{ secrets.PREPROD_HOST }} << 'EOF'
+            set -e
+            echo "🚀 Starting preprod deployment..."
+            
+            # Navigate to project directory
+            cd ${{ secrets.PREPROD_PROJECT_PATH || '~/db-server' }}
+            
+            # Store current commit for potential rollback
+            PREVIOUS_COMMIT=$(git rev-parse HEAD)
+            echo "$PREVIOUS_COMMIT" > /tmp/preprod_previous_commit.txt
+            echo "📝 Current commit: $PREVIOUS_COMMIT (saved for rollback)"
+            
+            # Pull latest changes
+            echo "📥 Pulling latest code from staging..."
+            git fetch origin
+            git checkout staging
+            git pull origin staging
+            
+            # Install dependencies
+            echo "📦 Installing dependencies..."
+            npm ci --production
+            
+            # Generate Prisma Client
+            echo "🔧 Generating Prisma Client..."
+            npx prisma generate
+            
+            # Run database migrations
+            echo "🗃️ Running database migrations..."
+            dotenv -e .env.preprod -- npx prisma migrate deploy
+            
+            # Restart PM2 process
+            echo "🔄 Restarting PM2 process..."
+            pm2 restart teamfitness-preprod || pm2 start ecosystem.config.js --only teamfitness-preprod
+            
+            # Wait for service to be ready
+            echo "⏳ Waiting for service to be ready..."
+            sleep 5
+            
+            # Check PM2 status
+            echo "✅ PM2 Status:"
+            pm2 list
+            
+            echo "🎉 Preprod deployment completed successfully!"
+          EOF
+
+      - name: Health Check
+        run: |
+          echo "🏥 Running health check..."
+          max_attempts=10
+          attempt=1
+          
+          while [ $attempt -le $max_attempts ]; do
+            echo "Attempt $attempt/$max_attempts..."
+            
+            if curl -f -s -o /dev/null "${{ secrets.PREPROD_URL }}/health"; then
+              echo "✅ Health check passed!"
+              exit 0
+            fi
+            
+            echo "❌ Health check failed, retrying in 5 seconds..."
+            sleep 5
+            attempt=$((attempt + 1))
+          done
+          
+          echo "❌ Health check failed after $max_attempts attempts"
+          exit 1
+
+      - name: Send deployment notification
+        if: always()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const status = '${{ job.status }}';
+            const emoji = status === 'success' ? '✅' : '❌';
+            const message = `${emoji} Preprod deployment ${status}!\n\nBranch: staging\nCommit: ${{ github.sha }}\nURL: ${{ secrets.PREPROD_URL }}`;
+            
+            console.log(message);
+
+      - name: Rollback on failure
+        if: failure()
+        run: |
+          ssh ${{ secrets.PREPROD_USER }}@${{ secrets.PREPROD_HOST }} << 'EOF'
+            echo "🔄 Rolling back to previous version..."
+            cd ${{ secrets.PREPROD_PROJECT_PATH || '~/db-server' }}
+            
+            # Get the previous commit from saved file
+            if [ -f /tmp/preprod_previous_commit.txt ]; then
+              PREVIOUS_COMMIT=$(cat /tmp/preprod_previous_commit.txt)
+              echo "🔄 Rolling back to saved commit: $PREVIOUS_COMMIT"
+            else
+              # Fallback to HEAD~1 if file not found
+              PREVIOUS_COMMIT=$(git rev-parse HEAD~1)
+              echo "🔄 Rolling back to previous commit (HEAD~1): $PREVIOUS_COMMIT"
+            fi
+            
+            git checkout $PREVIOUS_COMMIT
+            npm ci --production
+            npx prisma generate
+            pm2 restart teamfitness-preprod
+            echo "⚠️ Rollback completed"
+          EOF
