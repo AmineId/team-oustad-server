@@ -262,6 +262,9 @@ router.post('/', auth, async (req, res) => {
         fullName,
         role,
         gymId,
+      },
+      include: {
+        gym: true
       }
     });
 
@@ -1650,6 +1653,9 @@ router.post('/create-owner', requireOwner, async (req, res) => {
         fullName,
         role: 'owner',
         gymId,
+      },
+      include: {
+        gym: true
       }
     });
 
@@ -1829,6 +1835,9 @@ router.post('/create-admin', requireOwner, async (req, res) => {
         fullName,
         role: 'admin',
         gymId,
+      },
+      include: {
+        gym: true
       }
     });
 

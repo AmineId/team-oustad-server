@@ -304,6 +304,19 @@ router.post('/scan-qr', auth, async (req, res) => {
       return res.status(403).json({ error: 'Only admins can scan QR codes' });
     }
 
+    // Récupérer l'admin avec sa gymId
+    const adminUser = await prisma.user.findUnique({
+      where: { id: req.user.sub },
+      select: { id: true, gymId: true, fullName: true }
+    });
+
+    if (!adminUser) {
+      console.log(`❌ Admin non trouvé: ID ${req.user.sub}`);
+      return res.status(403).json({ error: 'Admin not found' });
+    }
+
+    console.log(`✅ Admin trouvé: ${adminUser.fullName} (Gym: ${adminUser.gymId})`);
+
     // Trouver l'utilisateur par son uniqueCode
     const member = await prisma.user.findFirst({
       where: { uniqueCode: qrCode },
@@ -336,8 +349,8 @@ router.post('/scan-qr', auth, async (req, res) => {
     }
 
     // Vérifier que le membre appartient à la même salle que l'admin
-    if (member.gymId !== req.user.gymId) {
-      console.log(`❌ Membre ${member.fullName} n'appartient pas à la salle de l'admin (membre: ${member.gymId}, admin: ${req.user.gymId})`);
+    if (member.gymId !== adminUser.gymId) {
+      console.log(`❌ Membre ${member.fullName} n'appartient pas à la salle de l'admin (membre: ${member.gymId}, admin: ${adminUser.gymId})`);
       return res.status(403).json({ error: 'Member does not belong to your gym' });
     }
 
@@ -351,7 +364,7 @@ router.post('/scan-qr', auth, async (req, res) => {
           error: 'Accès refusé - Aucun abonnement actif',
           reason: 'no_active_subscription',
           member: {
-            id: member.userId,
+            id: member.id,
             fullName: member.fullName,
             email: member.email
           }
@@ -359,43 +372,31 @@ router.post('/scan-qr', auth, async (req, res) => {
       }
 
       console.log(`✅ Abonnement valide pour ${member.fullName} - Statut: ${activeSubscription.activeCheck.details ? 'Paiement dû dans ' + activeSubscription.activeCheck.details.daysUntilDue + ' jours' : 'Actif'}`);
+
+      console.log(`✅ Accès autorisé pour ${member.fullName} - Abonnement valide jusqu'au ${activeSubscription.endDate}`);
+
+      const responseData = {
+        success: true,
+        member: {
+          id: member.id,
+          fullName: member.fullName,
+          email: member.email,
+          uniqueCode: member.uniqueCode,
+          subscription: activeSubscription ? {
+            id: activeSubscription.id,
+            status: activeSubscription.status,
+            endDate: activeSubscription.endDate,
+            isActive: activeSubscription.activeCheck.isActive,
+            nextPaymentDue: activeSubscription.activeCheck.details?.nextPaymentDue,
+            daysUntilDue: activeSubscription.activeCheck.details?.daysUntilDue
+          } : null
+        },
+        message: 'Access granted'
+      };
+
+      console.log(`📤 Réponse scan-qr:`, responseData);
+      res.json(responseData);
     }
-
-    console.log(`✅ Accès autorisé pour ${member.fullName} - Abonnement valide jusqu'au ${activeSubscription.endDate}`);
-
-    // Enregistrer l'accès
-    await prisma.accessLog.create({
-      data: {
-        memberId: member.member.userId,
-        adminId: req.user.sub,
-        gymId: req.user.gymId,
-        accessType: 'qr_scan'
-      }
-    });
-
-    const responseData = {
-      success: true,
-      member: {
-        id: member.userId,
-        fullName: member.fullName,
-        email: member.email,
-        uniqueCode: member.uniqueCode,
-        subscription: activeSubscription ? {
-          id: activeSubscription.id,
-          plan: activeSubscription.plan,
-          membership: activeSubscription.membership,
-          status: activeSubscription.status,
-          endDate: activeSubscription.endDate,
-          isActive: activeSubscription.activeCheck.isActive,
-          nextPaymentDue: activeSubscription.activeCheck.details?.nextPaymentDue,
-          daysUntilDue: activeSubscription.activeCheck.details?.daysUntilDue
-        } : null
-      },
-      message: 'Access granted'
-    };
-
-    console.log(`📤 Réponse scan-qr:`, responseData);
-    res.json(responseData);
 
   } catch (e) {
     console.error(`💥 Erreur dans /scan-qr:`, e);

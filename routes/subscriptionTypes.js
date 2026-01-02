@@ -60,7 +60,18 @@ router.get('/:id', async (req, res) => {
  */
 router.post('/', auth, async (req, res) => {
   try {
-    const requester = req.user;
+    const { PrismaClient } = require('@prisma/client');
+    const prisma = new PrismaClient();
+
+    // Récupérer l'utilisateur qui fait la requête
+    const requester = await prisma.user.findUnique({
+      where: { id: req.user.sub },
+      select: { id: true, role: true }
+    });
+
+    if (!requester) {
+      return res.status(403).json({ error: 'Utilisateur non trouvé' });
+    }
     
     // Seuls les owners peuvent créer des types
     if (requester.role !== 'owner') {
@@ -110,7 +121,18 @@ router.post('/', auth, async (req, res) => {
  */
 router.put('/:id', auth, async (req, res) => {
   try {
-    const requester = req.user;
+    const { PrismaClient } = require('@prisma/client');
+    const prisma = new PrismaClient();
+
+    // Récupérer l'utilisateur qui fait la requête
+    const requester = await prisma.user.findUnique({
+      where: { id: req.user.sub },
+      select: { id: true, role: true }
+    });
+
+    if (!requester) {
+      return res.status(403).json({ error: 'Utilisateur non trouvé' });
+    }
     
     if (requester.role !== 'owner') {
       return res.status(403).json({ error: 'Accès réservé aux propriétaires' });
@@ -157,7 +179,18 @@ router.put('/:id', auth, async (req, res) => {
  */
 router.delete('/:id', auth, async (req, res) => {
   try {
-    const requester = req.user;
+    const { PrismaClient } = require('@prisma/client');
+    const prisma = new PrismaClient();
+
+    // Récupérer l'utilisateur qui fait la requête
+    const requester = await prisma.user.findUnique({
+      where: { id: req.user.sub },
+      select: { id: true, role: true }
+    });
+
+    if (!requester) {
+      return res.status(403).json({ error: 'Utilisateur non trouvé' });
+    }
     
     if (requester.role !== 'owner') {
       return res.status(403).json({ error: 'Accès réservé aux propriétaires' });
@@ -204,7 +237,19 @@ router.delete('/:id', auth, async (req, res) => {
  */
 router.get('/:id/subscriptions', auth, async (req, res) => {
   try {
-    const requester = req.user;
+    const { PrismaClient } = require('@prisma/client');
+    const prisma = new PrismaClient();
+
+    // Récupérer l'utilisateur qui fait la requête
+    const requester = await prisma.user.findUnique({
+      where: { id: req.user.sub },
+      select: { id: true, role: true, gymId: true }
+    });
+
+    if (!requester) {
+      return res.status(403).json({ error: 'Utilisateur non trouvé' });
+    }
+
     const typeId = parseInt(req.params.id);
     
     if (requester.role === 'member') {

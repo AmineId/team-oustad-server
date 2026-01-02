@@ -23,16 +23,26 @@ router.post('/', auth, async (req, res) => {
       });
     }
     
+    // Récupérer l'utilisateur qui fait la requête
+    const { PrismaClient } = require('@prisma/client');
+    const prisma = new PrismaClient();
+    
+    const requester = await prisma.user.findUnique({
+      where: { id: req.user.sub },
+      select: { id: true, role: true, gymId: true }
+    });
+
+    if (!requester) {
+      return res.status(403).json({ error: 'Utilisateur non trouvé' });
+    }
+
     // Vérifier les permissions
-    const requester = req.user;
     if (requester.role === 'member' && requester.id !== memberId) {
       return res.status(403).json({ error: 'Accès refusé' });
     }
     
     if (requester.role === 'admin') {
       // Vérifier que le membre est dans la même salle
-      const { PrismaClient } = require('@prisma/client');
-      const prisma = new PrismaClient();
       const member = await prisma.user.findUnique({
         where: { id: memberId }
       });
@@ -81,8 +91,20 @@ router.get('/:id', auth, async (req, res) => {
     
     const status = await getSubscriptionStatus(subscriptionId);
     
+    // Récupérer l'utilisateur qui fait la requête
+    const { PrismaClient } = require('@prisma/client');
+    const prisma = new PrismaClient();
+    
+    const requester = await prisma.user.findUnique({
+      where: { id: req.user.sub },
+      select: { id: true, role: true, gymId: true }
+    });
+
+    if (!requester) {
+      return res.status(403).json({ error: 'Utilisateur non trouvé' });
+    }
+    
     // Vérifier les permissions
-    const requester = req.user;
     if (requester.role === 'member' && status.subscription.memberId !== requester.id) {
       return res.status(403).json({ error: 'Accès refusé' });
     }
@@ -107,14 +129,23 @@ router.get('/member/:memberId', auth, async (req, res) => {
   try {
     const memberId = parseInt(req.params.memberId);
     
+    // Récupérer l'utilisateur qui fait la requête
+    const { PrismaClient } = require('@prisma/client');
+    const prisma = new PrismaClient();
+    
+    const requester = await prisma.user.findUnique({
+      where: { id: req.user.sub },
+      select: { id: true, role: true, gymId: true }
+    });
+
+    if (!requester) {
+      return res.status(403).json({ error: 'Utilisateur non trouvé' });
+    }
+
     // Vérifier les permissions
-    const requester = req.user;
     if (requester.role === 'member' && requester.id !== memberId) {
       return res.status(403).json({ error: 'Accès refusé' });
     }
-    
-    const { PrismaClient } = require('@prisma/client');
-    const prisma = new PrismaClient();
     
     if (requester.role === 'admin') {
       const member = await prisma.user.findUnique({
@@ -279,14 +310,23 @@ router.post('/payments/:paymentId/complete', auth, async (req, res) => {
  */
 router.get('/payments/upcoming', auth, async (req, res) => {
   try {
+    // Récupérer l'utilisateur qui fait la requête
+    const { PrismaClient } = require('@prisma/client');
+    const prisma = new PrismaClient();
+    
+    const requester = await prisma.user.findUnique({
+      where: { id: req.user.sub },
+      select: { id: true, role: true, gymId: true }
+    });
+
+    if (!requester) {
+      return res.status(403).json({ error: 'Utilisateur non trouvé' });
+    }
+
     // Seuls les admins et owners peuvent voir tous les paiements à venir
-    const requester = req.user;
     if (requester.role === 'member') {
       return res.status(403).json({ error: 'Accès réservé aux administrateurs' });
     }
-    
-    const { PrismaClient } = require('@prisma/client');
-    const prisma = new PrismaClient();
     
     const now = new Date();
     const sevenDaysLater = new Date(now);
