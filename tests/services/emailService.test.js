@@ -88,12 +88,16 @@ describe('Email Service Integration Tests', () => {
 
   describe('Email service error handling', () => {
     it('should handle email sending errors gracefully', async () => {
-      // Mock to throw error
-      emailService.sendPasswordResetEmail.mockRejectedValueOnce(new Error('SMTP Error'));
+      // Override the mock to throw error for this specific test
+      const originalMock = emailService.sendPasswordResetEmail;
+      emailService.sendPasswordResetEmail = jest.fn().mockRejectedValue(new Error('SMTP Error'));
       
       await expect(
         emailService.sendPasswordResetEmail('invalid@test.com', 'token')
       ).rejects.toThrow('SMTP Error');
+      
+      // Restore original mock
+      emailService.sendPasswordResetEmail = originalMock;
     });
   });
 });
