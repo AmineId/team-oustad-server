@@ -89,6 +89,11 @@ jobs:
             # Navigate to project directory
             cd ${{ secrets.PREPROD_PROJECT_PATH || '~/db-server' }}
             
+            # Store current commit for potential rollback
+            PREVIOUS_COMMIT=$(git rev-parse HEAD)
+            echo "$PREVIOUS_COMMIT" > /tmp/preprod_previous_commit.txt
+            echo "📝 Current commit: $PREVIOUS_COMMIT (saved for rollback)"
+            
             # Pull latest changes
             echo "📥 Pulling latest code from staging..."
             git fetch origin
@@ -161,7 +166,18 @@ jobs:
           ssh ${{ secrets.PREPROD_USER }}@${{ secrets.PREPROD_HOST }} << 'EOF'
             echo "🔄 Rolling back to previous version..."
             cd ${{ secrets.PREPROD_PROJECT_PATH || '~/db-server' }}
-            git checkout HEAD~1
+            
+            # Get the previous commit from saved file
+            if [ -f /tmp/preprod_previous_commit.txt ]; then
+              PREVIOUS_COMMIT=$(cat /tmp/preprod_previous_commit.txt)
+              echo "🔄 Rolling back to saved commit: $PREVIOUS_COMMIT"
+            else
+              # Fallback to HEAD~1 if file not found
+              PREVIOUS_COMMIT=$(git rev-parse HEAD~1)
+              echo "🔄 Rolling back to previous commit (HEAD~1): $PREVIOUS_COMMIT"
+            fi
+            
+            git checkout $PREVIOUS_COMMIT
             npm ci --production
             npx prisma generate
             pm2 restart teamfitness-preprod

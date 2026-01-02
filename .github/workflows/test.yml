@@ -2,9 +2,9 @@ name: Test All Routes
 
 on:
   push:
-    branches: [ main, staging, develop ]
+    branches: [ main, staging, 'feat/**', 'fix/**' ]
   pull_request:
-    branches: [ main, staging, develop ]
+    branches: [ main, staging ]
 
 jobs:
   test:
