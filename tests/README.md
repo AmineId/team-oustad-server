@@ -9,11 +9,20 @@ tests/
 ├── setup.js                      # Configuration globale Jest
 ├── helpers/
 │   └── testHelpers.js           # Utilitaires de test (création fixtures, etc.)
+├── services/
+│   └── emailService.test.js     # Tests des services (email mocking)
 └── routes/
     ├── auth.test.js             # Tests authentification
     ├── gyms.test.js             # Tests gestion des salles
     ├── subscriptions.test.js    # Tests abonnements et paiements
-    └── members.test.js          # Tests profils membres
+    ├── members.test.js          # Tests profils membres
+    ├── plannings.test.js        # Tests plannings et exercices
+    ├── subscriptionTypes.test.js # Tests types d'abonnements
+    ├── banners.test.js          # Tests bannières
+    ├── checkIn.test.js          # Tests check-in/check-out
+    ├── store.test.js            # Tests boutique
+    ├── users.test.js            # Tests utilisateurs
+    └── android.test.js          # Tests endpoints Android
 ```
 
 ## 🚀 Commandes de Test
@@ -31,6 +40,9 @@ npm run test:watch
 
 # Mode verbose (plus de détails)
 npm run test:verbose
+
+# Mode CI (pour GitHub Actions)
+npm run test:ci
 ```
 
 ### Tests par Module
@@ -46,6 +58,69 @@ npm run test:subscriptions
 
 # Tests des membres
 npm run test:members
+```
+
+## ⚙️ Configuration des Tests
+
+### 1. Base de Données de Test
+
+Les tests nécessitent une base de données PostgreSQL séparée. Deux options :
+
+#### Option A : Docker (Recommandé)
+```bash
+# Lancer PostgreSQL avec Docker
+docker run -d \
+  --name teamfitness-test-db \
+  -p 5432:5432 \
+  -e POSTGRES_USER=testuser \
+  -e POSTGRES_PASSWORD=testpass \
+  -e POSTGRES_DB=team_fitness_test \
+  postgres:14
+
+# Arrêter
+docker stop teamfitness-test-db
+
+# Supprimer
+docker rm teamfitness-test-db
+```
+
+#### Option B : PostgreSQL Local
+```bash
+# Créer une base de test
+createdb team_fitness_test -U testuser
+
+# Ou via psql
+psql -U postgres
+CREATE DATABASE team_fitness_test;
+CREATE USER testuser WITH PASSWORD 'testpass';
+GRANT ALL PRIVILEGES ON DATABASE team_fitness_test TO testuser;
+```
+
+### 2. Configuration de l'Environnement
+
+```bash
+# Copier le fichier d'exemple
+cp .env.test.example .env.test
+
+# Éditer si nécessaire (déjà configuré par défaut)
+nano .env.test
+```
+
+### 3. Migrations de la Base de Test
+
+```bash
+# Appliquer les migrations
+DATABASE_URL="postgresql://testuser:testpass@localhost:5432/team_fitness_test" \
+  npx prisma migrate deploy
+
+# Générer le client Prisma
+npx prisma generate
+```
+
+### 4. Exécuter les Tests
+
+```bash
+npm test
 ```
 
 ### Tests CI/CD
