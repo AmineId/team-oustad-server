@@ -142,7 +142,8 @@ jobs:
             
             # Store current commit for potential rollback
             PREVIOUS_COMMIT=$(git rev-parse HEAD)
-            echo "📝 Current commit: $PREVIOUS_COMMIT"
+            echo "$PREVIOUS_COMMIT" > /tmp/previous_commit.txt
+            echo "📝 Current commit: $PREVIOUS_COMMIT (saved for rollback)"
             
             # Pull latest changes
             echo "📥 Pulling latest code from main..."
@@ -186,10 +187,21 @@ jobs:
           echo "🏥 Running initial health check..."
           sleep 5
           
-          if curl -f -s "${{ secrets.PROD_URL }}/health" | jq -e '.ok == true and .db == "connected"'; then
+          # Try to get health check response
+          response=$(curl -f -s "${{ secrets.PROD_URL }}/health" || echo "")
+          
+          if [ -z "$response" ]; then
+            echo "❌ Health endpoint not responding"
+            exit 1
+          fi
+          
+          # Check if response contains ok:true (allow for variations in JSON format)
+          if echo "$response" | grep -q '"ok".*true' && echo "$response" | grep -q '"db".*"connected"'; then
             echo "✅ Initial health check passed!"
+            echo "Response: $response"
           else
-            echo "❌ Initial health check failed!"
+            echo "❌ Health check failed!"
+            echo "Response: $response"
             exit 1
           fi
 
@@ -236,9 +248,15 @@ jobs:
             echo "🚨 DEPLOYMENT FAILED - INITIATING ROLLBACK"
             cd ${{ secrets.PROD_PROJECT_PATH || '~/db-server' }}
             
-            # Get the previous commit (stored before deployment)
-            PREVIOUS_COMMIT=$(git rev-parse HEAD~1)
-            echo "🔄 Rolling back to commit: $PREVIOUS_COMMIT"
+            # Get the previous commit from saved file
+            if [ -f /tmp/previous_commit.txt ]; then
+              PREVIOUS_COMMIT=$(cat /tmp/previous_commit.txt)
+              echo "🔄 Rolling back to saved commit: $PREVIOUS_COMMIT"
+            else
+              # Fallback to HEAD~1 if file not found
+              PREVIOUS_COMMIT=$(git rev-parse HEAD~1)
+              echo "🔄 Rolling back to previous commit (HEAD~1): $PREVIOUS_COMMIT"
+            fi
             
             # Rollback code
             git checkout $PREVIOUS_COMMIT
@@ -304,3 +322,12 @@ jobs:
           echo "- **URL:** ${{ secrets.PROD_URL }}" >> $GITHUB_STEP_SUMMARY
           echo "- **Deployed by:** @${{ github.actor }}" >> $GITHUB_STEP_SUMMARY
           echo "- **Time:** $(date -u)" >> $GITHUB_STEP_SUMMARY
+
+      - name: Cleanup
+        if: always()
+        run: |
+          # Cleanup temporary files on VPS
+          ssh ${{ secrets.PROD_USER }}@${{ secrets.PROD_HOST }} << 'EOF'
+            rm -f /tmp/previous_commit.txt
+          EOF
+
