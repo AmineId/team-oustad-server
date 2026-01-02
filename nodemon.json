@@ -1,0 +1,14 @@
+{
+  "watch": ["routes", "middleware", "services", "index.js", "prisma/schema.prisma"],
+  "ext": "js,json",
+  "ignore": [
+    "node_modules",
+    "prisma/migrations"
+  ],
+  "env": {
+    "PORT": "3000"
+  },
+  "exec": "node index.js",
+  "verbose": true,
+  "delay": 500
+}

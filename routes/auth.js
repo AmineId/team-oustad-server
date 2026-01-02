@@ -1,15 +1,13 @@
 const express = require('express');
 const router = express.Router();
-const { formatUser } = require('../utils/responseFormatter');
-const prisma = require('../utils/prismaClient');
+const { PrismaClient } = require('@prisma/client');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
-const { sendPasswordResetEmail, sendAccountSetupEmail } = require('../services/emailService');
+const { sendPasswordResetEmail } = require('../services/emailService');
 const { getActiveSubscription, getSubscriptionsWithStatus } = require('../utils/subscriptionUtils');
-const { getFullName, formatUserWithFullName } = require('../utils/nameUtils');
-const { authLimiter } = require('../middleware/rateLimiter');
-const logger = require('../utils/logger');
+
+const prisma = new PrismaClient();
 
 const JWT_SECRET = process.env.JWT_SECRET || 'change_this_secret';
 
@@ -25,107 +23,10 @@ const sanitizeEmail = (email) => {
 
 /**
  * @swagger
- * /auth/check-phone:
- *   post:
- *     summary: Vérifier si un numéro de téléphone existe
- *     description: Vérifie si un numéro de téléphone est déjà enregistré et si un mot de passe est configuré
- *     tags: [Authentification]
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             required:
- *               - phoneNumber
- *             properties:
- *               phoneNumber:
- *                 type: string
- *                 example: "+33612345678"
- *     responses:
- *       200:
- *         description: Numéro vérifié avec succès
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 exists:
- *                   type: boolean
- *                   example: true
- *                 hasPassword:
- *                   type: boolean
- *                   example: true
- *                 message:
- *                   type: string
- *                   example: "Ce numéro existe déjà avec un mot de passe configuré"
- *       400:
- *         description: Numéro de téléphone manquant
- *       500:
- *         description: Erreur serveur
- */
-router.post('/check-phone', authLimiter, async (req, res) => {
-  const { phoneNumber } = req.body;
-  logger.info(`📱 Vérification numéro de téléphone - PhoneNumber: ${phoneNumber}`);
-  
-  if (!phoneNumber) {
-    logger.warn(`❌ Numéro de téléphone manquant`);
-    return res.status(400).json({ error: 'Numéro de téléphone requis' });
-  }
-
-  try {
-    const user = await prisma.user.findUnique({
-      where: { phoneNumber },
-      select: {
-        id: true,
-        phoneNumber: true,
-        password: true,
-        email: true
-      }
-    });
-
-    if (!user) {
-      logger.info(`✅ Numéro ${phoneNumber} n'existe pas - Création possible`);
-      return res.json({
-        exists: false,
-        hasPassword: false,
-        message: 'Ce numéro n\'est pas encore enregistré'
-      });
-    }
-
-    // Vérifier si le mot de passe est configuré
-    // Un mot de passe temporaire long (généré automatiquement) indique qu'aucun mot de passe n'a été défini
-    const hasPassword = user.password && user.password.length > 0;
-
-    logger.warn(`⚠️ Numéro ${phoneNumber} existe déjà - hasPassword: ${hasPassword}`);
-    
-    if (hasPassword) {
-      return res.status(409).json({
-        exists: true,
-        hasPassword: true,
-        error: 'Vous avez déjà un compte avec un mot de passe. Si vous l\'avez oublié, cliquez sur "Réinitialiser le mot de passe"',
-        hasEmail: !!user.email
-      });
-    } else {
-      return res.json({
-        exists: true,
-        hasPassword: false,
-        message: 'Ce numéro existe mais aucun mot de passe n\'est configuré'
-      });
-    }
-
-  } catch (e) {
-    logger.error(`💥 Erreur vérification numéro de téléphone:`, e);
-    res.status(500).json({ error: e.message });
-  }
-});
-
-/**
- * @swagger
  * /auth/login:
  *   post:
  *     summary: Connexion utilisateur
- *     description: Authentifie un utilisateur avec email ou numéro de téléphone et retourne un token JWT
+ *     description: Authentifie un utilisateur et retourne un token JWT
  *     tags: [Authentification]
  *     requestBody:
  *       required: true
@@ -134,15 +35,13 @@ router.post('/check-phone', authLimiter, async (req, res) => {
  *           schema:
  *             type: object
  *             required:
+ *               - email
  *               - password
  *             properties:
  *               email:
  *                 type: string
  *                 format: email
  *                 example: "admin@teamfitness.com"
- *               phoneNumber:
- *                 type: string
- *                 example: "+33612345678"
  *               password:
  *                 type: string
  *                 example: "admin123"
@@ -184,212 +83,139 @@ router.post('/check-phone', authLimiter, async (req, res) => {
  *       500:
  *         description: Erreur serveur
  */
-// Login: expect { email or phoneNumber, password }
-router.post('/login', authLimiter, async (req, res) => {
-  const { email, phoneNumber, password } = req.body;
-  const identifier = email || phoneNumber;
-  logger.info(`🔐 Tentative de connexion - Identifiant: ${identifier}`);
+// Login: expect { email, password }
+router.post('/login', async (req, res) => {
+  const { email, password } = req.body;
+  console.log(`🔐 Tentative de connexion - Email: ${email}`);
   
-  if ((!email && !phoneNumber) || !password) {
-    logger.warn(`❌ Connexion échouée - Identifiant ou password manquant`);
-    return res.status(400).json({ error: 'email or phoneNumber and password required' });
+  if (!email || !password) {
+    console.log(`❌ Connexion échouée - Email ou password manquant`);
+    return res.status(400).json({ error: 'email and password required' });
+  }
+
+  // Sanitize email to remove any null bytes or control characters
+  const sanitizedEmail = sanitizeEmail(email);
+  
+  if (sanitizedEmail !== email.toLowerCase().trim()) {
+    console.log(`⚠️  Email contenait des caractères invalides, nettoyé: ${sanitizedEmail}`);
   }
 
   try {
-    let user;
-    
-    // Find user by email or phoneNumber
-    if (email) {
-      const sanitizedEmail = sanitizeEmail(email);
-      if (sanitizedEmail !== email.toLowerCase().trim()) {
-        logger.warn(`⚠️  Email contenait des caractères invalides, nettoyé: ${sanitizedEmail}`);
+    // Find user by email
+    const user = await prisma.user.findUnique({
+      where: { email: sanitizedEmail },
+      include: {
+        admin: true,
+        member: {
+          include: {
+            subscriptions: {
+              include: {
+                payments: true
+              }
+            },
+            payments: true
+          }
+        },
+        gym: true
       }
-      user = await prisma.user.findUnique({
-        where: { email: sanitizedEmail },
-        include: {
-          Admin: true,
-          Member: {
-            include: {
-              Subscription: {
-                include: {
-                  Payment: true
-                }
-              },
-              Payment: true
-            }
-          },
-          Gym: true
-        }
-      });
-    } else if (phoneNumber) {
-      user = await prisma.user.findUnique({
-        where: { phoneNumber: phoneNumber },
-        include: {
-          Admin: true,
-          Member: {
-            include: {
-              Subscription: {
-                include: {
-                  Payment: true
-                }
-              },
-              Payment: true
-            }
-          },
-          Gym: true
-        }
-      });
-    }
+    });
 
     if (!user) {
-      logger.warn(`❌ Connexion échouée - Utilisateur non trouvé: ${identifier}`);
+      console.log(`❌ Connexion échouée - Utilisateur non trouvé: ${email}`);
       return res.status(401).json({ error: 'Invalid credentials' });
     }
 
-    logger.info(`✅ Utilisateur trouvé: ${getFullName(user)} (${user.role}) - ID: ${user.id}`);
+    console.log(`✅ Utilisateur trouvé: ${user.fullName} (${user.role}) - ID: ${user.id}`);
 
     // Check password
     const valid = await bcrypt.compare(password, user.password);
-    logger.debug(`🔍 Vérification password: ${valid ? '✅ VALIDE' : '❌ INVALIDE'}`);
+    console.log(`🔍 Vérification password: ${valid ? '✅ VALIDE' : '❌ INVALIDE'}`);
 
     if (!valid) {
-      logger.warn(`❌ Connexion échouée - Mot de passe incorrect pour: ${identifier}`);
+      console.log(`❌ Connexion échouée - Mot de passe incorrect pour: ${email}`);
       return res.status(401).json({ error: 'Invalid credentials' });
     }
 
-    logger.info(`✅ Connexion réussie pour: ${getFullName(user)} (${user.role})`);
-
-    // Récupérer le statut onboarding du membre (seulement pour les membres)
-    const onboarding = user.role === 'member' ? (user.Member?.onboarding || false) : false;
-    logger.debug(`🔔 Onboarding requis: ${onboarding ? 'OUI ✨' : 'NON'}`);
-
-    // Mettre à jour la date de dernière connexion
-    await prisma.user.update({
-      where: { id: user.id },
-      data: { lastLoginAt: new Date() }
-    });
+    console.log(`✅ Connexion réussie pour: ${user.fullName} (${user.role})`);
 
     // Token valid for 30 days
     const token = jwt.sign({
       sub: user.id,
       email: user.email,
-      phoneNumber: user.phoneNumber,
-      type: user.role,
-      gymId: user.gymId // Ajouter gymId dans le token
+      type: user.role
     }, JWT_SECRET, { expiresIn: '30d' });
 
-    logger.debug(`🎫 Token JWT généré pour: ${user.email}`);
+    console.log(`🎫 Token JWT généré pour: ${user.email}`);
 
     // Return different data based on user role
     if (user.role === 'admin') {
-      logger.info(`👨‍💼 Réponse admin préparée pour: ${getFullName(user)}`);
+      console.log(`👨‍💼 Réponse admin préparée pour: ${user.fullName}`);
       const responseData = {
-        
         token,
-        onboarding,
         user: {
           id: user.id,
-          displayId: user.displayId,
           email: user.email,
-          phoneNumber: user.phoneNumber,
-          firstName: user.firstName,
-          lastName: user.lastName,
-          fullName: getFullName(user),
-          role: user.role,
+          fullName: user.fullName,
           gymId: user.gymId,
-          gym: user.Gym,
-          fcmToken: user.fcmToken,
-          lastLoginAt: user.lastLoginAt,
-          createdAt: user.createdAt,
-          updatedAt: user.updatedAt,
+          gym: user.gym,
           type: 'admin'
         }
       };
-      logger.debug(`📤 Réponse login admin: ${JSON.stringify({
+      console.log(`📤 Réponse login admin:`, {
         token: token.substring(0, 20) + '...',
         user: responseData.user
-      })}`);
+      });
       res.json(responseData);
     } else if (user.role === 'owner') {
-      logger.info(`👑 Réponse owner préparée pour: ${getFullName(user)}`);
+      console.log(`👑 Réponse owner préparée pour: ${user.fullName}`);
       const responseData = {
         token,
-        onboarding,
         user: {
           id: user.id,
-          displayId: user.displayId,
           email: user.email,
-          phoneNumber: user.phoneNumber,
-          firstName: user.firstName,
-          lastName: user.lastName,
-          fullName: getFullName(user),
-          role: user.role,
+          fullName: user.fullName,
           gymId: user.gymId,
-          gym: user.Gym,
-          fcmToken: user.fcmToken,
-          lastLoginAt: user.lastLoginAt,
-          createdAt: user.createdAt,
-          updatedAt: user.updatedAt,
+          gym: user.gym,
           permissions: {
-            canManageAdmins: user.Owner?.canManageAdmins || false,
-            canManageGyms: user.Owner?.canManageGyms || false,
-            canViewReports: user.Owner?.canViewReports || false,
-            maxGymsAllowed: user.Owner?.maxGymsAllowed || 0,
+            canManageAdmins: user.owner?.canManageAdmins || false,
+            canManageGyms: user.owner?.canManageGyms || false,
+            canViewReports: user.owner?.canViewReports || false,
+            maxGymsAllowed: user.owner?.maxGymsAllowed || 0,
           },
           type: 'owner'
         }
       };
-      logger.debug(`📤 Réponse login owner: ${JSON.stringify({
+      console.log(`� Réponse login owner:`, {
         token: token.substring(0, 20) + '...',
         user: responseData.user
-      })}`);
+      });
       res.json(responseData);
     } else if (user.role === 'member') {
-      logger.info(`👤 Réponse membre préparée pour: ${getFullName(user)}`);
+      console.log(`👤 Réponse membre préparée pour: ${user.fullName}`);
       const responseData = {
         token,
-        onboarding,
         user: {
           id: user.id,
-          displayId: user.displayId,
           email: user.email,
-          phoneNumber: user.phoneNumber,
-          firstName: user.firstName,
-          lastName: user.lastName,
-          fullName: getFullName(user),
-          role: user.role,
+          fullName: user.fullName,
           gymId: user.gymId,
-          gym: user.Gym,
-          fcmToken: user.fcmToken,
-          lastLoginAt: user.lastLoginAt,
-          createdAt: user.createdAt,
-          updatedAt: user.updatedAt,
-          profileImage: user.profileImage ? Buffer.from(user.profileImage).toString('base64') : null,
-          qrCode: user.qrCode ? Buffer.from(user.qrCode).toString('base64') : null,
-          member: {
-            onboarding: user.Member?.onboarding,
-            birthDate: user.Member?.birthDate,
-            profession: user.Member?.profession,
-            fitnessLevel: user.Member?.fitnessLevel,
-            preferredTrainingDays: user.Member?.preferredTrainingDays,
-            joinedAt: user.Member?.joinedAt,
-          },
-          subscriptions: user.Member?.Subscription || [],
-          payments: user.Member?.Payment || [],
+          gym: user.gym,
+          subscriptions: user.member?.subscriptions || [],
+          payments: user.member?.payments || [],
           type: 'member'
         }
       };
-      logger.debug(`📤 Réponse login membre: ${JSON.stringify({
+      console.log(`📤 Réponse login membre:`, {
         token: token.substring(0, 20) + '...',
         user: responseData.user
-      })}`);
+      });
       res.json(responseData);
     } else {
-      logger.warn(`❓ Rôle inconnu: ${user.role} pour ${getFullName(user)}`);
+      console.log(`❓ Rôle inconnu: ${user.role} pour ${user.fullName}`);
       return res.status(400).json({ error: 'Invalid user role' });
     }
   } catch (e) {
-    logger.error(`💥 Erreur lors de la connexion:`, e);
+    console.error(`💥 Erreur lors de la connexion:`, e);
     res.status(500).json({ error: e.message });
   }
 });
@@ -468,60 +294,39 @@ router.post('/login', authLimiter, async (req, res) => {
  */
 // Protected: scan QR code for access
 router.post('/scan-qr', auth, async (req, res) => {
-  // Support à la fois qrCode et qrData pour rétrocompatibilité
-  let qrCodeRaw = req.body.qrCode || req.body.qrData;
-  
+  const { qrCode } = req.body;
+  console.log(`📱 Scan QR - User ID: ${req.user?.sub}, Email: ${req.user?.email}, QR Code: ${qrCode}`);
+
   try {
-    if (!qrCodeRaw) {
-      logger.warn(`❌ QR code manquant dans la requête`);
-      return res.status(400).json({ error: 'QR code is required', field: 'qrCode or qrData' });
-    }
-
-    // Parser le QR code si c'est un JSON string ou un objet
-    let qrData;
-    let displayId;
-
-    if (typeof qrCodeRaw === 'string') {
-      try {
-        qrData = JSON.parse(qrCodeRaw);
-        displayId = qrData.displayId || qrCodeRaw; // Utiliser displayId du JSON ou le string brut
-      } catch (e) {
-        displayId = qrCodeRaw; // Si ce n'est pas du JSON, utiliser tel quel
-      }
-    } else if (typeof qrCodeRaw === 'object') {
-      qrData = qrCodeRaw;
-      displayId = qrData.displayId;
-    } else {
-      displayId = String(qrCodeRaw);
-    }
-
-    logger.info(`📱 Scan QR - User ID: ${req.user?.sub}, Email: ${req.user?.email}, GymID: ${req.user?.gymId}, DisplayID: ${displayId}`);
-
     // Vérifier que l'utilisateur est un admin
     if (req.user.type !== 'admin') {
-      logger.warn(`❌ Accès refusé: utilisateur ${req.user.email} n'est pas admin (type: ${req.user.type})`);
+      console.log(`❌ Accès refusé: utilisateur ${req.user.email} n'est pas admin (type: ${req.user.type})`);
       return res.status(403).json({ error: 'Only admins can scan QR codes' });
     }
 
-    // Vérifier que l'admin a un gymId
-    if (!req.user.gymId) {
-      logger.error(`❌ Admin ${req.user.email} n'a pas de gymId configuré - Token doit être régénéré`);
-      return res.status(403).json({ 
-        error: 'Admin account not properly configured - missing gymId',
-        message: 'Please log in again to get a new token with gymId'
-      });
+    // Récupérer l'admin avec sa gymId
+    const adminUser = await prisma.user.findUnique({
+      where: { id: req.user.sub },
+      select: { id: true, gymId: true, fullName: true }
+    });
+
+    if (!adminUser) {
+      console.log(`❌ Admin non trouvé: ID ${req.user.sub}`);
+      return res.status(403).json({ error: 'Admin not found' });
     }
 
-    // Trouver l'utilisateur par son displayId
+    console.log(`✅ Admin trouvé: ${adminUser.fullName} (Gym: ${adminUser.gymId})`);
+
+    // Trouver l'utilisateur par son uniqueCode
     const member = await prisma.user.findFirst({
-      where: { displayId },
+      where: { uniqueCode: qrCode },
       include: {
-        Member: {
+        member: {
           include: {
-            Subscription: {
+            subscriptions: {
               where: { status: 'active' },
               include: {
-                Payment: {
+                payments: {
                   orderBy: { createdAt: 'desc' },
                   take: 1 // Dernier paiement de l'abonnement
                 }
@@ -529,137 +334,72 @@ router.post('/scan-qr', auth, async (req, res) => {
             },
           }
         },
-        Gym: true
+        gym: true
       }
     });
 
     if (!member) {
-      logger.warn(`❌ Membre non trouvé avec displayId: ${displayId}`);
-      return res.status(404).json({ error: 'Member not found', displayId });
+      console.log(`❌ Membre non trouvé avec QR code: ${qrCode}`);
+      return res.status(404).json({ error: 'Member not found' });
     }
 
     if (member.role !== 'member') {
-      logger.warn(`❌ Utilisateur trouvé mais n'est pas membre: ${getFullName(member)} (rôle: ${member.role})`);
+      console.log(`❌ Utilisateur trouvé mais n'est pas membre: ${member.fullName} (rôle: ${member.role})`);
       return res.status(400).json({ error: 'QR code is not for a member' });
     }
 
     // Vérifier que le membre appartient à la même salle que l'admin
-    if (member.gymId !== req.user.gymId) {
-      logger.warn(`❌ Membre ${getFullName(member)} n'appartient pas à la salle de l'admin (membre: ${member.gymId}, admin: ${req.user.gymId})`);
+    if (member.gymId !== adminUser.gymId) {
+      console.log(`❌ Membre ${member.fullName} n'appartient pas à la salle de l'admin (membre: ${member.gymId}, admin: ${adminUser.gymId})`);
       return res.status(403).json({ error: 'Member does not belong to your gym' });
     }
 
     // Vérifier l'abonnement actif pour les membres
     if (member.role === 'member') {
-      // Debug: vérifier ce qui est récupéré
-      logger.info(`🔍 Debug member.Member: ${JSON.stringify({
-        userId: member.Member?.userId,
-        hasSubscription: !!member.Member?.Subscription,
-        hasSubscriptions: !!member.Member?.subscriptions,
-        SubscriptionLength: member.Member?.Subscription?.length,
-        subscriptionsLength: member.Member?.subscriptions?.length
-      })}`);
-      
-      if (!member.Member) {
-        logger.error(`❌ Membre ${getFullName(member)} n'a pas de profil Member en base`);
-        return res.status(500).json({
-          error: 'Member profile not found in database',
-          message: 'Please contact support'
-        });
-      }
-
-      const activeSubscription = getActiveSubscription(member.Member);
+      const activeSubscription = getActiveSubscription(member.member);
 
       if (!activeSubscription) {
-        logger.warn(`❌ Membre ${getFullName(member)} n'a pas d'abonnement actif - Subscriptions: ${member.Member.Subscription?.length || 0}`);
+        console.log(`❌ Membre ${member.fullName} n'a pas d'abonnement actif`);
         return res.status(403).json({
           error: 'Accès refusé - Aucun abonnement actif',
           reason: 'no_active_subscription',
           member: {
-            id: member.userId,
-            fullName: getFullName(member),
+            id: member.id,
+            fullName: member.fullName,
             email: member.email
           }
         });
       }
 
-      logger.info(`✅ Abonnement valide pour ${getFullName(member)} - Statut: ${activeSubscription.activeCheck.details ? 'Paiement dû dans ' + activeSubscription.activeCheck.details.daysUntilDue + ' jours' : 'Actif'}`);
+      console.log(`✅ Abonnement valide pour ${member.fullName} - Statut: ${activeSubscription.activeCheck.details ? 'Paiement dû dans ' + activeSubscription.activeCheck.details.daysUntilDue + ' jours' : 'Actif'}`);
+
+      console.log(`✅ Accès autorisé pour ${member.fullName} - Abonnement valide jusqu'au ${activeSubscription.endDate}`);
+
+      const responseData = {
+        success: true,
+        member: {
+          id: member.id,
+          fullName: member.fullName,
+          email: member.email,
+          uniqueCode: member.uniqueCode,
+          subscription: activeSubscription ? {
+            id: activeSubscription.id,
+            status: activeSubscription.status,
+            endDate: activeSubscription.endDate,
+            isActive: activeSubscription.activeCheck.isActive,
+            nextPaymentDue: activeSubscription.activeCheck.details?.nextPaymentDue,
+            daysUntilDue: activeSubscription.activeCheck.details?.daysUntilDue
+          } : null
+        },
+        message: 'Access granted'
+      };
+
+      console.log(`📤 Réponse scan-qr:`, responseData);
+      res.json(responseData);
     }
-
-    logger.info(`✅ Accès autorisé pour ${getFullName(member)}`);
-
-
-    // Récupérer le quota complet de l'abonnement actif
-    const activeSubscription = getActiveSubscription(member.Member);
-    let quota = null;
-    
-    if (activeSubscription) {
-      const checkInService = require('../services/checkInService');
-      try {
-        quota = await checkInService.getSubscriptionQuota(activeSubscription.id);
-      } catch (error) {
-        logger.error(`❌ Erreur lors de la récupération du quota:`, error);
-      }
-    }
-
-    // Récupérer le dernier check-in du membre
-    const lastCheckIn = await prisma.gymCheckIn.findFirst({
-      where: { memberId: member.userId },
-      orderBy: { checkInTime: 'desc' },
-      include: { 
-        Gym: {
-          select: {
-            id: true,
-            name: true
-          }
-        }
-      }
-    });
-
-    // Générer un message contextuel
-    let message = 'Accès autorisé';
-    if (quota) {
-      if (quota.isUnlimited) {
-        message = 'Accès autorisé - Séances illimitées';
-      } else if (quota.canCheckIn) {
-        message = `Accès autorisé - ${quota.sessionsRemaining} séance(s) restante(s)`;
-      } else {
-        message = 'Quota épuisé - Renouvellement nécessaire';
-      }
-    }
-
-    const responseData = {
-      success: true,
-      member: {
-        id: member.userId,
-        firstName: member.firstName,
-        lastName: member.lastName,
-        fullName: getFullName(member),
-        email: member.email,
-        displayId: member.displayId,
-        profileImageUrl: member.profileImage || null,
-        subscription: activeSubscription
-      },
-      quota: quota ? {
-        sessionQuota: quota.sessionQuota,
-        sessionsUsed: quota.sessionsUsed,
-        sessionsRemaining: quota.sessionsRemaining,
-        isUnlimited: quota.isUnlimited,
-        percentageUsed: quota.percentageUsed,
-        canCheckIn: quota.canCheckIn
-      } : null,
-      lastCheckIn: lastCheckIn ? {
-        checkInTime: lastCheckIn.checkInTime,
-        gymName: lastCheckIn.Gym?.name || 'N/A'
-      } : null,
-      message
-    };
-
-    logger.info(`📤 Réponse scan-qr: succès - ${message}`);
-    res.json(responseData);
 
   } catch (e) {
-    logger.error(`💥 Erreur dans /scan-qr:`, e);
+    console.error(`💥 Erreur dans /scan-qr:`, e);
     res.status(500).json({ error: e.message });
   }
 });
@@ -717,79 +457,68 @@ router.post('/scan-qr', auth, async (req, res) => {
  */
 // Protected: return current user info (admin or member)
 router.get('/me', auth, async (req, res) => {
-  logger.info(`👤 Requête /me - User ID du token: ${req.user?.sub}, Email: ${req.user?.email}, Type: ${req.user?.type}`);
+  console.log(`👤 Requête /me - User ID du token: ${req.user?.sub}, Email: ${req.user?.email}, Type: ${req.user?.type}`);
 
   try {
     const user = await prisma.user.findUnique({
       where: { id: req.user.sub },
       include: {
-        Gym: true,
-        Admin: true,
-        Member: {
+        gym: true,
+        admin: true,
+        member: {
           include: {
-            Subscription: {
+            subscriptions: {
               where: { status: 'active' },
               include: {
-                Payment: {
+                payments: {
                   orderBy: { createdAt: 'desc' },
                   take: 5 // Derniers 5 paiements liés à l'abonnement
                 }
               }
             },
-            Payment: {
+            payments: {
               orderBy: { createdAt: 'desc' },
               take: 10 // Derniers 10 paiements du membre
             }
           }
         },
-        Owner: true
+        owner: true
       }
     });
 
     if (!user) {
-      logger.warn(`❌ Utilisateur non trouvé en base: ID ${req.user.sub}`);
+      console.log(`❌ Utilisateur non trouvé en base: ID ${req.user.sub}`);
       return res.status(404).json({ error: 'User not found' });
     }
 
-    logger.info(`✅ Utilisateur trouvé: ${getFullName(user)} (${user.role}) - ID: ${user.id}`);
+    console.log(`✅ Utilisateur trouvé: ${user.fullName} (${user.role}) - ID: ${user.id}, uniqueCode: ${user.uniqueCode}`);
 
     if (user.role === 'admin') {
+      console.log(`👨‍💼 Réponse admin pour: ${user.fullName}`);
       // Pour les admins : retourner leur salle
       const responseData = {
         id: user.id,
-        displayId: user.displayId,
         email: user.email,
-        phoneNumber: user.phoneNumber,
-        firstName: user.firstName,
-        lastName: user.lastName,
-        fullName: getFullName(user),
+        fullName: user.fullName,
         uniqueCode: user.uniqueCode,
-        role: user.role,
-        gymId: user.gymId,
-        gym: user.Gym,
-        fcmToken: user.fcmToken,
-        profileImage: user.profileImage ? Buffer.from(user.profileImage).toString('base64') : null,
-        qrCode: user.qrCode ? Buffer.from(user.qrCode).toString('base64') : null,
-        lastLoginAt: user.lastLoginAt,
-        notificationsEnabled: user.notificationsEnabled,
-        createdAt: user.createdAt,
-        updatedAt: user.updatedAt,
+        gym: user.gym,
         type: 'admin'
       };
-      logger.info(`📤 Réponse /me admin envoyée`);
+      console.log(`📤 Réponse /me admin:`, responseData);
       res.json(responseData);
     } else if (user.role === 'owner') {
+      console.log(`👑 Réponse owner pour: ${user.fullName}`);
       // Pour les owners : retourner toutes les salles avec statistiques
       const allGyms = await prisma.gym.findMany({
         include: {
-          User: {
+          users: {
             select: {
               role: true
             }
           },
           _count: {
             select: {
-              User: true
+              users: true
             }
           }
         }
@@ -806,100 +535,72 @@ router.get('/me', auth, async (req, res) => {
         createdAt: gym.createdAt,
         updatedAt: gym.updatedAt,
         stats: {
-          totalUsers: gym._count.User,
-          members: gym.User.filter(u => u.role === 'member').length,
-          admins: gym.User.filter(u => u.role === 'admin').length,
-          owners: gym.User.filter(u => u.role === 'owner').length
+          totalUsers: gym._count.users,
+          members: gym.users.filter(u => u.role === 'member').length,
+          admins: gym.users.filter(u => u.role === 'admin').length,
+          owners: gym.users.filter(u => u.role === 'owner').length
         }
       }));
 
       const responseData = {
         id: user.id,
-        displayId: user.displayId,
         email: user.email,
-        phoneNumber: user.phoneNumber,
-        firstName: user.firstName,
-        lastName: user.lastName,
-        fullName: getFullName(user),
+        fullName: user.fullName,
         uniqueCode: user.uniqueCode,
-        role: user.role,
-        gymId: user.gymId,
-        gym: user.Gym,
         gyms: gymsWithStats,
-        fcmToken: user.fcmToken,
-        profileImage: user.profileImage ? Buffer.from(user.profileImage).toString('base64') : null,
-        qrCode: user.qrCode ? Buffer.from(user.qrCode).toString('base64') : null,
-        lastLoginAt: user.lastLoginAt,
-        notificationsEnabled: user.notificationsEnabled,
-        createdAt: user.createdAt,
-        updatedAt: user.updatedAt,
         permissions: {
-          canManageAdmins: user.Owner?.canManageAdmins || false,
-          canManageGyms: user.Owner?.canManageGyms || false,
-          canViewReports: user.Owner?.canViewReports || false,
-          maxGymsAllowed: user.Owner?.maxGymsAllowed || 0,
+          canManageAdmins: user.owner?.canManageAdmins || false,
+          canManageGyms: user.owner?.canManageGyms || false,
+          canViewReports: user.owner?.canViewReports || false,
+          maxGymsAllowed: user.owner?.maxGymsAllowed || 0,
         },
         type: 'owner'
       };
-      logger.info(`📤 Réponse /me owner envoyée`);
+      console.log(`📤 Réponse /me owner:`, {
+        ...responseData,
+        gyms: `${gymsWithStats.length} salles trouvées`
+      });
       res.json(responseData);
     } else if (user.role === 'member') {
+      console.log(`👤 Réponse membre pour: ${user.fullName}`);
       // Pour les membres : abonnement actif + derniers paiements
-      const activeSubscription = getActiveSubscription(user.Member);
-      const subscriptionsWithStatus = getSubscriptionsWithStatus(user.Member);
+      const activeSubscription = getActiveSubscription(user.member);
+      const subscriptionsWithStatus = getSubscriptionsWithStatus(user.member);
 
       const responseData = {
         id: user.id,
-        displayId: user.displayId,
         email: user.email,
-        phoneNumber: user.phoneNumber,
-        firstName: user.firstName,
-        lastName: user.lastName,
-        fullName: getFullName(user),
+        fullName: user.fullName,
         uniqueCode: user.uniqueCode,
-        role: user.role,
-        gymId: user.gymId,
-        gym: user.Gym,
-        fcmToken: user.fcmToken,
-        profileImage: user.profileImage ? Buffer.from(user.profileImage).toString('base64') : null,
-        qrCode: user.qrCode ? Buffer.from(user.qrCode).toString('base64') : null,
-        lastLoginAt: user.lastLoginAt,
-        notificationsEnabled: user.notificationsEnabled,
-        createdAt: user.createdAt,
-        updatedAt: user.updatedAt,
-        member: {
-          onboarding: user.Member?.onboarding,
-          birthDate: user.Member?.birthDate,
-          profession: user.Member?.profession,
-          fitnessLevel: user.Member?.fitnessLevel,
-          preferredTrainingDays: user.Member?.preferredTrainingDays,
-          workoutNotificationsEnabled: user.Member?.workoutNotificationsEnabled,
-          joinedAt: user.Member?.joinedAt,
-        },
+        gym: user.gym,
         activeSubscription: activeSubscription,
         subscriptions: subscriptionsWithStatus,
-        recentPayments: user.Member?.Payment || [],
+        recentPayments: user.member?.payments || [],
         type: 'member'
       };
-      logger.info(`📤 Réponse /me membre envoyée`);
+      console.log(`📤 Réponse /me membre:`, {
+        ...responseData,
+        recentPayments: `${responseData.recentPayments.length} paiements récents`,
+        subscriptions: `${responseData.subscriptions.length} abonnements`
+      });
       res.json(responseData);
     } else {
-      logger.warn(`❓ Rôle inconnu: ${user.role} pour ${getFullName(user)}`);
+      console.log(`❓ Rôle inconnu: ${user.role} pour ${user.fullName}`);
       return res.status(400).json({ error: 'Invalid user role' });
     }
   } catch (e) {
-    logger.error(`💥 Erreur dans /me:`, e);
+    console.error(`💥 Erreur dans /me:`, e);
     res.status(500).json({ error: e.message });
   }
 });
 
-// Forgot password: expect { email or phoneNumber } - For admins and members
+// Forgot password: expect { email } - For admins and members
 /**
  * @swagger
  * /auth/forgot-password:
  *   post:
  *     summary: Request password reset
- *     description: Send a password reset code to the user's email address (requires email)
+ *     description: Send a password reset code to the user's email address
  *     tags: [Authentication]
  *     requestBody:
  *       required: true
@@ -907,16 +608,14 @@ router.get('/me', auth, async (req, res) => {
  *         application/json:
  *           schema:
  *             type: object
+ *             required:
+ *               - email
  *             properties:
  *               email:
  *                 type: string
  *                 format: email
  *                 description: User's email address
  *                 example: "user@example.com"
- *               phoneNumber:
- *                 type: string
- *                 description: User's phone number (email must exist for reset)
- *                 example: "+33612345678"
  *     responses:
  *       200:
  *         description: Reset code sent successfully
@@ -929,7 +628,7 @@ router.get('/me', auth, async (req, res) => {
  *                   type: string
  *                   example: "Si cet email existe, un code de réinitialisation a été envoyé"
  *       400:
- *         description: Email or phoneNumber is required
+ *         description: Email is required
  *         content:
  *           application/json:
  *             schema:
@@ -937,7 +636,7 @@ router.get('/me', auth, async (req, res) => {
  *               properties:
  *                 error:
  *                   type: string
- *                   example: "Email ou phoneNumber requis"
+ *                   example: "Email requis"
  *       500:
  *         description: Server error
  *         content:
@@ -949,29 +648,18 @@ router.get('/me', auth, async (req, res) => {
  *                   type: string
  *                   example: "Erreur lors de l'envoi du code"
  */
-router.post('/forgot-password', authLimiter, async (req, res) => {
-  const { email, phoneNumber } = req.body;
-  if (!email && !phoneNumber) return res.status(400).json({ error: 'Email ou phoneNumber requis' });
+router.post('/forgot-password', async (req, res) => {
+  const { email } = req.body;
+  if (!email) return res.status(400).json({ error: 'Email requis' });
+
+  const sanitizedEmail = sanitizeEmail(email);
 
   try {
-    let user;
-    
-    // Find user by email or phoneNumber
-    if (email) {
-      const sanitizedEmail = sanitizeEmail(email);
-      user = await prisma.user.findUnique({ where: { email: sanitizedEmail } });
-    } else if (phoneNumber) {
-      user = await prisma.user.findUnique({ where: { phoneNumber } });
-    }
-    
+    // Find user by email
+    const user = await prisma.user.findUnique({ where: { email: sanitizedEmail } });
     if (!user) {
-      // Pour sécurité, on ne révèle pas si l'identifiant existe ou pas
-      return res.json({ message: 'Si cet identifiant existe, un code de réinitialisation a été envoyé' });
-    }
-    
-    // Vérifier que l'utilisateur a un email pour recevoir le code
-    if (!user.email) {
-      return res.status(400).json({ error: 'Cet utilisateur n\'a pas d\'email configuré. Contactez un administrateur.' });
+      // Pour sécurité, on ne révèle pas si l'email existe ou pas
+      return res.json({ message: 'Si cet email existe, un code de réinitialisation a été envoyé' });
     }
 
     // Générer un token unique (6 chiffres)
@@ -987,18 +675,18 @@ router.post('/forgot-password', authLimiter, async (req, res) => {
     });
 
     // Envoyer l'email
-    await sendPasswordResetEmail(user.email, resetToken);
+    await sendPasswordResetEmail(email, resetToken);
 
     const responseData = { message: 'Code de réinitialisation envoyé par email' };
-    logger.info(`📤 Réponse forgot-password:`, responseData);
+    console.log(`📤 Réponse forgot-password:`, responseData);
     res.json(responseData);
   } catch (e) {
-    logger.error('Erreur forgot password:', e);
+    console.error('Erreur forgot password:', e);
     res.status(500).json({ error: 'Erreur lors de l\'envoi du code' });
   }
 });
 
-// Reset password: expect { email or phoneNumber, token, newPassword }
+// Reset password: expect { email, token, newPassword }
 /**
  * @swagger
  * /auth/reset-password:
@@ -1013,6 +701,7 @@ router.post('/forgot-password', authLimiter, async (req, res) => {
  *           schema:
  *             type: object
  *             required:
+ *               - email
  *               - token
  *               - newPassword
  *             properties:
@@ -1021,10 +710,6 @@ router.post('/forgot-password', authLimiter, async (req, res) => {
  *                 format: email
  *                 description: User's email address
  *                 example: "user@example.com"
- *               phoneNumber:
- *                 type: string
- *                 description: User's phone number
- *                 example: "+33612345678"
  *               token:
  *                 type: string
  *                 description: 6-digit reset token
@@ -1056,7 +741,7 @@ router.post('/forgot-password', authLimiter, async (req, res) => {
  *                   type: string
  *                   examples:
  *                     missing_fields:
- *                       value: "Email ou phoneNumber, token et nouveau mot de passe requis"
+ *                       value: "Email, token et nouveau mot de passe requis"
  *                     weak_password:
  *                       value: "Le mot de passe doit contenir au moins 6 caractères"
  *                     invalid_token:
@@ -1082,27 +767,21 @@ router.post('/forgot-password', authLimiter, async (req, res) => {
  *                   type: string
  *                   example: "Erreur lors de la réinitialisation"
  */
-router.post('/reset-password', authLimiter, async (req, res) => {
-  const { email, phoneNumber, token, newPassword } = req.body;
-  if ((!email && !phoneNumber) || !token || !newPassword) {
-    return res.status(400).json({ error: 'Email ou phoneNumber, token et nouveau mot de passe requis' });
+router.post('/reset-password', async (req, res) => {
+  const { email, token, newPassword } = req.body;
+  if (!email || !token || !newPassword) {
+    return res.status(400).json({ error: 'Email, token et nouveau mot de passe requis' });
   }
 
   if (newPassword.length < 6) {
     return res.status(400).json({ error: 'Le mot de passe doit contenir au moins 6 caractères' });
   }
 
+  const sanitizedEmail = sanitizeEmail(email);
+
   try {
-    let user;
-    
-    // Find user by email or phoneNumber
-    if (email) {
-      const sanitizedEmail = sanitizeEmail(email);
-      user = await prisma.user.findUnique({ where: { email: sanitizedEmail } });
-    } else if (phoneNumber) {
-      user = await prisma.user.findUnique({ where: { phoneNumber } });
-    }
-    
+    // Find user by email
+    const user = await prisma.user.findUnique({ where: { email: sanitizedEmail } });
     if (!user) return res.status(404).json({ error: 'Utilisateur non trouvé' });
 
     // Vérifier le token
@@ -1146,10 +825,10 @@ router.post('/reset-password', authLimiter, async (req, res) => {
     });
 
     const responseData = { message: 'Mot de passe réinitialisé avec succès' };
-    logger.info(`📤 Réponse reset-password: ${JSON.stringify(responseData)}`);
+    console.log(`📤 Réponse reset-password:`, responseData);
     res.json(responseData);
   } catch (e) {
-    logger.error('Erreur reset password:', e);
+    console.error('Erreur reset password:', e);
     res.status(500).json({ error: 'Erreur lors de la réinitialisation' });
   }
 });
@@ -1160,7 +839,7 @@ router.post('/reset-password', authLimiter, async (req, res) => {
  * /auth/send-setup-email:
  *   post:
  *     summary: Send account setup email
- *     description: Send an email to a new user with a token to set up their password. Admins/Owners can send to any user in their gym, or specify userId.
+ *     description: Send an email to a new user with a token to set up their password
  *     tags: [Authentication]
  *     security:
  *       - bearerAuth: []
@@ -1170,16 +849,14 @@ router.post('/reset-password', authLimiter, async (req, res) => {
  *         application/json:
  *           schema:
  *             type: object
+ *             required:
+ *               - email
  *             properties:
  *               email:
  *                 type: string
  *                 format: email
  *                 description: User's email address
  *                 example: "newuser@example.com"
- *               userId:
- *                 type: integer
- *                 description: User ID (alternative to email)
- *                 example: 5
  *     responses:
  *       200:
  *         description: Setup email sent successfully
@@ -1190,73 +867,35 @@ router.post('/reset-password', authLimiter, async (req, res) => {
  *               properties:
  *                 message:
  *                   type: string
- *                   example: "Email de configuration envoyé à newuser@example.com"
- *                 user:
- *                   type: object
- *                   properties:
- *                     id:
- *                       type: integer
- *                     email:
- *                       type: string
- *                     fullName:
- *                       type: string
+ *                   example: "Email d'activation envoyé"
  *       400:
- *         description: Email or userId is required
- *       403:
- *         description: Permission denied
+ *         description: Email is required
  *       404:
  *         description: User not found
  *       500:
  *         description: Server error
  */
-router.post('/send-setup-email', auth, authLimiter, async (req, res) => {
-  const { email, userId } = req.body;
-  logger.info(`📧 Envoi email de configuration - Email: ${email}, UserId: ${userId}, Requester: ${req.user.email} (${req.user.type})`);
+router.post('/send-setup-email', auth, async (req, res) => {
+  const { email } = req.body;
+  console.log(`📧 Envoi email d'activation - Email: ${email}`);
 
-  if (!email && !userId) {
-    logger.warn(`❌ Email ou userId requis`);
-    return res.status(400).json({ error: 'Email ou userId requis' });
+  if (!email) {
+    console.log(`❌ Email requis`);
+    return res.status(400).json({ error: 'Email requis' });
   }
 
-  try {
-    // Find user
-    const whereClause = userId ? { id: userId } : { email: sanitizeEmail(email) };
-    const user = await prisma.user.findUnique({ 
-      where: whereClause,
-      include: { Gym: true }
-    });
+  const sanitizedEmail = sanitizeEmail(email);
 
+  try {
+    // Find user by email
+    const user = await prisma.user.findUnique({ where: { email: sanitizedEmail } });
     if (!user) {
-      logger.warn(`❌ Utilisateur non trouvé`);
+      console.log(`❌ Utilisateur non trouvé: ${email}`);
       return res.status(404).json({ error: 'Utilisateur non trouvé' });
     }
 
-    // Vérifier les permissions
-    if (req.user.type === 'admin') {
-      // Les admins peuvent seulement envoyer aux membres de leur salle
-      if (user.gymId !== req.user.gymId) {
-        logger.warn(`❌ Permission refusée - Utilisateur d'une autre salle`);
-        return res.status(403).json({ error: 'Vous ne pouvez envoyer d\'emails qu\'aux membres de votre salle' });
-      }
-    } else if (req.user.type === 'member') {
-      // Les membres ne peuvent envoyer qu'à eux-mêmes
-      if (user.id !== req.user.sub) {
-        logger.warn(`❌ Permission refusée - Les membres ne peuvent pas envoyer d'emails à d'autres`);
-        return res.status(403).json({ error: 'Permission refusée' });
-      }
-    }
-    // Les owners peuvent envoyer à n'importe qui
-
     // Générer un token unique (6 chiffres)
     const setupToken = crypto.randomInt(100000, 999999).toString();
-
-    // Supprimer les anciens tokens non utilisés pour cet utilisateur
-    await prisma.passwordResetToken.deleteMany({
-      where: {
-        userId: user.id,
-        used: false,
-      },
-    });
 
     // Créer le token en base avec expiration dans 24 heures
     await prisma.passwordResetToken.create({
@@ -1267,21 +906,13 @@ router.post('/send-setup-email', auth, authLimiter, async (req, res) => {
       },
     });
 
-    // Envoyer l'email avec le nouveau service
-    await sendAccountSetupEmail(user.email, getFullName(user), setupToken);
+    // Envoyer l'email avec le token
+    await sendPasswordResetEmail(email, setupToken, true); // true = setup mode
 
-    logger.info(`✅ Email de configuration envoyé à ${user.email}`);
-    res.json({ 
-      message: `Email de configuration envoyé à ${user.email}`,
-      user: {
-        id: user.id,
-        email: user.email,
-        fullName: getFullName(user),
-        gym: user.Gym.name
-      }
-    });
+    console.log(`✅ Email d'activation envoyé à ${email}`);
+    res.json({ message: "Email d'activation envoyé" });
   } catch (e) {
-    logger.error('Erreur send-setup-email:', e);
+    console.error('Erreur send-setup-email:', e);
     res.status(500).json({ error: "Erreur lors de l'envoi de l'email" });
   }
 });
@@ -1301,6 +932,7 @@ router.post('/send-setup-email', auth, authLimiter, async (req, res) => {
  *           schema:
  *             type: object
  *             required:
+ *               - email
  *               - token
  *               - password
  *             properties:
@@ -1309,10 +941,6 @@ router.post('/send-setup-email', auth, authLimiter, async (req, res) => {
  *                 format: email
  *                 description: User's email address
  *                 example: "newuser@example.com"
- *               phoneNumber:
- *                 type: string
- *                 description: User's phone number
- *                 example: "+33612345678"
  *               token:
  *                 type: string
  *                 description: 6-digit setup token
@@ -1340,33 +968,27 @@ router.post('/send-setup-email', auth, authLimiter, async (req, res) => {
  *       500:
  *         description: Server error
  */
-router.post('/setup-password', authLimiter, async (req, res) => {
-  const { email, phoneNumber, token, password } = req.body;
-  logger.info(`🔐 Création mot de passe initial - Email: ${email}, PhoneNumber: ${phoneNumber}`);
+router.post('/setup-password', async (req, res) => {
+  const { email, token, password } = req.body;
+  console.log(`🔐 Création mot de passe initial - Email: ${email}`);
 
-  if ((!email && !phoneNumber) || !token || !password) {
-    logger.warn(`❌ Champs manquants`);
-    return res.status(400).json({ error: 'Email ou phoneNumber, token et mot de passe requis' });
+  if (!email || !token || !password) {
+    console.log(`❌ Champs manquants`);
+    return res.status(400).json({ error: 'Email, token et mot de passe requis' });
   }
 
   if (password.length < 6) {
-    logger.warn(`❌ Mot de passe trop court`);
+    console.log(`❌ Mot de passe trop court`);
     return res.status(400).json({ error: 'Le mot de passe doit contenir au moins 6 caractères' });
   }
 
+  const sanitizedEmail = sanitizeEmail(email);
+
   try {
-    let user;
-    
-    // Find user by email or phoneNumber
-    if (email) {
-      const sanitizedEmail = sanitizeEmail(email);
-      user = await prisma.user.findUnique({ where: { email: sanitizedEmail } });
-    } else if (phoneNumber) {
-      user = await prisma.user.findUnique({ where: { phoneNumber } });
-    }
-    
+    // Find user by email
+    const user = await prisma.user.findUnique({ where: { email: sanitizedEmail } });
     if (!user) {
-      logger.warn(`❌ Utilisateur non trouvé: ${email || phoneNumber}`);
+      console.log(`❌ Utilisateur non trouvé: ${email}`);
       return res.status(404).json({ error: 'Utilisateur non trouvé' });
     }
 
@@ -1383,7 +1005,7 @@ router.post('/setup-password', authLimiter, async (req, res) => {
     });
 
     if (!setupToken) {
-      logger.warn(`❌ Token invalide ou expiré`);
+      console.log(`❌ Token invalide ou expiré`);
       return res.status(400).json({ error: 'Token invalide ou expiré' });
     }
 
@@ -1402,10 +1024,10 @@ router.post('/setup-password', authLimiter, async (req, res) => {
       data: { used: true },
     });
 
-    logger.info(`✅ Mot de passe créé pour ${user.email || user.phoneNumber}`);
+    console.log(`✅ Mot de passe créé pour ${email}`);
     res.json({ message: 'Mot de passe créé avec succès' });
   } catch (e) {
-    logger.error('Erreur setup-password:', e);
+    console.error('Erreur setup-password:', e);
     res.status(500).json({ error: 'Erreur lors de la création du mot de passe' });
   }
 });
