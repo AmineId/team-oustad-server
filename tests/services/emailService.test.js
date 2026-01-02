@@ -6,8 +6,22 @@ describe('Email Service Integration Tests', () => {
     jest.clearAllMocks();
   });
 
-  describe('sendPasswordResetEmail', () => {
-    it('should be called with correct parameters', async () => {
+  describe('Email service mocking', () => {
+    it('should have all required email functions mocked', () => {
+      expect(typeof emailService.sendPasswordResetEmail).toBe('function');
+      expect(typeof emailService.sendAccountSetupEmail).toBe('function');
+      expect(typeof emailService.sendPaymentConfirmationEmail).toBe('function');
+      expect(typeof emailService.sendPaymentReminderEmail).toBe('function');
+    });
+
+    it('should return resolved promises for mocked email functions', async () => {
+      const result = await emailService.sendPasswordResetEmail('test@test.com', 'token');
+      expect(result).toBe(true);
+    });
+  });
+
+  describe('sendPasswordResetEmail mock tracking', () => {
+    it('should track calls with correct parameters', async () => {
       const email = 'test@example.com';
       const token = 'test-token-123';
       
@@ -17,7 +31,7 @@ describe('Email Service Integration Tests', () => {
       expect(emailService.sendPasswordResetEmail).toHaveBeenCalledTimes(1);
     });
 
-    it('should handle setup emails', async () => {
+    it('should track calls with isSetup parameter', async () => {
       const email = 'newuser@example.com';
       const token = 'setup-token-456';
       const isSetup = true;
@@ -28,8 +42,8 @@ describe('Email Service Integration Tests', () => {
     });
   });
 
-  describe('sendAccountSetupEmail', () => {
-    it('should be called for new account setup', async () => {
+  describe('sendAccountSetupEmail mock tracking', () => {
+    it('should track calls for new account setup', async () => {
       const email = 'newmember@example.com';
       const setupToken = 'setup-token-789';
       
@@ -40,8 +54,8 @@ describe('Email Service Integration Tests', () => {
     });
   });
 
-  describe('sendPaymentConfirmationEmail', () => {
-    it('should be called with payment details', async () => {
+  describe('sendPaymentConfirmationEmail mock tracking', () => {
+    it('should track calls with payment details', async () => {
       const email = 'member@example.com';
       const paymentDetails = {
         amount: 50.00,
@@ -56,8 +70,8 @@ describe('Email Service Integration Tests', () => {
     });
   });
 
-  describe('sendPaymentReminderEmail', () => {
-    it('should be called with reminder details', async () => {
+  describe('sendPaymentReminderEmail mock tracking', () => {
+    it('should track calls with reminder details', async () => {
       const email = 'member@example.com';
       const reminderDetails = {
         amount: 50.00,
@@ -72,22 +86,8 @@ describe('Email Service Integration Tests', () => {
     });
   });
 
-  describe('Email service availability', () => {
-    it('should have all required email functions', () => {
-      expect(typeof emailService.sendPasswordResetEmail).toBe('function');
-      expect(typeof emailService.sendAccountSetupEmail).toBe('function');
-      expect(typeof emailService.sendPaymentConfirmationEmail).toBe('function');
-      expect(typeof emailService.sendPaymentReminderEmail).toBe('function');
-    });
-
-    it('should mock email functions to return promises', async () => {
-      const result = await emailService.sendPasswordResetEmail('test@test.com', 'token');
-      expect(result).toBe(true);
-    });
-  });
-
   describe('Email service error handling', () => {
-    it('should handle email sending errors gracefully', async () => {
+    it('should allow mocking errors when needed', async () => {
       // Override the mock to throw error for this specific test
       const originalMock = emailService.sendPasswordResetEmail;
       emailService.sendPasswordResetEmail = jest.fn().mockRejectedValue(new Error('SMTP Error'));
