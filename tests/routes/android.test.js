@@ -31,7 +31,8 @@ describe('Android Routes', () => {
         .get('/android/version');
 
       expect(response.status).toBe(200);
-      expect(response.body.version).toBeDefined();
+      expect(response.body.version_code).toBeDefined();
+      expect(response.body.version_name).toBeDefined();
     });
   });
 

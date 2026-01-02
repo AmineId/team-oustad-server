@@ -435,6 +435,18 @@ router.get('/checksum', (req, res) => {
   return handleChecksum(req, res, channel);
 });
 
+// Config endpoint for Android app
+router.get('/config', (req, res) => {
+  res.json({
+    apiUrl: process.env.API_URL || 'http://localhost:3000',
+    minVersion: 1,
+    features: {
+      offlineMode: true,
+      pushNotifications: true
+    }
+  });
+});
+
 /**
  * @swagger
  * /android/upload:

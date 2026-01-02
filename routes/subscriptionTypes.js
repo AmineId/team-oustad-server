@@ -19,7 +19,7 @@ router.get('/', async (req, res) => {
       orderBy: { monthlyPrice: 'asc' }
     });
     
-    res.json({ types });
+    res.json(types);
   } catch (error) {
     console.error('Erreur récupération types:', error);
     res.status(500).json({ error: error.message });
@@ -38,7 +38,7 @@ router.get('/:id', async (req, res) => {
       where: { id: typeId },
       include: {
         _count: {
-          select: { subscriptions: true }
+          select: { Subscription: true }
         }
       }
     });
@@ -47,7 +47,7 @@ router.get('/:id', async (req, res) => {
       return res.status(404).json({ error: 'Type d\'abonnement non trouvé' });
     }
     
-    res.json({ type });
+    res.json(type);
   } catch (error) {
     console.error('Erreur récupération type:', error);
     res.status(500).json({ error: error.message });
@@ -73,9 +73,9 @@ router.post('/', auth, async (req, res) => {
       return res.status(403).json({ error: 'Utilisateur non trouvé' });
     }
     
-    // Seuls les owners peuvent créer des types
-    if (requester.role !== 'owner') {
-      return res.status(403).json({ error: 'Accès réservé aux propriétaires' });
+    // Seuls les owners et admins peuvent créer des types
+    if (requester.role !== 'owner' && requester.role !== 'admin') {
+      return res.status(403).json({ error: 'Accès réservé aux propriétaires et administrateurs' });
     }
     
     const { name, description, monthlyPrice, features } = req.body;
@@ -99,6 +99,7 @@ router.post('/', auth, async (req, res) => {
         description,
         monthlyPrice: parseFloat(monthlyPrice),
         features: features || [],
+        displayId: `SUBT${Date.now()}`,
         isActive: true
       }
     });
@@ -134,8 +135,8 @@ router.put('/:id', auth, async (req, res) => {
       return res.status(403).json({ error: 'Utilisateur non trouvé' });
     }
     
-    if (requester.role !== 'owner') {
-      return res.status(403).json({ error: 'Accès réservé aux propriétaires' });
+    if (requester.role !== 'owner' && requester.role !== 'admin') {
+      return res.status(403).json({ error: 'Accès réservé aux propriétaires et administrateurs' });
     }
     
     const typeId = parseInt(req.params.id);
@@ -192,8 +193,8 @@ router.delete('/:id', auth, async (req, res) => {
       return res.status(403).json({ error: 'Utilisateur non trouvé' });
     }
     
-    if (requester.role !== 'owner') {
-      return res.status(403).json({ error: 'Accès réservé aux propriétaires' });
+    if (requester.role !== 'owner' && requester.role !== 'admin') {
+      return res.status(403).json({ error: 'Accès réservé aux propriétaires et administrateurs' });
     }
     
     const typeId = parseInt(req.params.id);

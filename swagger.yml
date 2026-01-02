@@ -5428,6 +5428,215 @@ paths:
         '500':
           description: Erreur serveur
 
+  /members/{id}/onboarding:
+    put:
+      tags:
+        - Members
+      summary: Mettre à jour le statut d'onboarding
+      description: Met à jour le statut d'onboarding d'un membre (si le membre a terminé son onboarding)
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+          description: ID de l'utilisateur membre
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - onboarding
+              properties:
+                onboarding:
+                  type: boolean
+                  description: Statut d'onboarding du membre
+                  example: true
+      responses:
+        '200':
+          description: Statut d'onboarding mis à jour
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "onboarding status updated"
+                  member:
+                    $ref: '#/components/schemas/Member'
+        '400':
+          description: Données invalides
+        '403':
+          description: Accès interdit
+        '500':
+          description: Erreur serveur
+
+  /members/{id}/profile-picture:
+    put:
+      tags:
+        - Members
+      summary: Upload photo de profil
+      description: Upload une nouvelle photo de profil pour le membre (base64)
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+          description: ID de l'utilisateur membre
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - imageData
+              properties:
+                imageData:
+                  type: string
+                  description: Image en base64 (peut inclure le préfixe data:image/...)
+                  example: "data:image/jpeg;base64,/9j/4AAQSkZJRg..."
+      responses:
+        '200':
+          description: Photo de profil mise à jour
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "Profile picture uploaded successfully"
+        '400':
+          description: Données d'image invalides
+        '403':
+          description: Accès interdit
+        '500':
+          description: Erreur serveur
+    get:
+      tags:
+        - Members
+      summary: Récupérer la photo de profil
+      description: Récupère la photo de profil d'un membre
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+          description: ID de l'utilisateur membre
+      responses:
+        '200':
+          description: Photo de profil
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  profileImage:
+                    type: string
+                    description: Image en base64
+        '403':
+          description: Accès interdit
+        '404':
+          description: Photo non trouvée
+        '500':
+          description: Erreur serveur
+    delete:
+      tags:
+        - Members
+      summary: Supprimer la photo de profil
+      description: Supprime la photo de profil d'un membre
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+          description: ID de l'utilisateur membre
+      responses:
+        '200':
+          description: Photo supprimée
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "Profile picture deleted successfully"
+        '403':
+          description: Accès interdit
+        '500':
+          description: Erreur serveur
+
+  /members/{id}/preferred-training-days:
+    put:
+      tags:
+        - Members
+      summary: Mettre à jour les jours d'entraînement préférés
+      description: Met à jour les jours de la semaine où le membre préfère s'entraîner
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+          description: ID de l'utilisateur membre
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - days
+              properties:
+                days:
+                  type: array
+                  items:
+                    oneOf:
+                      - type: integer
+                        minimum: 0
+                        maximum: 6
+                      - type: string
+                        enum: [sunday, monday, tuesday, wednesday, thursday, friday, saturday]
+                  description: Jours de la semaine (0=dimanche, 6=samedi) ou noms de jours
+                  example: [1, 3, 5]
+      responses:
+        '200':
+          description: Jours d'entraînement mis à jour
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "preferred training days updated"
+                  member:
+                    $ref: '#/components/schemas/Member'
+        '400':
+          description: Données invalides
+        '403':
+          description: Accès interdit
+        '500':
+          description: Erreur serveur
+
   # ==================== BANNERS API ====================
   /banners:
     get:
@@ -6199,6 +6408,43 @@ paths:
                 $ref: '#/components/schemas/CheckIn'
         '400':
           description: Erreur (quota épuisé, déjà scanné aujourd'hui)
+        '500':
+          description: Erreur serveur
+
+  /check-in/{id}/checkout:
+    post:
+      summary: Checkout d'un membre
+      description: Enregistre l'heure de sortie d'un membre de la salle
+      tags:
+        - Check-In
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+          description: ID du check-in à clôturer
+      responses:
+        '200':
+          description: Checkout effectué
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CheckIn'
+        '400':
+          description: Déjà checked out
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: "Already checked out"
+        '404':
+          description: Check-in non trouvé
         '500':
           description: Erreur serveur
 

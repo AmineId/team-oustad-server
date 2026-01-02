@@ -65,7 +65,7 @@ const sanitizeEmail = (email) => {
  *                     email:
  *                       type: string
  *                       example: "admin@teamfitness.com"
- *                     fullName:
+ *                     firstName, lastName:
  *                       type: string
  *                       example: "Admin TeamFitness"
  *                     role:
@@ -83,40 +83,40 @@ const sanitizeEmail = (email) => {
  *       500:
  *         description: Erreur serveur
  */
-// Login: expect { email, password }
+// Login: expect { email, password } or { phoneNumber, password }
 router.post('/login', async (req, res) => {
-  const { email, password } = req.body;
-  console.log(`🔐 Tentative de connexion - Email: ${email}`);
+  const { email, phoneNumber, password } = req.body;
+  console.log(`🔐 Tentative de connexion - Email: ${email}, Phone: ${phoneNumber}`);
   
-  if (!email || !password) {
-    console.log(`❌ Connexion échouée - Email ou password manquant`);
-    return res.status(400).json({ error: 'email and password required' });
+  if ((!email && !phoneNumber) || !password) {
+    console.log(`❌ Connexion échouée - Email/Phone ou password manquant`);
+    return res.status(400).json({ error: 'email or phoneNumber and password required' });
   }
 
   // Sanitize email to remove any null bytes or control characters
-  const sanitizedEmail = sanitizeEmail(email);
+  const sanitizedEmail = email ? sanitizeEmail(email) : null;
   
-  if (sanitizedEmail !== email.toLowerCase().trim()) {
+  if (email && sanitizedEmail !== email.toLowerCase().trim()) {
     console.log(`⚠️  Email contenait des caractères invalides, nettoyé: ${sanitizedEmail}`);
   }
 
   try {
-    // Find user by email
-    const user = await prisma.user.findUnique({
-      where: { email: sanitizedEmail },
+    // Find user by email or phoneNumber
+    const user = await prisma.user.findFirst({
+      where: email ? { email: sanitizedEmail } : { phoneNumber },
       include: {
-        admin: true,
-        member: {
+        Admin: true,
+        Member: {
           include: {
-            subscriptions: {
+            Subscription: {
               include: {
-                payments: true
+                Payment: true
               }
             },
-            payments: true
+            Payment: true
           }
         },
-        gym: true
+        Gym: true
       }
     });
 
@@ -125,7 +125,7 @@ router.post('/login', async (req, res) => {
       return res.status(401).json({ error: 'Invalid credentials' });
     }
 
-    console.log(`✅ Utilisateur trouvé: ${user.fullName} (${user.role}) - ID: ${user.id}`);
+    console.log(`✅ Utilisateur trouvé: ${user.firstName} ${user.lastName} (${user.role}) - ID: ${user.id}`);
 
     // Check password
     const valid = await bcrypt.compare(password, user.password);
@@ -136,7 +136,7 @@ router.post('/login', async (req, res) => {
       return res.status(401).json({ error: 'Invalid credentials' });
     }
 
-    console.log(`✅ Connexion réussie pour: ${user.fullName} (${user.role})`);
+    console.log(`✅ Connexion réussie pour: ${user.firstName} ${user.lastName} (${user.role})`);
 
     // Token valid for 30 days
     const token = jwt.sign({
@@ -149,15 +149,17 @@ router.post('/login', async (req, res) => {
 
     // Return different data based on user role
     if (user.role === 'admin') {
-      console.log(`👨‍💼 Réponse admin préparée pour: ${user.fullName}`);
+      console.log(`👨‍💼 Réponse admin préparée pour: ${user.firstName} ${user.lastName}`);
       const responseData = {
         token,
         user: {
           id: user.id,
           email: user.email,
-          fullName: user.fullName,
+          phoneNumber: user.phoneNumber,
+          firstName: user.firstName, lastName: user.lastName,
+          role: 'admin',
           gymId: user.gymId,
-          gym: user.gym,
+          gym: user.Gym,
           type: 'admin'
         }
       };
@@ -167,15 +169,15 @@ router.post('/login', async (req, res) => {
       });
       res.json(responseData);
     } else if (user.role === 'owner') {
-      console.log(`👑 Réponse owner préparée pour: ${user.fullName}`);
+      console.log(`👑 Réponse owner préparée pour: ${user.firstName} ${user.lastName}`);
       const responseData = {
         token,
         user: {
           id: user.id,
           email: user.email,
-          fullName: user.fullName,
+          firstName: user.firstName, lastName: user.lastName,
           gymId: user.gymId,
-          gym: user.gym,
+          gym: user.Gym,
           permissions: {
             canManageAdmins: user.owner?.canManageAdmins || false,
             canManageGyms: user.owner?.canManageGyms || false,
@@ -191,17 +193,20 @@ router.post('/login', async (req, res) => {
       });
       res.json(responseData);
     } else if (user.role === 'member') {
-      console.log(`👤 Réponse membre préparée pour: ${user.fullName}`);
+      console.log(`👤 Réponse membre préparée pour: ${user.firstName} ${user.lastName}`);
       const responseData = {
         token,
         user: {
           id: user.id,
           email: user.email,
-          fullName: user.fullName,
+          phoneNumber: user.phoneNumber,
+          firstName: user.firstName, lastName: user.lastName,
+          role: 'member',
           gymId: user.gymId,
-          gym: user.gym,
-          subscriptions: user.member?.subscriptions || [],
-          payments: user.member?.payments || [],
+          gym: user.Gym,
+          member: user.Member,
+          subscriptions: user.Member?.Subscription || [],
+          payments: user.Member?.Payment || [],
           type: 'member'
         }
       };
@@ -211,7 +216,7 @@ router.post('/login', async (req, res) => {
       });
       res.json(responseData);
     } else {
-      console.log(`❓ Rôle inconnu: ${user.role} pour ${user.fullName}`);
+      console.log(`❓ Rôle inconnu: ${user.role} pour ${user.firstName} ${user.lastName}`);
       return res.status(400).json({ error: 'Invalid user role' });
     }
   } catch (e) {
@@ -259,7 +264,7 @@ router.post('/login', async (req, res) => {
  *                     id:
  *                       type: integer
  *                       example: 2
- *                     fullName:
+ *                     firstName, lastName:
  *                       type: string
  *                       example: "Bob Member"
  *                     email:
@@ -307,7 +312,7 @@ router.post('/scan-qr', auth, async (req, res) => {
     // Récupérer l'admin avec sa gymId
     const adminUser = await prisma.user.findUnique({
       where: { id: req.user.sub },
-      select: { id: true, gymId: true, fullName: true }
+      select: { id: true, gymId: true, firstName: true, lastName: true }
     });
 
     if (!adminUser) {
@@ -315,18 +320,18 @@ router.post('/scan-qr', auth, async (req, res) => {
       return res.status(403).json({ error: 'Admin not found' });
     }
 
-    console.log(`✅ Admin trouvé: ${adminUser.fullName} (Gym: ${adminUser.gymId})`);
+    console.log(`✅ Admin trouvé: ${adminUser.firstName} ${adminUser.lastName} (Gym: ${adminUser.gymId})`);
 
     // Trouver l'utilisateur par son uniqueCode
     const member = await prisma.user.findFirst({
       where: { uniqueCode: qrCode },
       include: {
-        member: {
+        Member: {
           include: {
-            subscriptions: {
+            Subscription: {
               where: { status: 'active' },
               include: {
-                payments: {
+                Payment: {
                   orderBy: { createdAt: 'desc' },
                   take: 1 // Dernier paiement de l'abonnement
                 }
@@ -334,7 +339,7 @@ router.post('/scan-qr', auth, async (req, res) => {
             },
           }
         },
-        gym: true
+        Gym: true
       }
     });
 
@@ -344,42 +349,42 @@ router.post('/scan-qr', auth, async (req, res) => {
     }
 
     if (member.role !== 'member') {
-      console.log(`❌ Utilisateur trouvé mais n'est pas membre: ${member.fullName} (rôle: ${member.role})`);
+      console.log(`❌ Utilisateur trouvé mais n'est pas membre: ${member.firstName} ${member.lastName} (rôle: ${member.role})`);
       return res.status(400).json({ error: 'QR code is not for a member' });
     }
 
     // Vérifier que le membre appartient à la même salle que l'admin
     if (member.gymId !== adminUser.gymId) {
-      console.log(`❌ Membre ${member.fullName} n'appartient pas à la salle de l'admin (membre: ${member.gymId}, admin: ${adminUser.gymId})`);
+      console.log(`❌ Membre ${member.firstName} ${member.lastName} n'appartient pas à la salle de l'admin (membre: ${member.gymId}, admin: ${adminUser.gymId})`);
       return res.status(403).json({ error: 'Member does not belong to your gym' });
     }
 
     // Vérifier l'abonnement actif pour les membres
     if (member.role === 'member') {
-      const activeSubscription = getActiveSubscription(member.member);
+      const activeSubscription = getActiveSubscription(member.Member);
 
       if (!activeSubscription) {
-        console.log(`❌ Membre ${member.fullName} n'a pas d'abonnement actif`);
+        console.log(`❌ Membre ${member.firstName} ${member.lastName} n'a pas d'abonnement actif`);
         return res.status(403).json({
           error: 'Accès refusé - Aucun abonnement actif',
           reason: 'no_active_subscription',
           member: {
             id: member.id,
-            fullName: member.fullName,
+            firstName: member.firstName, lastName: member.lastName,
             email: member.email
           }
         });
       }
 
-      console.log(`✅ Abonnement valide pour ${member.fullName} - Statut: ${activeSubscription.activeCheck.details ? 'Paiement dû dans ' + activeSubscription.activeCheck.details.daysUntilDue + ' jours' : 'Actif'}`);
+      console.log(`✅ Abonnement valide pour ${member.firstName} ${member.lastName} - Statut: ${activeSubscription.activeCheck.details ? 'Paiement dû dans ' + activeSubscription.activeCheck.details.daysUntilDue + ' jours' : 'Actif'}`);
 
-      console.log(`✅ Accès autorisé pour ${member.fullName} - Abonnement valide jusqu'au ${activeSubscription.endDate}`);
+      console.log(`✅ Accès autorisé pour ${member.firstName} ${member.lastName} - Abonnement valide jusqu'au ${activeSubscription.endDate}`);
 
       const responseData = {
         success: true,
         member: {
           id: member.id,
-          fullName: member.fullName,
+          firstName: member.firstName, lastName: member.lastName,
           email: member.email,
           uniqueCode: member.uniqueCode,
           subscription: activeSubscription ? {
@@ -427,7 +432,7 @@ router.post('/scan-qr', auth, async (req, res) => {
  *                 email:
  *                   type: string
  *                   example: "admin@teamfitness.com"
- *                 fullName:
+ *                 firstName, lastName:
  *                   type: string
  *                   example: "Admin TeamFitness"
  *                 uniqueCode:
@@ -463,26 +468,26 @@ router.get('/me', auth, async (req, res) => {
     const user = await prisma.user.findUnique({
       where: { id: req.user.sub },
       include: {
-        gym: true,
-        admin: true,
-        member: {
+        Gym: true,
+        Admin: true,
+        Member: {
           include: {
-            subscriptions: {
+            Subscription: {
               where: { status: 'active' },
               include: {
-                payments: {
+                Payment: {
                   orderBy: { createdAt: 'desc' },
                   take: 5 // Derniers 5 paiements liés à l'abonnement
                 }
               }
             },
-            payments: {
+            Payment: {
               orderBy: { createdAt: 'desc' },
               take: 10 // Derniers 10 paiements du membre
             }
           }
         },
-        owner: true
+        Owner: true
       }
     });
 
@@ -491,23 +496,23 @@ router.get('/me', auth, async (req, res) => {
       return res.status(404).json({ error: 'User not found' });
     }
 
-    console.log(`✅ Utilisateur trouvé: ${user.fullName} (${user.role}) - ID: ${user.id}, uniqueCode: ${user.uniqueCode}`);
+    console.log(`✅ Utilisateur trouvé: ${user.firstName} ${user.lastName} (${user.role}) - ID: ${user.id}, uniqueCode: ${user.uniqueCode}`);
 
     if (user.role === 'admin') {
-      console.log(`👨‍💼 Réponse admin pour: ${user.fullName}`);
+      console.log(`👨‍💼 Réponse admin pour: ${user.firstName} ${user.lastName}`);
       // Pour les admins : retourner leur salle
       const responseData = {
         id: user.id,
         email: user.email,
-        fullName: user.fullName,
+        firstName: user.firstName, lastName: user.lastName,
         uniqueCode: user.uniqueCode,
-        gym: user.gym,
+        gym: user.Gym,
         type: 'admin'
       };
       console.log(`📤 Réponse /me admin:`, responseData);
       res.json(responseData);
     } else if (user.role === 'owner') {
-      console.log(`👑 Réponse owner pour: ${user.fullName}`);
+      console.log(`👑 Réponse owner pour: ${user.firstName} ${user.lastName}`);
       // Pour les owners : retourner toutes les salles avec statistiques
       const allGyms = await prisma.gym.findMany({
         include: {
@@ -545,7 +550,7 @@ router.get('/me', auth, async (req, res) => {
       const responseData = {
         id: user.id,
         email: user.email,
-        fullName: user.fullName,
+        firstName: user.firstName, lastName: user.lastName,
         uniqueCode: user.uniqueCode,
         gyms: gymsWithStats,
         permissions: {
@@ -562,30 +567,31 @@ router.get('/me', auth, async (req, res) => {
       });
       res.json(responseData);
     } else if (user.role === 'member') {
-      console.log(`👤 Réponse membre pour: ${user.fullName}`);
+      console.log(`👤 Réponse membre pour: ${user.firstName} ${user.lastName}`);
       // Pour les membres : abonnement actif + derniers paiements
-      const activeSubscription = getActiveSubscription(user.member);
-      const subscriptionsWithStatus = getSubscriptionsWithStatus(user.member);
+      const activeSubscription = getActiveSubscription(user.Member);
+      const subscriptionsWithStatus = getSubscriptionsWithStatus(user.Member);
 
       const responseData = {
         id: user.id,
         email: user.email,
-        fullName: user.fullName,
+        firstName: user.firstName, lastName: user.lastName,
         uniqueCode: user.uniqueCode,
-        gym: user.gym,
+        gym: user.Gym,
         activeSubscription: activeSubscription,
         subscriptions: subscriptionsWithStatus,
-        recentPayments: user.member?.payments || [],
+        Subscription: subscriptionsWithStatus,
+        recentPayments: user.Member?.Payment || [],
         type: 'member'
       };
       console.log(`📤 Réponse /me membre:`, {
         ...responseData,
-        recentPayments: `${responseData.recentPayments.length} paiements récents`,
-        subscriptions: `${responseData.subscriptions.length} abonnements`
+        recentPayments: `${responseData.recentPayments?.length || 0} paiements récents`,
+        Subscription: `${responseData.Subscription?.length || 0} abonnements`
       });
       res.json(responseData);
     } else {
-      console.log(`❓ Rôle inconnu: ${user.role} pour ${user.fullName}`);
+      console.log(`❓ Rôle inconnu: ${user.role} pour ${user.firstName} ${user.lastName}`);
       return res.status(400).json({ error: 'Invalid user role' });
     }
   } catch (e) {
@@ -649,17 +655,23 @@ router.get('/me', auth, async (req, res) => {
  *                   example: "Erreur lors de l'envoi du code"
  */
 router.post('/forgot-password', async (req, res) => {
-  const { email } = req.body;
-  if (!email) return res.status(400).json({ error: 'Email requis' });
+  const { email, phoneNumber } = req.body;
+  if (!email && !phoneNumber) return res.status(400).json({ error: 'Email or phoneNumber required' });
 
-  const sanitizedEmail = sanitizeEmail(email);
+  const sanitizedEmail = email ? sanitizeEmail(email) : null;
 
   try {
-    // Find user by email
-    const user = await prisma.user.findUnique({ where: { email: sanitizedEmail } });
+    // Find user by email or phoneNumber
+    const user = await prisma.user.findFirst({ 
+      where: email ? { email: sanitizedEmail } : { phoneNumber }
+    });
     if (!user) {
       // Pour sécurité, on ne révèle pas si l'email existe ou pas
       return res.json({ message: 'Si cet email existe, un code de réinitialisation a été envoyé' });
+    }
+    
+    if (!user.email) {
+      return res.status(400).json({ error: 'User has no email address configured' });
     }
 
     // Générer un token unique (6 chiffres)
@@ -675,9 +687,9 @@ router.post('/forgot-password', async (req, res) => {
     });
 
     // Envoyer l'email
-    await sendPasswordResetEmail(email, resetToken);
+    await sendPasswordResetEmail(user.email, resetToken);
 
-    const responseData = { message: 'Code de réinitialisation envoyé par email' };
+    const responseData = { message: 'Password reset code sent successfully' };
     console.log(`📤 Réponse forgot-password:`, responseData);
     res.json(responseData);
   } catch (e) {
@@ -876,22 +888,45 @@ router.post('/reset-password', async (req, res) => {
  *         description: Server error
  */
 router.post('/send-setup-email', auth, async (req, res) => {
-  const { email } = req.body;
-  console.log(`📧 Envoi email d'activation - Email: ${email}`);
+  const { email, userId } = req.body;
+  console.log(`📧 Envoi email d'activation - Email: ${email}, UserId: ${userId}`);
 
-  if (!email) {
-    console.log(`❌ Email requis`);
-    return res.status(400).json({ error: 'Email requis' });
+  if (!email && !userId) {
+    console.log(`❌ Email ou userId requis`);
+    return res.status(400).json({ error: 'Email or userId required' });
   }
 
-  const sanitizedEmail = sanitizeEmail(email);
+  const sanitizedEmail = email ? sanitizeEmail(email) : null;
 
   try {
-    // Find user by email
-    const user = await prisma.user.findUnique({ where: { email: sanitizedEmail } });
+    // Find user by email or userId
+    const user = await prisma.user.findFirst({ 
+      where: email ? { email: sanitizedEmail } : { id: userId },
+      include: { Member: true, Admin: true }
+    });
     if (!user) {
-      console.log(`❌ Utilisateur non trouvé: ${email}`);
+      console.log(`❌ Utilisateur non trouvé: ${email || userId}`);
       return res.status(404).json({ error: 'Utilisateur non trouvé' });
+    }
+
+    // Check permissions
+    const requestingUser = await prisma.user.findUnique({
+      where: { id: req.user.sub },
+      include: { Admin: true }
+    });
+
+    // If requesting user is admin, verify target user is in same gym
+    if (requestingUser.role === 'admin') {
+      if (user.gymId !== requestingUser.gymId) {
+        console.log(`❌ Admin ${requestingUser.email} trying to access user from different gym`);
+        return res.status(403).json({ error: 'Cannot send setup email to user from different gym' });
+      }
+    }
+
+    // If requesting user is member, can only send to themselves
+    if (requestingUser.role === 'member' && user.id !== requestingUser.id) {
+      console.log(`❌ Member ${requestingUser.email} trying to send to another user`);
+      return res.status(403).json({ error: 'Members can only send setup email to themselves' });
     }
 
     // Générer un token unique (6 chiffres)
@@ -907,10 +942,18 @@ router.post('/send-setup-email', auth, async (req, res) => {
     });
 
     // Envoyer l'email avec le token
-    await sendPasswordResetEmail(email, setupToken, true); // true = setup mode
+    await sendPasswordResetEmail(user.email, setupToken, true); // true = setup mode
 
-    console.log(`✅ Email d'activation envoyé à ${email}`);
-    res.json({ message: "Email d'activation envoyé" });
+    console.log(`✅ Email d'activation envoyé à ${user.email}`);
+    res.json({ 
+      message: "Email d'activation envoyé",
+      user: {
+        id: user.id,
+        email: user.email,
+        firstName: user.firstName,
+        lastName: user.lastName
+      }
+    });
   } catch (e) {
     console.error('Erreur send-setup-email:', e);
     res.status(500).json({ error: "Erreur lors de l'envoi de l'email" });
@@ -969,12 +1012,12 @@ router.post('/send-setup-email', auth, async (req, res) => {
  *         description: Server error
  */
 router.post('/setup-password', async (req, res) => {
-  const { email, token, password } = req.body;
-  console.log(`🔐 Création mot de passe initial - Email: ${email}`);
+  const { email, phoneNumber, token, password } = req.body;
+  console.log(`🔐 Création mot de passe initial - Email: ${email}, Phone: ${phoneNumber}`);
 
-  if (!email || !token || !password) {
+  if ((!email && !phoneNumber) || !token || !password) {
     console.log(`❌ Champs manquants`);
-    return res.status(400).json({ error: 'Email, token et mot de passe requis' });
+    return res.status(400).json({ error: 'Email or phoneNumber, token et mot de passe requis' });
   }
 
   if (password.length < 6) {
@@ -982,13 +1025,15 @@ router.post('/setup-password', async (req, res) => {
     return res.status(400).json({ error: 'Le mot de passe doit contenir au moins 6 caractères' });
   }
 
-  const sanitizedEmail = sanitizeEmail(email);
+  const sanitizedEmail = email ? sanitizeEmail(email) : null;
 
   try {
-    // Find user by email
-    const user = await prisma.user.findUnique({ where: { email: sanitizedEmail } });
+    // Find user by email or phoneNumber
+    const user = await prisma.user.findFirst({ 
+      where: email ? { email: sanitizedEmail } : { phoneNumber }
+    });
     if (!user) {
-      console.log(`❌ Utilisateur non trouvé: ${email}`);
+      console.log(`❌ Utilisateur non trouvé: ${email || phoneNumber}`);
       return res.status(404).json({ error: 'Utilisateur non trouvé' });
     }
 

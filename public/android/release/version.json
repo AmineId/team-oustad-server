@@ -1,16 +1,1 @@
-{
-  "version_code": 2,
-  "version_name": "1.0.1",
-  "download_url": "https://app.team-oustad.com/android/app-release.apk",
-  "changelog": "Test authenticated upload",
-  "min_supported_version": 2,
-  "force_update": false,
-  "release_date": "2025-11-15T22:27:53.018Z",
-  "file_size": 26,
-  "checksum": "d6ac590f16663cc5d3f886e38237e6d3e3658ec98c7d78deb82625ece06f04b7",
-  "uploaded_by": {
-    "user_id": 1,
-    "email": "admin@team-oustad.com",
-    "role": "owner"
-  }
-}
+{"version_code": 1, "version_name": "1.0.0", "min_supported_version": 1, "download_url": "https://example.com/app.apk"}

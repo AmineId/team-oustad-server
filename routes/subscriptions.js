@@ -64,9 +64,9 @@ router.post('/', auth, async (req, res) => {
     res.status(201).json({
       message: 'Abonnement annuel créé avec succès',
       subscription: result.subscription,
-      subscriptionType: result.subscriptionType,
+      SubscriptionType: result.subscriptionType,
       paymentsGenerated: result.payments.length,
-      payments: result.payments.map(p => ({
+      Payment: result.payments.map(p => ({
         id: p.id,
         monthNumber: p.monthNumber,
         amount: p.amount,
@@ -77,6 +77,57 @@ router.post('/', auth, async (req, res) => {
     
   } catch (error) {
     console.error('Erreur création abonnement:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+/**
+ * POST /subscriptions/:id/renew
+ * Renew a subscription
+ */
+router.post('/:id/renew', auth, async (req, res) => {
+  try {
+    const subscriptionId = parseInt(req.params.id);
+    
+    const { PrismaClient } = require('@prisma/client');
+    const prisma = new PrismaClient();
+    
+    const subscription = await prisma.subscription.findUnique({
+      where: { id: subscriptionId },
+      include: { Member: true, SubscriptionType: true }
+    });
+    
+    if (!subscription) {
+      return res.status(404).json({ error: 'Abonnement non trouvé' });
+    }
+    
+    const requester = await prisma.user.findUnique({
+      where: { id: req.user.sub }
+    });
+    
+    if (!requester) {
+      return res.status(403).json({ error: 'Utilisateur non trouvé' });
+    }
+    
+    // Check permissions
+    if (requester.role === 'member' && subscription.memberId !== requester.id) {
+      return res.status(403).json({ error: 'Accès refusé' });
+    }
+    
+    // Create new subscription
+    const newSubscription = await createYearlySubscriptionWithPayments(
+      subscription.memberId,
+      subscription.subscriptionTypeId,
+      new Date()
+    );
+    
+    res.status(201).json({
+      message: 'Abonnement renouvelé avec succès',
+      newSubscription: newSubscription.subscription
+    });
+    
+  } catch (error) {
+    console.error('Erreur renouvellement:', error);
     res.status(500).json({ error: error.message });
   }
 });
@@ -160,8 +211,8 @@ router.get('/member/:memberId', auth, async (req, res) => {
     const subscriptions = await prisma.subscription.findMany({
       where: { memberId },
       include: {
-        subscriptionType: true,
-        payments: {
+        SubscriptionType: true,
+        Payment: {
           orderBy: { monthNumber: 'asc' }
         }
       },
@@ -226,7 +277,7 @@ router.post('/payments/:paymentId/acknowledge', auth, async (req, res) => {
     const subscription = await prisma.subscription.findUnique({
       where: { id: payment.subscriptionId },
       include: {
-        subscriptionType: true
+        SubscriptionType: true
       }
     });
     
@@ -364,7 +415,7 @@ router.get('/payments/upcoming', auth, async (req, res) => {
     
     res.json({
       count: upcomingPayments.length,
-      payments: upcomingPayments.map(p => ({
+      Payment: upcomingPayments.map(p => ({
         id: p.id,
         memberId: p.memberId,
         memberName: p.member.user.fullName,

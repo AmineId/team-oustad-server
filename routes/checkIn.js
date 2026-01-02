@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const authenticateToken = require('../middleware/auth');
 const checkInService = require('../services/checkInService');
+const prisma = require('../utils/prismaClient');
 
 /**
  * POST /check-in
@@ -26,6 +27,41 @@ router.post('/', authenticateToken, async (req, res) => {
     console.error('Error creating check-in:', error);
     res.status(400).json({
       error: 'Failed to create check-in',
+      message: error.message
+    });
+  }
+});
+
+/**
+ * POST /check-in/:id/checkout
+ * Checkout a member from the gym
+ */
+router.post('/:id/checkout', authenticateToken, async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    const checkIn = await prisma.gymCheckIn.findUnique({
+      where: { id: parseInt(id) }
+    });
+    
+    if (!checkIn) {
+      return res.status(404).json({ error: 'Check-in not found' });
+    }
+    
+    if (checkIn.checkOutTime) {
+      return res.status(400).json({ error: 'Already checked out' });
+    }
+    
+    const updatedCheckIn = await prisma.gymCheckIn.update({
+      where: { id: parseInt(id) },
+      data: { checkOutTime: new Date() }
+    });
+    
+    res.json(updatedCheckIn);
+  } catch (error) {
+    console.error('Error checking out:', error);
+    res.status(400).json({
+      error: 'Failed to checkout',
       message: error.message
     });
   }
@@ -66,7 +102,7 @@ router.get('/member/:memberId', authenticateToken, async (req, res) => {
       limit: parseInt(limit)
     });
 
-    res.json({ checkIns });
+    res.json(checkIns);
   } catch (error) {
     console.error('Error fetching check-ins:', error);
     res.status(500).json({
@@ -103,10 +139,16 @@ router.get('/subscription/:subscriptionId/quota', authenticateToken, async (req,
 router.get('/gym/:gymId/today', authenticateToken, async (req, res) => {
   try {
     const { gymId } = req.params;
+    
+    // Check if user is admin or owner
+    const user = await prisma.user.findUnique({ where: { id: req.user.sub } });
+    if (!user || user.role === 'member') {
+      return res.status(403).json({ error: 'Forbidden' });
+    }
 
     const present = await checkInService.getPresentMembers(parseInt(gymId));
 
-    res.json({ present, count: present.length });
+    res.json(present);
   } catch (error) {
     console.error('Error fetching present members:', error);
     res.status(500).json({

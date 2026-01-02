@@ -187,6 +187,15 @@ function isValidId(id, expectedPrefix = null) {
   return true;
 }
 
+/**
+ * Génère un ID générique avec un préfixe donné
+ * @param {string} prefix - Le préfixe à utiliser
+ * @returns {string} Format: PREFIX-XXXXXXXXXXXXXXXX
+ */
+function generateDisplayId(prefix) {
+  return `${prefix}-${generateRandomHex()}`;
+}
+
 module.exports = {
   generateMemberId,
   generateAdminId,
@@ -203,6 +212,7 @@ module.exports = {
   generateBannerVariantId,
   generateCheckInId,
   generateUserIdByRole,
+  generateDisplayId,
   extractPrefix,
   isValidId
 };

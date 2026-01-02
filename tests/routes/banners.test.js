@@ -98,22 +98,28 @@ describe('Banners Routes', () => {
     beforeEach(async () => {
       await prisma.banner.create({
         data: {
+          displayId: `BANNER-${Date.now()}-1`,
           title: 'Active Banner',
-          message: 'This is active',
+          description: 'This is active',
           type: 'info',
-          priority: 'medium',
+          priority: 1,
           isActive: true,
+          startDate: new Date(),
+          endDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
           gymId: testGym.id
         }
       });
 
       await prisma.banner.create({
         data: {
+          displayId: `BANNER-${Date.now()}-2`,
           title: 'Inactive Banner',
-          message: 'This is inactive',
+          description: 'This is inactive',
           type: 'warning',
-          priority: 'low',
+          priority: 0,
           isActive: false,
+          startDate: new Date(),
+          endDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
           gymId: testGym.id
         }
       });
@@ -151,11 +157,14 @@ describe('Banners Routes', () => {
     beforeEach(async () => {
       testBanner = await prisma.banner.create({
         data: {
+          displayId: `BANNER-${Date.now()}-get`,
           title: 'Test Banner',
-          message: 'Test message',
+          description: 'Test message',
           type: 'info',
-          priority: 'medium',
+          priority: 1,
           isActive: true,
+          startDate: new Date(),
+          endDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
           gymId: testGym.id
         }
       });
@@ -186,11 +195,14 @@ describe('Banners Routes', () => {
     beforeEach(async () => {
       testBanner = await prisma.banner.create({
         data: {
+          displayId: `BANNER-${Date.now()}-put`,
           title: 'Original Title',
-          message: 'Original message',
+          description: 'Original message',
           type: 'info',
-          priority: 'medium',
+          priority: 1,
           isActive: true,
+          startDate: new Date(),
+          endDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
           gymId: testGym.id
         }
       });
@@ -202,12 +214,12 @@ describe('Banners Routes', () => {
         .set('Authorization', authHeader(testAdmin))
         .send({
           title: 'Updated Title',
-          message: 'Updated message'
+          description: 'Updated message'
         });
 
       expect(response.status).toBe(200);
       expect(response.body.title).toBe('Updated Title');
-      expect(response.body.message).toBe('Updated message');
+      expect(response.body.description).toBe('Updated message');
     });
 
     it('should return 403 for members', async () => {
@@ -228,11 +240,14 @@ describe('Banners Routes', () => {
     beforeEach(async () => {
       testBanner = await prisma.banner.create({
         data: {
+          displayId: `BANNER-${Date.now()}-del`,
           title: 'To Delete',
-          message: 'Will be deleted',
+          description: 'Will be deleted',
           type: 'info',
-          priority: 'medium',
+          priority: 1,
           isActive: true,
+          startDate: new Date(),
+          endDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
           gymId: testGym.id
         }
       });

@@ -555,8 +555,9 @@ describe('Gyms Routes', () => {
 
       expect(response.status).toBe(200);
       expect(response.headers['content-type']).toBe('image/svg+xml');
-      expect(response.text).toContain('<svg');
-      expect(response.text).toContain('MG'); // Initials of "Main Gym"
+      const svgContent = response.body.toString('utf8');
+      expect(svgContent).toContain('<svg');
+      expect(svgContent).toContain('MG'); // Initials of "Main Gym"
     });
 
     it('should allow admin to get image of their gym', async () => {

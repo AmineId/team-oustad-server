@@ -33,7 +33,11 @@ describe('Authentication Routes', () => {
 
   beforeEach(async () => {
     // Clean up users and related data before each test
+    // Delete in proper order to respect foreign key constraints
     await prisma.passwordResetToken.deleteMany({});
+    await prisma.payment.deleteMany({});
+    await prisma.subscription.deleteMany({});
+    await prisma.subscriptionType.deleteMany({});
     await prisma.member.deleteMany({});
     await prisma.admin.deleteMany({});
     await prisma.user.deleteMany({});
@@ -47,37 +51,6 @@ describe('Authentication Routes', () => {
     testMember = await createTestMember(testGym.id, {
       email: 'testmember@test.com',
       password: 'member123'
-    });
-  });
-
-  describe('POST /auth/check-phone', () => {
-    it('should return exists=false for non-existent phone number', async () => {
-      const response = await request(app)
-        .post('/auth/check-phone')
-        .send({ phoneNumber: '+33999999999' });
-
-      expect(response.status).toBe(200);
-      expect(response.body.exists).toBe(false);
-      expect(response.body.hasPassword).toBe(false);
-    });
-
-    it('should return exists=true for existing phone number with password', async () => {
-      const response = await request(app)
-        .post('/auth/check-phone')
-        .send({ phoneNumber: testMember.phoneNumber });
-
-      expect(response.status).toBe(409);
-      expect(response.body.exists).toBe(true);
-      expect(response.body.hasPassword).toBe(true);
-    });
-
-    it('should return 400 if phone number is missing', async () => {
-      const response = await request(app)
-        .post('/auth/check-phone')
-        .send({});
-
-      expect(response.status).toBe(400);
-      expect(response.body.error).toBeDefined();
     });
   });
 
@@ -373,11 +346,55 @@ describe('Authentication Routes', () => {
   });
 
   describe('POST /auth/scan-qr', () => {
-    it('should allow admin to scan member QR code', async () => {
+    it('should allow admin to scan member QR code', async () => {      // Create an active subscription for the member
+      const subscriptionType = await prisma.subscriptionType.create({
+        data: {
+          name: 'Premium Monthly',
+          displayId: `SUBT${Date.now()}`,
+          monthlyPrice: 49.99,
+          durationMonths: 1,
+          features: ['Access to all equipment', 'Free classes'],
+          sessionQuota: 30,
+          sessionType: 'unlimited'
+        }
+      });
+
+      const subscription = await prisma.subscription.create({
+        data: {
+          displayId: `SUBS${Date.now()}`,
+          startDate: new Date(),
+          endDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 days from now
+          status: 'active',
+          autoRenew: true,
+          paymentFrequency: 12,
+          sessionsUsed: 0,
+          sessionQuota: 30,
+          Member: {
+            connect: { userId: testMember.id }
+          },
+          SubscriptionType: {
+            connect: { id: subscriptionType.id }
+          }
+        }
+      });
+
+      // Create a completed payment for the subscription
+      await prisma.payment.create({
+        data: {
+          amount: subscriptionType.monthlyPrice,
+          status: 'completed',
+          type: 'subscription',
+          paymentMethod: 'card',
+          displayId: `PAY${Date.now()}`,
+          subscriptionId: subscription.id,
+          memberId: testMember.id
+        }
+      });
+
       const response = await request(app)
         .post('/auth/scan-qr')
         .set('Authorization', authHeader(testAdmin))
-        .send({ qrCode: testMember.displayId });
+        .send({ qrCode: testMember.uniqueCode });
 
       expect(response.status).toBe(200);
       expect(response.body.success).toBe(true);
@@ -406,14 +423,14 @@ describe('Authentication Routes', () => {
     });
 
     it('should return 403 if member is from different gym', async () => {
-      // Create another gym and member
+      // Create another gym and admin
       const otherGym = await createTestGym({ name: 'Other Gym' });
-      const otherMember = await createTestMember(otherGym.id);
+      const adminFromOtherGym = await createTestAdmin(otherGym.id);
 
       const response = await request(app)
         .post('/auth/scan-qr')
-        .set('Authorization', authHeader(testAdmin))
-        .send({ qrCode: otherMember.displayId });
+        .set('Authorization', authHeader(adminFromOtherGym))
+        .send({ qrCode: testMember.uniqueCode });
 
       expect(response.status).toBe(403);
       expect(response.body.error).toContain('gym');

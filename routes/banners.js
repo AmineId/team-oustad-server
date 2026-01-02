@@ -24,7 +24,7 @@ router.get('/', async (req, res) => {
 
     const banners = await bannerService.getActiveBanners(filters);
     
-    res.json({ banners });
+    res.json(banners);
   } catch (error) {
     console.error('Error fetching banners:', error);
     res.status(500).json({ 

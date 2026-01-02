@@ -7,6 +7,18 @@ const { generateBannerId, generateBannerVariantId } = require('../utils/idGenera
 class BannerService {
   
   /**
+   * Convert priority string/number to Int
+   */
+  _parsePriority(priority) {
+    if (typeof priority === 'number') return priority;
+    if (typeof priority === 'string') {
+      const map = { low: 0, normal: 1, medium: 1, high: 2, urgent: 3 };
+      return map[priority.toLowerCase()] ?? 0;
+    }
+    return 0;
+  }
+
+  /**
    * Récupère les bannières actives avec filtrage
    */
   async getActiveBanners(filters = {}) {
@@ -132,12 +144,12 @@ class BannerService {
         videoUrl: data.videoUrl,
         mediaType: data.mediaType || 'image',
         type: data.type,
-        startDate: new Date(data.startDate),
-        endDate: new Date(data.endDate),
+        startDate: data.startDate ? new Date(data.startDate) : new Date(),
+        endDate: data.endDate ? new Date(data.endDate) : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
         actionType,
         actionData,
         actionParams,
-        priority: data.priority || 0,
+        priority: this._parsePriority(data.priority),
         isActive: data.isActive !== undefined ? data.isActive : true,
         gymId: data.gymId,
         backgroundColor: data.backgroundColor,

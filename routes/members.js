@@ -148,7 +148,14 @@ router.put('/:id/profile', auth, canAccessMemberProfile, apiLimiter, async (req,
     const memberUpdateData = {};
     if (birthDate !== undefined) memberUpdateData.birthDate = birthDate ? new Date(birthDate) : null;
     if (phone !== undefined) memberUpdateData.phone = phone;
-    if (profession !== undefined) memberUpdateData.profession = profession;
+    if (profession !== undefined) {
+      // Validate profession enum
+      const validProfessions = ['Actif', 'Etudiant', 'Retraite', 'Autre'];
+      if (!validProfessions.includes(profession)) {
+        return res.status(400).json({ error: 'Invalid profession value' });
+      }
+      memberUpdateData.profession = profession;
+    }
     if (fitnessLevel !== undefined) memberUpdateData.fitnessLevel = fitnessLevel;
     if (onboarding !== undefined) memberUpdateData.onboarding = onboarding;
     if (onboarding !== undefined) memberUpdateData.onboarding = onboarding;
@@ -238,6 +245,191 @@ router.put('/:id/profile', auth, canAccessMemberProfile, apiLimiter, async (req,
 
   } catch (e) {
     logger.error('💥 Erreur mise à jour profil membre:', e);
+    handleError(res, e, 500);
+  }
+});
+
+// PUT /members/:id/onboarding - Update onboarding status
+router.put('/:id/onboarding', auth, apiLimiter, async (req, res) => {
+  try {
+    const memberId = Number(req.params.id);
+    const { onboarding } = req.body;
+
+    if (onboarding === undefined) {
+      return res.status(400).json({ error: 'onboarding is required' });
+    }
+
+    // Check permissions
+    const requester = await prisma.user.findUnique({ where: { id: req.user.sub } });
+    if (!requester) return res.status(403).json({ error: 'Forbidden' });
+
+    if (requester.role === 'member' && requester.id !== memberId) {
+      return res.status(403).json({ error: 'Forbidden' });
+    }
+
+    const member = await prisma.member.update({
+      where: { userId: memberId },
+      data: { onboarding: Boolean(onboarding) }
+    });
+
+    res.json({ message: 'onboarding status updated', member });
+  } catch (e) {
+    handleError(res, e, 500);
+  }
+});
+
+// PUT /members/:id/profile-picture - Upload profile picture
+router.put('/:id/profile-picture', auth, apiLimiter, async (req, res) => {
+  try {
+    const memberId = Number(req.params.id);
+    const { imageData } = req.body;
+
+    if (!imageData) {
+      return res.status(400).json({ error: 'imageData is required' });
+    }
+
+    // Check permissions
+    const requester = await prisma.user.findUnique({ where: { id: req.user.sub } });
+    if (!requester) return res.status(403).json({ error: 'Forbidden' });
+
+    if (requester.role === 'member' && requester.id !== memberId) {
+      return res.status(403).json({ error: 'Forbidden' });
+    }
+
+    // Process base64 image
+    let imageBuffer;
+    try {
+      if (imageData.startsWith('data:image/')) {
+        const base64Data = imageData.split(',')[1];
+        imageBuffer = Buffer.from(base64Data, 'base64');
+      } else {
+        imageBuffer = Buffer.from(imageData, 'base64');
+      }
+    } catch (error) {
+      return res.status(400).json({ error: 'Invalid image data' });
+    }
+
+    await prisma.user.update({
+      where: { id: memberId },
+      data: { profileImage: imageBuffer }
+    });
+
+    res.json({ message: 'Profile picture uploaded successfully' });
+  } catch (e) {
+    handleError(res, e, 500);
+  }
+});
+
+// GET /members/:id/profile-picture - Get profile picture
+router.get('/:id/profile-picture', auth, async (req, res) => {
+  try {
+    const memberId = Number(req.params.id);
+
+    // Check permissions
+    const requester = await prisma.user.findUnique({ where: { id: req.user.sub } });
+    if (!requester) return res.status(403).json({ error: 'Forbidden' });
+
+    if (requester.role === 'member' && requester.id !== memberId) {
+      return res.status(403).json({ error: 'Forbidden' });
+    }
+
+    const user = await prisma.user.findUnique({
+      where: { id: memberId },
+      select: { profileImage: true, firstName: true, lastName: true }
+    });
+
+    if (!user) {
+      return res.status(404).json({ error: 'Member not found' });
+    }
+
+    if (!user.profileImage) {
+      // Return SVG placeholder with initials
+      const initials = `${(user.firstName || '?')[0]}${(user.lastName || '?')[0]}`.toUpperCase();
+      const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200"><rect width="200" height="200" fill="#ddd"/><text x="50%" y="50%" font-size="60" text-anchor="middle" dy=".3em" fill="#999">${initials}</text></svg>`;
+      res.setHeader('Content-Type', 'image/svg+xml');
+      return res.send(svg);
+    }
+
+    // Detect image type
+    const buffer = user.profileImage;
+    let contentType = 'image/jpeg';
+    if (buffer[0] === 0x89 && buffer[1] === 0x50 && buffer[2] === 0x4E && buffer[3] === 0x47) {
+      contentType = 'image/png';
+    }
+
+    res.setHeader('Content-Type', contentType);
+    res.send(buffer);
+  } catch (e) {
+    handleError(res, e, 500);
+  }
+});
+
+// DELETE /members/:id/profile-picture - Delete profile picture
+router.delete('/:id/profile-picture', auth, apiLimiter, async (req, res) => {
+  try {
+    const memberId = Number(req.params.id);
+
+    // Check permissions
+    const requester = await prisma.user.findUnique({ where: { id: req.user.sub } });
+    if (!requester) return res.status(403).json({ error: 'Forbidden' });
+
+    if (requester.role === 'member' && requester.id !== memberId) {
+      return res.status(403).json({ error: 'Forbidden' });
+    }
+
+    // Check if user exists
+    const user = await prisma.user.findUnique({ where: { id: memberId } });
+    if (!user) {
+      return res.status(404).json({ error: 'Member not found' });
+    }
+
+    await prisma.user.update({
+      where: { id: memberId },
+      data: { profileImage: null }
+    });
+
+    res.json({ message: 'Profile picture deleted successfully' });
+  } catch (e) {
+    handleError(res, e, 500);
+  }
+});
+
+// PUT /members/:id/preferred-training-days - Update preferred training days
+router.put('/:id/preferred-training-days', auth, apiLimiter, async (req, res) => {
+  try {
+    const memberId = Number(req.params.id);
+    const { days, preferredTrainingDays } = req.body;
+    const daysArray = days !== undefined ? days : preferredTrainingDays;
+
+    if (daysArray === undefined || !Array.isArray(daysArray)) {
+      return res.status(400).json({ error: 'days must be an array' });
+    }
+
+    // Convert day names to numbers if strings
+    const dayMap = { sunday: 0, monday: 1, tuesday: 2, wednesday: 3, thursday: 4, friday: 5, saturday: 6 };
+    const numericDays = daysArray.map(day => typeof day === 'string' ? dayMap[day.toLowerCase()] : day);
+
+    // Validate days are 0-6
+    if (numericDays.some(d => d === undefined || typeof d !== 'number' || d < 0 || d > 6)) {
+      return res.status(400).json({ error: 'days must be numbers between 0 and 6 or valid day names' });
+    }
+
+    // Check permissions
+    const requester = await prisma.user.findUnique({ where: { id: req.user.sub } });
+    if (!requester) return res.status(403).json({ error: 'Forbidden' });
+
+    if (requester.role === 'member' && requester.id !== memberId) {
+      return res.status(403).json({ error: 'Forbidden' });
+    }
+
+    const member = await prisma.member.update({
+      where: { userId: memberId },
+      data: { preferredTrainingDays: numericDays }
+    });
+
+    // Return with original format
+    res.json({ message: 'preferred training days updated', member: { ...member, preferredTrainingDays: daysArray } });
+  } catch (e) {
     handleError(res, e, 500);
   }
 });

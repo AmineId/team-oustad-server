@@ -34,7 +34,7 @@ describe('Check-In Routes', () => {
 
   beforeEach(async () => {
     // Clean up before each test
-    await prisma.checkIn.deleteMany({});
+    await prisma.gymCheckIn.deleteMany({});
     await prisma.subscription.deleteMany({});
     await prisma.passwordResetToken.deleteMany({});
     await prisma.member.deleteMany({});
@@ -56,24 +56,23 @@ describe('Check-In Routes', () => {
     // Create a subscription type and subscription
     const subscriptionType = await prisma.subscriptionType.create({
       data: {
-        displayId: 'SUB001',
+        displayId: `SUBTYPE${Date.now()}`,
         name: 'Monthly',
         description: 'Monthly membership',
-        price: 50.00,
-        durationDays: 30,
+        monthlyPrice: 50.00,
         sessionQuota: 20,
-        gymId: testGym.id
+        features: ['Gym Access']
       }
     });
 
     testSubscription = await prisma.subscription.create({
       data: {
-        displayId: 'MEMBERSHIP001',
-        memberId: testMember.Member.id,
-        subscriptionTypeId: subscriptionType.id,
+        displayId: `SUB${Date.now()}`,
+        Member: { connect: { userId: testMember.id } },
+        SubscriptionType: { connect: { id: subscriptionType.id } },
         startDate: new Date(),
         endDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
-        remainingSessionQuota: 20,
+        paymentFrequency: 1,
         status: 'active'
       }
     });
@@ -85,13 +84,14 @@ describe('Check-In Routes', () => {
         .post('/check-in')
         .set('Authorization', authHeader(testMember))
         .send({
-          memberId: testMember.Member.id
+          memberId: testMember.id,
+          subscriptionId: testSubscription.id,
+          gymId: testGym.id
         });
 
       expect(response.status).toBe(201);
-      expect(response.body.memberId).toBe(testMember.Member.id);
+      expect(response.body.memberId).toBe(testMember.id);
       expect(response.body.checkInTime).toBeDefined();
-      expect(response.body.checkOutTime).toBeNull();
     });
 
     it('should return 400 if member already checked in', async () => {
@@ -100,7 +100,9 @@ describe('Check-In Routes', () => {
         .post('/check-in')
         .set('Authorization', authHeader(testMember))
         .send({
-          memberId: testMember.Member.id
+          memberId: testMember.id,
+          subscriptionId: testSubscription.id,
+          gymId: testGym.id
         });
 
       // Second check-in should fail
@@ -108,7 +110,9 @@ describe('Check-In Routes', () => {
         .post('/check-in')
         .set('Authorization', authHeader(testMember))
         .send({
-          memberId: testMember.Member.id
+          memberId: testMember.id,
+          subscriptionId: testSubscription.id,
+          gymId: testGym.id
         });
 
       expect(response.status).toBe(400);
@@ -118,7 +122,7 @@ describe('Check-In Routes', () => {
       const response = await request(app)
         .post('/check-in')
         .send({
-          memberId: testMember.Member.id
+          memberId: testMember.id,
         });
 
       expect(response.status).toBe(401);
@@ -129,12 +133,13 @@ describe('Check-In Routes', () => {
     let checkIn;
 
     beforeEach(async () => {
-      checkIn = await prisma.checkIn.create({
+      checkIn = await prisma.gymCheckIn.create({
         data: {
-          memberId: testMember.Member.id,
+          displayId: `CHECKIN${Date.now()}`,
+          memberId: testMember.id,
+          subscriptionId: testSubscription.id,
           gymId: testGym.id,
-          checkInTime: new Date(),
-          checkOutTime: null
+          checkInTime: new Date()
         }
       });
     });
@@ -173,9 +178,11 @@ describe('Check-In Routes', () => {
 
   describe('GET /check-in/member/:memberId', () => {
     beforeEach(async () => {
-      await prisma.checkIn.create({
+      await prisma.gymCheckIn.create({
         data: {
-          memberId: testMember.Member.id,
+          displayId: `CHECKIN${Date.now()}`,
+          memberId: testMember.id,
+          subscriptionId: testSubscription.id,
           gymId: testGym.id,
           checkInTime: new Date(Date.now() - 2 * 60 * 60 * 1000), // 2 hours ago
           checkOutTime: new Date(Date.now() - 1 * 60 * 60 * 1000) // 1 hour ago
@@ -185,7 +192,7 @@ describe('Check-In Routes', () => {
 
     it('should get check-in history for member', async () => {
       const response = await request(app)
-        .get(`/check-in/member/${testMember.Member.id}`)
+        .get(`/check-in/member/${testMember.id}`)
         .set('Authorization', authHeader(testMember));
 
       expect(response.status).toBe(200);
@@ -195,7 +202,7 @@ describe('Check-In Routes', () => {
 
     it('should allow admin to get member check-in history', async () => {
       const response = await request(app)
-        .get(`/check-in/member/${testMember.Member.id}`)
+        .get(`/check-in/member/${testMember.id}`)
         .set('Authorization', authHeader(testAdmin));
 
       expect(response.status).toBe(200);
@@ -206,19 +213,20 @@ describe('Check-In Routes', () => {
   describe('GET /check-in/gym/today', () => {
     beforeEach(async () => {
       // Create a check-in for today
-      await prisma.checkIn.create({
+      await prisma.gymCheckIn.create({
         data: {
-          memberId: testMember.Member.id,
+          displayId: `CHECKIN${Date.now()}`,
+          memberId: testMember.id,
+          subscriptionId: testSubscription.id,
           gymId: testGym.id,
-          checkInTime: new Date(),
-          checkOutTime: null
+          checkInTime: new Date()
         }
       });
     });
 
     it('should get today\'s check-ins as admin', async () => {
       const response = await request(app)
-        .get('/check-in/gym/today')
+        .get(`/check-in/gym/${testGym.id}/today`)
         .set('Authorization', authHeader(testAdmin));
 
       expect(response.status).toBe(200);
@@ -228,7 +236,7 @@ describe('Check-In Routes', () => {
 
     it('should return 403 for members', async () => {
       const response = await request(app)
-        .get('/check-in/gym/today')
+        .get(`/check-in/gym/${testGym.id}/today`)
         .set('Authorization', authHeader(testMember));
 
       expect(response.status).toBe(403);

@@ -59,15 +59,14 @@ describe('Subscription Types Routes', () => {
         .send({
           name: 'Premium Monthly',
           description: 'Premium membership with all access',
-          price: 99.99,
-          durationDays: 30,
+          monthlyPrice: 99.99,
+          features: ['All access', 'Personal trainer'],
           sessionQuota: 30
         });
 
       expect(response.status).toBe(201);
-      expect(response.body.name).toBe('Premium Monthly');
-      expect(response.body.price).toBe(99.99);
-      expect(response.body.durationDays).toBe(30);
+      expect(response.body.type.name).toBe('Premium Monthly');
+      expect(response.body.type.monthlyPrice).toBe(99.99);
     });
 
     it('should return 403 for members', async () => {
@@ -76,8 +75,8 @@ describe('Subscription Types Routes', () => {
         .set('Authorization', authHeader(testMember))
         .send({
           name: 'Basic Monthly',
-          price: 49.99,
-          durationDays: 30
+          monthlyPrice: 49.99,
+          features: ['Basic access']
         });
 
       expect(response.status).toBe(403);
@@ -103,10 +102,9 @@ describe('Subscription Types Routes', () => {
           displayId: 'SUB001',
           name: 'Basic',
           description: 'Basic membership',
-          price: 49.99,
-          durationDays: 30,
-          sessionQuota: 15,
-          gymId: testGym.id
+          monthlyPrice: 49.99,
+          features: ['Basic access'],
+          sessionQuota: 15
         }
       });
 
@@ -115,10 +113,9 @@ describe('Subscription Types Routes', () => {
           displayId: 'SUB002',
           name: 'Premium',
           description: 'Premium membership',
-          price: 99.99,
-          durationDays: 30,
-          sessionQuota: 30,
-          gymId: testGym.id
+          monthlyPrice: 99.99,
+          features: ['Premium access', 'All equipment'],
+          sessionQuota: 30
         }
       });
     });
@@ -156,10 +153,9 @@ describe('Subscription Types Routes', () => {
           displayId: 'SUB001',
           name: 'Test Subscription',
           description: 'Test description',
-          price: 59.99,
-          durationDays: 30,
-          sessionQuota: 20,
-          gymId: testGym.id
+          monthlyPrice: 59.99,
+          features: ['Test access'],
+          sessionQuota: 20
         }
       });
     });
@@ -192,10 +188,9 @@ describe('Subscription Types Routes', () => {
           displayId: 'SUB001',
           name: 'Original Name',
           description: 'Original description',
-          price: 59.99,
-          durationDays: 30,
-          sessionQuota: 20,
-          gymId: testGym.id
+          monthlyPrice: 59.99,
+          features: ['Original access'],
+          sessionQuota: 20
         }
       });
     });
@@ -206,12 +201,12 @@ describe('Subscription Types Routes', () => {
         .set('Authorization', authHeader(testAdmin))
         .send({
           name: 'Updated Name',
-          price: 69.99
+          monthlyPrice: 69.99
         });
 
       expect(response.status).toBe(200);
-      expect(response.body.name).toBe('Updated Name');
-      expect(response.body.price).toBe(69.99);
+      expect(response.body.type.name).toBe('Updated Name');
+      expect(response.body.type.monthlyPrice).toBe(69.99);
     });
 
     it('should return 403 for members', async () => {
@@ -235,10 +230,9 @@ describe('Subscription Types Routes', () => {
           displayId: 'SUB001',
           name: 'To Delete',
           description: 'Will be deleted',
-          price: 59.99,
-          durationDays: 30,
-          sessionQuota: 20,
-          gymId: testGym.id
+          monthlyPrice: 59.99,
+          features: ['To delete'],
+          sessionQuota: 20
         }
       });
     });
@@ -250,11 +244,12 @@ describe('Subscription Types Routes', () => {
 
       expect(response.status).toBe(200);
       
-      // Verify deletion
+      // Verify soft deletion (isActive = false)
       const deletedType = await prisma.subscriptionType.findUnique({
         where: { id: testSubscriptionType.id }
       });
-      expect(deletedType).toBeNull();
+      expect(deletedType).toBeDefined();
+      expect(deletedType.isActive).toBe(false);
     });
 
     it('should return 403 for members', async () => {

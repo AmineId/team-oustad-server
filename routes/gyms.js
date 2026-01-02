@@ -394,7 +394,7 @@ router.get('/:id', auth, async (req, res) => {
       return notFound(res, 'Gym', id);
     }
 
-    logger.info(`✅ Gym trouvé: ${gym.name} (${id}) - ${gym.users.length} utilisateurs, ${gym.openingHours.length} horaires`);
+    logger.info(`✅ Gym trouvé: ${gym.name} (${id}) - ${gym._count.User} utilisateurs, ${gym.OpeningHour.length} horaires`);
     logger.debug(`📤 Réponse détails gym: ${gym.name}`);
     res.json({ gym });
   } catch (e) {

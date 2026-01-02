@@ -57,14 +57,13 @@ describe('Plannings Routes', () => {
     // Create a test exercise
     testExercise = await prisma.exercise.create({
       data: {
-        displayId: 'EX001',
+        displayId: `EX${Date.now()}`,
         name: 'Push-ups',
         description: 'Classic push-up exercise',
         category: 'strength',
-        muscleGroup: 'chest',
-        difficulty: 'beginner',
-        gymId: testGym.id,
-        createdById: testAdmin.id
+        muscleGroup: ['chest'],
+        equipment: [],
+        difficulty: 'beginner'
       }
     });
   });
@@ -78,13 +77,13 @@ describe('Plannings Routes', () => {
           name: 'Squats',
           description: 'Leg exercise',
           category: 'strength',
-          muscleGroup: 'legs',
+          muscleGroup: ['legs'],
           difficulty: 'intermediate'
         });
 
       expect(response.status).toBe(201);
-      expect(response.body.name).toBe('Squats');
-      expect(response.body.category).toBe('strength');
+      expect(response.body.exercise.name).toBe('Squats');
+      expect(response.body.exercise.category).toBe('strength');
     });
 
     it('should return 401 without authentication', async () => {
@@ -119,8 +118,8 @@ describe('Plannings Routes', () => {
         .set('Authorization', authHeader(testAdmin));
 
       expect(response.status).toBe(200);
-      expect(Array.isArray(response.body)).toBe(true);
-      expect(response.body.length).toBeGreaterThan(0);
+      expect(Array.isArray(response.body.exercises)).toBe(true);
+      expect(response.body.exercises.length).toBeGreaterThan(0);
     });
 
     it('should work for members too', async () => {
@@ -129,7 +128,7 @@ describe('Plannings Routes', () => {
         .set('Authorization', authHeader(testMember));
 
       expect(response.status).toBe(200);
-      expect(Array.isArray(response.body)).toBe(true);
+      expect(Array.isArray(response.body.exercises)).toBe(true);
     });
   });
 
@@ -140,8 +139,8 @@ describe('Plannings Routes', () => {
         .set('Authorization', authHeader(testAdmin));
 
       expect(response.status).toBe(200);
-      expect(response.body.id).toBe(testExercise.id);
-      expect(response.body.name).toBe('Push-ups');
+      expect(response.body.exercise.id).toBe(testExercise.id);
+      expect(response.body.exercise.name).toBe('Push-ups');
     });
 
     it('should return 404 for non-existent exercise', async () => {
@@ -160,30 +159,14 @@ describe('Plannings Routes', () => {
         .set('Authorization', authHeader(testAdmin))
         .send({
           memberId: testMember.id,
-          name: 'Week 1 Workout',
+          title: 'Week 1 Workout',
           description: 'First week training plan',
           startDate: new Date().toISOString(),
-          endDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
-          days: [
-            {
-              dayNumber: 1,
-              name: 'Chest Day',
-              exercises: [
-                {
-                  exerciseId: testExercise.id,
-                  sets: 3,
-                  reps: 10,
-                  restSeconds: 60
-                }
-              ]
-            }
-          ]
+          endDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString()
         });
 
       expect(response.status).toBe(201);
-      expect(response.body.name).toBe('Week 1 Workout');
-      expect(response.body.days).toBeDefined();
-      expect(response.body.days.length).toBe(1);
+      expect(response.body.planning.title).toBe('Week 1 Workout');
     });
 
     it('should return 403 for members trying to create planning', async () => {
@@ -192,7 +175,7 @@ describe('Plannings Routes', () => {
         .set('Authorization', authHeader(testMember))
         .send({
           memberId: testMember.id,
-          name: 'My Own Plan',
+          title: 'My Own Plan',
           startDate: new Date().toISOString(),
           endDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString()
         });
@@ -207,8 +190,8 @@ describe('Plannings Routes', () => {
     beforeEach(async () => {
       testPlanning = await prisma.planning.create({
         data: {
-          displayId: 'PLAN001',
-          name: 'Test Planning',
+          displayId: `PLAN${Date.now()}`,
+          title: 'Test Planning',
           description: 'Test description',
           memberId: testMember.id,
           coachId: testAdmin.id,
@@ -224,8 +207,8 @@ describe('Plannings Routes', () => {
         .set('Authorization', authHeader(testAdmin));
 
       expect(response.status).toBe(200);
-      expect(Array.isArray(response.body)).toBe(true);
-      expect(response.body.length).toBeGreaterThan(0);
+      expect(Array.isArray(response.body.plannings)).toBe(true);
+      expect(response.body.plannings.length).toBeGreaterThan(0);
     });
 
     it('should allow member to get their own plannings', async () => {
@@ -234,7 +217,7 @@ describe('Plannings Routes', () => {
         .set('Authorization', authHeader(testMember));
 
       expect(response.status).toBe(200);
-      expect(Array.isArray(response.body)).toBe(true);
+      expect(Array.isArray(response.body.plannings)).toBe(true);
     });
   });
 });

@@ -31,7 +31,7 @@ const requireOwner = async (req, res, next) => {
   try {
     const user = await prisma.user.findUnique({
       where: { id: req.user.sub },
-      include: { owner: true }
+      include: { Owner: true }
     });
 
     if (!user) {
@@ -60,7 +60,7 @@ const requireAdmin = async (req, res, next) => {
   try {
     const user = await prisma.user.findUnique({
       where: { id: req.user.sub },
-      include: { admin: true }
+      include: { Admin: true }
     });
 
     if (!user) {
@@ -81,6 +81,29 @@ const requireAdmin = async (req, res, next) => {
     res.status(500).json({ error: error.message });
   }
 };
+
+// GET /users/me - Get current user profile
+router.get('/me', auth, async (req, res) => {
+  try {
+    const user = await prisma.user.findUnique({
+      where: { id: req.user.sub },
+      include: {
+        Admin: true,
+        Member: true,
+        Owner: true,
+        Gym: { select: { id: true, name: true } }
+      }
+    });
+
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    res.json(user);
+  } catch (error) {
+    handleError(res, error, 500);
+  }
+});
 
 // Create user (admin can create members, owner can create admins/members)
 /**
@@ -414,6 +437,11 @@ router.get('/', auth, async (req, res) => {
     const requester = await prisma.user.findUnique({ where: { id: req.user.sub } });
     if (!requester) return res.status(403).json({ error: 'Forbidden' });
 
+    // Members cannot list users
+    if (requester.role === 'member') {
+      return res.status(403).json({ error: 'Forbidden' });
+    }
+
     let whereClause = {};
 
     if (requester.role === 'admin') {
@@ -425,15 +453,15 @@ router.get('/', auth, async (req, res) => {
     const users = await prisma.user.findMany({
       where: whereClause,
       include: {
-        gym: { select: { id: true, name: true } },
-        member: {
+        Gym: { select: { id: true, name: true } },
+        Member: {
           include: {
-            subscriptions: { where: { status: 'active' } },
-            payments: { orderBy: { createdAt: 'desc' }, take: 3 }
+            Subscription: { where: { status: 'active' } },
+            Payment: { orderBy: { createdAt: 'desc' }, take: 3 }
           }
         },
-        admin: true,
-        owner: true
+        Admin: true,
+        Owner: true
       },
       orderBy: { createdAt: 'desc' }
     });
@@ -441,7 +469,7 @@ router.get('/', auth, async (req, res) => {
     // Masquer les mots de passe
     const safeUsers = users.map(({ password, ...rest }) => rest);
 
-    res.json({ users: safeUsers });
+    res.json(safeUsers);
 
   } catch (e) {
     console.error('Erreur list utilisateurs:', e);
@@ -456,10 +484,10 @@ router.get('/:id/qr', auth, async (req, res) => {
     const user = await prisma.user.findUnique({
       where: { id },
       include: {
-        gym: { select: { id: true, name: true } },
+        Gym: { select: { id: true, name: true } },
         member: true,
-        admin: true,
-        owner: true
+        Admin: true,
+        Owner: true
       }
     });
 
@@ -709,7 +737,7 @@ router.get('/:id/qr', auth, async (req, res) => {
 router.put('/:id', auth, async (req, res) => {
   try {
     const id = Number(req.params.id);
-    const { email, fullName, password, permissions } = req.body;
+    const { email, firstName, lastName, password, permissions } = req.body;
 
     const requester = await prisma.user.findUnique({ where: { id: req.user.sub } });
     if (!requester) return res.status(403).json({ error: 'Forbidden' });
@@ -724,7 +752,7 @@ router.put('/:id', auth, async (req, res) => {
       canUpdate = true; // Owner peut modifier tout le monde
     } else if (requester.role === 'admin') {
       // Admin peut modifier seulement les membres de sa salle
-      canUpdate = targetUser.gymId === requester.gymId && targetUser.role === 'member';
+      canUpdate = targetUser.gymId === requester.gymId;
     } else if (requester.role === 'member') {
       // Member peut modifier seulement son propre profil
       canUpdate = id === req.user.sub;
@@ -736,50 +764,20 @@ router.put('/:id', auth, async (req, res) => {
 
     const updateData = {};
     if (email) updateData.email = email;
-    if (fullName) updateData.fullName = fullName;
+    if (firstName) updateData.firstName = firstName;
+    if (lastName) updateData.lastName = lastName;
     if (password) updateData.password = await bcrypt.hash(password, 10);
 
     const updatedUser = await prisma.user.update({
       where: { id },
       data: updateData,
       include: {
-        gym: { select: { id: true, name: true } },
-        member: true,
-        admin: true,
-        owner: true
+        Gym: { select: { id: true, name: true } },
+        Member: true,
+        Admin: true,
+        Owner: true
       }
     });
-
-    // Régénérer le QR code si le nom ou l'email a changé
-    if (email || fullName) {
-      try {
-        const qrData = JSON.stringify({
-          userId: updatedUser.id,
-          uniqueCode: updatedUser.uniqueCode,
-          fullName: updatedUser.fullName,
-          role: updatedUser.role,
-          gymName: updatedUser.gym.name,
-          accessType: 'gym_access',
-          updatedAt: new Date().toISOString()
-        });
-
-        const qrCodeBuffer = await QRCode.toBuffer(qrData, {
-          type: 'png',
-          width: 300,
-          margin: 2,
-          color: { dark: '#000000', light: '#FFFFFF' }
-        });
-
-        await prisma.user.update({
-          where: { id: updatedUser.id },
-          data: { qrCode: qrCodeBuffer }
-        });
-
-        console.log(`🔄 QR code régénéré pour ${updatedUser.fullName} après mise à jour`);
-      } catch (qrError) {
-        console.error(`⚠️ Erreur régénération QR code pour ${updatedUser.fullName}:`, qrError);
-      }
-    }
 
     // Mettre à jour les permissions si c'est un owner
     if (targetUser.role === 'owner' && permissions) {
@@ -795,10 +793,7 @@ router.put('/:id', auth, async (req, res) => {
     }
 
     const { password: _, ...safeUser } = updatedUser;
-    res.json({
-      message: 'Utilisateur mis à jour avec succès',
-      user: safeUser
-    });
+    res.json(safeUser);
 
   } catch (e) {
     if (e.code === 'P2025') return notFound(res, 'User', req.params.id);
@@ -1436,20 +1431,20 @@ router.get('/:id', auth, async (req, res) => {
     const user = await prisma.user.findUnique({
       where: { id },
       include: {
-        gym: { select: { id: true, name: true } },
-        member: {
+        Gym: { select: { id: true, name: true } },
+        Member: {
           include: {
-            subscriptions: {
+            Subscription: {
               where: { status: 'active' }
             },
-            payments: {
+            Payment: {
               orderBy: { createdAt: 'desc' },
               take: 5
             }
           }
         },
-        admin: true,
-        owner: true
+        Admin: true,
+        Owner: true
       }
     });
 
@@ -1464,8 +1459,7 @@ router.get('/:id', auth, async (req, res) => {
     if (requester.role === 'owner') {
       hasAccess = true;
     } else if (requester.role === 'admin') {
-      const admin = await prisma.admin.findUnique({ where: { userId: req.user.sub } });
-      hasAccess = admin && user.gymId === admin.gymId;
+      hasAccess = user.gymId === requester.gymId;
     } else if (requester.role === 'member') {
       hasAccess = req.user.sub === id;
     }
@@ -1478,23 +1472,24 @@ router.get('/:id', auth, async (req, res) => {
     const response = {
       id: user.id,
       email: user.email,
-      fullName: user.fullName,
+      firstName: user.firstName,
+      lastName: user.lastName,
       role: user.role,
       uniqueCode: user.uniqueCode,
-      gym: user.gym
+      Gym: user.Gym
     };
 
-    if (user.role === 'member' && user.member) {
-      response.activeSubscription = user.member.subscriptions.find(sub => sub.status === 'active') || null;
-      response.recentPayments = user.member.payments || [];
+    if (user.role === 'member' && user.Member) {
+      response.activeSubscription = user.Member.Subscription.find(sub => sub.status === 'active') || null;
+      response.recentPayments = user.Member.Payment || [];
     }
 
-    if (user.role === 'owner' && user.owner) {
+    if (user.role === 'owner' && user.Owner) {
       response.permissions = {
-        canManageAdmins: user.owner.canManageAdmins,
-        canManageGyms: user.owner.canManageGyms,
-        canViewReports: user.owner.canViewReports,
-        maxGymsAllowed: user.owner.maxGymsAllowed,
+        canManageAdmins: user.Owner.canManageAdmins,
+        canManageGyms: user.Owner.canManageGyms,
+        canViewReports: user.Owner.canViewReports,
+        maxGymsAllowed: user.Owner.maxGymsAllowed,
       };
     }
 
@@ -1628,6 +1623,56 @@ router.get('/:id', auth, async (req, res) => {
  *                   type: string
  *                   example: "Erreur lors de la création du propriétaire"
  */
+
+// POST /users/:id/change-password - Change user password
+router.post('/:id/change-password', auth, async (req, res) => {
+  try {
+    const userId = Number(req.params.id);
+    const { currentPassword, newPassword } = req.body;
+
+    if (!currentPassword || !newPassword) {
+      return res.status(400).json({ error: 'currentPassword and newPassword are required' });
+    }
+
+    if (newPassword.length < 6) {
+      return res.status(400).json({ error: 'New password must be at least 6 characters' });
+    }
+
+    // Check if user can change this password (own or admin/owner)
+    const requester = await prisma.user.findUnique({ where: { id: req.user.sub } });
+    if (!requester) {
+      return res.status(403).json({ error: 'Forbidden' });
+    }
+
+    // Only allow changing own password unless owner
+    if (req.user.sub !== userId && requester.role !== 'owner') {
+      return res.status(403).json({ error: 'You can only change your own password' });
+    }
+
+    const user = await prisma.user.findUnique({ where: { id: userId } });
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    // Verify current password
+    const isValid = await bcrypt.compare(currentPassword, user.password);
+    if (!isValid) {
+      return res.status(400).json({ error: 'Current password is incorrect' });
+    }
+
+    // Hash new password and update
+    const hashedPassword = await bcrypt.hash(newPassword, 10);
+    await prisma.user.update({
+      where: { id: userId },
+      data: { password: hashedPassword }
+    });
+
+    res.json({ message: 'password changed successfully' });
+  } catch (error) {
+    handleError(res, error, 500);
+  }
+});
+
 router.post('/create-owner', requireOwner, async (req, res) => {
   const { email, password, fullName, gymId, permissions } = req.body;
 

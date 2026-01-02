@@ -33,7 +33,7 @@ describe('Store Routes', () => {
 
   beforeEach(async () => {
     // Clean up before each test
-    await prisma.product.deleteMany({});
+    await prisma.storeProduct.deleteMany({});
     await prisma.passwordResetToken.deleteMany({});
     await prisma.member.deleteMany({});
     await prisma.admin.deleteMany({});
@@ -65,8 +65,8 @@ describe('Store Routes', () => {
         });
 
       expect(response.status).toBe(201);
-      expect(response.body.name).toBe('Protein Shake');
-      expect(response.body.price).toBe(29.99);
+      expect(response.body.product.name).toBe('Protein Shake');
+      expect(response.body.product.price).toBe(29.99);
     });
 
     it('should return 403 for members', async () => {
@@ -75,7 +75,8 @@ describe('Store Routes', () => {
         .set('Authorization', authHeader(testMember))
         .send({
           name: 'Test Product',
-          price: 19.99
+          price: 19.99,
+          stock: 10
         });
 
       expect(response.status).toBe(403);
@@ -87,7 +88,7 @@ describe('Store Routes', () => {
         .set('Authorization', authHeader(testAdmin))
         .send({
           name: 'Incomplete Product'
-          // Missing price
+          // Missing price and stock
         });
 
       expect(response.status).toBe(400);
@@ -96,27 +97,30 @@ describe('Store Routes', () => {
 
   describe('GET /store/products', () => {
     beforeEach(async () => {
-      await prisma.product.createMany({
-        data: [
-          {
-            displayId: 'PROD001',
-            name: 'Protein Bar',
-            description: 'Energy bar',
-            price: 4.99,
-            stock: 100,
-            category: 'snacks',
-            gymId: testGym.id
-          },
-          {
-            displayId: 'PROD002',
-            name: 'Water Bottle',
-            description: 'Sports bottle',
-            price: 9.99,
-            stock: 50,
-            category: 'accessories',
-            gymId: testGym.id
-          }
-        ]
+      // Create products one by one with createdBy field
+      await prisma.storeProduct.create({
+        data: {
+          displayId: `PROD${Date.now()}1`,
+          name: 'Protein Bar',
+          description: 'Energy bar',
+          price: 4.99,
+          stock: 100,
+          category: 'snacks',
+          gymId: testGym.id,
+          createdBy: testAdmin.id
+        }
+      });
+      await prisma.storeProduct.create({
+        data: {
+          displayId: `PROD${Date.now()}2`,
+          name: 'Water Bottle',
+          description: 'Sports bottle',
+          price: 9.99,
+          stock: 50,
+          category: 'accessories',
+          gymId: testGym.id,
+          createdBy: testAdmin.id
+        }
       });
     });
 
@@ -126,8 +130,8 @@ describe('Store Routes', () => {
         .set('Authorization', authHeader(testMember));
 
       expect(response.status).toBe(200);
-      expect(Array.isArray(response.body)).toBe(true);
-      expect(response.body.length).toBe(2);
+      expect(Array.isArray(response.body.products)).toBe(true);
+      expect(response.body.products.length).toBe(2);
     });
 
     it('should work for both members and admins', async () => {
@@ -148,27 +152,28 @@ describe('Store Routes', () => {
     let testProduct;
 
     beforeEach(async () => {
-      testProduct = await prisma.product.create({
+      testProduct = await prisma.storeProduct.create({
         data: {
-          displayId: 'PROD001',
+          displayId: `PROD${Date.now()}`,
           name: 'Test Product',
           description: 'Test description',
           price: 19.99,
           stock: 25,
           category: 'supplements',
-          gymId: testGym.id
+          gymId: testGym.id,
+          createdBy: testAdmin.id
         }
       });
     });
 
     it('should get a specific product', async () => {
       const response = await request(app)
-        .get(`/store/products/${testProduct.id}`)
+        .get(`/store/products/${testProduct.displayId}`)
         .set('Authorization', authHeader(testMember));
 
       expect(response.status).toBe(200);
-      expect(response.body.id).toBe(testProduct.id);
-      expect(response.body.name).toBe('Test Product');
+      expect(response.body.product.id).toBe(testProduct.id);
+      expect(response.body.product.name).toBe('Test Product');
     });
 
     it('should return 404 for non-existent product', async () => {
@@ -184,22 +189,23 @@ describe('Store Routes', () => {
     let testProduct;
 
     beforeEach(async () => {
-      testProduct = await prisma.product.create({
+      testProduct = await prisma.storeProduct.create({
         data: {
-          displayId: 'PROD001',
+          displayId: `PROD${Date.now()}`,
           name: 'Original Name',
           description: 'Original description',
           price: 19.99,
           stock: 25,
           category: 'supplements',
-          gymId: testGym.id
+          gymId: testGym.id,
+          createdBy: testAdmin.id
         }
       });
     });
 
     it('should update a product as admin', async () => {
       const response = await request(app)
-        .put(`/store/products/${testProduct.id}`)
+        .put(`/store/products/${testProduct.displayId}`)
         .set('Authorization', authHeader(testAdmin))
         .send({
           name: 'Updated Name',
@@ -207,13 +213,13 @@ describe('Store Routes', () => {
         });
 
       expect(response.status).toBe(200);
-      expect(response.body.name).toBe('Updated Name');
-      expect(response.body.price).toBe(24.99);
+      expect(response.body.product.name).toBe('Updated Name');
+      expect(response.body.product.price).toBe(24.99);
     });
 
     it('should return 403 for members', async () => {
       const response = await request(app)
-        .put(`/store/products/${testProduct.id}`)
+        .put(`/store/products/${testProduct.displayId}`)
         .set('Authorization', authHeader(testMember))
         .send({
           name: 'Updated Name'
@@ -227,28 +233,29 @@ describe('Store Routes', () => {
     let testProduct;
 
     beforeEach(async () => {
-      testProduct = await prisma.product.create({
+      testProduct = await prisma.storeProduct.create({
         data: {
-          displayId: 'PROD001',
+          displayId: `PROD${Date.now()}`,
           name: 'To Delete',
           description: 'Will be deleted',
           price: 19.99,
           stock: 25,
           category: 'supplements',
-          gymId: testGym.id
+          gymId: testGym.id,
+          createdBy: testAdmin.id
         }
       });
     });
 
     it('should delete a product as admin', async () => {
       const response = await request(app)
-        .delete(`/store/products/${testProduct.id}`)
+        .delete(`/store/products/${testProduct.displayId}`)
         .set('Authorization', authHeader(testAdmin));
 
       expect(response.status).toBe(200);
       
       // Verify deletion
-      const deletedProduct = await prisma.product.findUnique({
+      const deletedProduct = await prisma.storeProduct.findUnique({
         where: { id: testProduct.id }
       });
       expect(deletedProduct).toBeNull();
@@ -256,7 +263,7 @@ describe('Store Routes', () => {
 
     it('should return 403 for members', async () => {
       const response = await request(app)
-        .delete(`/store/products/${testProduct.id}`)
+        .delete(`/store/products/${testProduct.displayId}`)
         .set('Authorization', authHeader(testMember));
 
       expect(response.status).toBe(403);

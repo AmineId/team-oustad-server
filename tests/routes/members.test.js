@@ -213,13 +213,13 @@ describe('Members Routes', () => {
         .send({ imageData });
 
       expect(response.status).toBe(200);
-      expect(response.body.message).toContain('Photo');
+      expect(response.body.message).toContain('picture');
 
       // Verify image was saved
-      const member = await prisma.member.findUnique({
-        where: { userId: testMember.id }
+      const user = await prisma.user.findUnique({
+        where: { id: testMember.id }
       });
-      expect(member.profilePicture).not.toBeNull();
+      expect(user.profileImage).not.toBeNull();
     });
 
     it('should allow admin to upload profile picture for member', async () => {
@@ -281,9 +281,9 @@ describe('Members Routes', () => {
     it('should return member profile picture if exists', async () => {
       // Upload an image first
       const imageBuffer = Buffer.from('fake image data');
-      await prisma.member.update({
-        where: { userId: testMember.id },
-        data: { profilePicture: imageBuffer }
+      await prisma.user.update({
+        where: { id: testMember.id },
+        data: { profileImage: imageBuffer }
       });
 
       const response = await request(app)
@@ -295,14 +295,21 @@ describe('Members Routes', () => {
     });
 
     it('should return SVG placeholder if no picture exists', async () => {
+      // Clear any existing profile picture
+      await prisma.user.update({
+        where: { id: testMember.id },
+        data: { profileImage: null }
+      });
+
       const response = await request(app)
         .get(`/members/${testMember.id}/profile-picture`)
         .set('Authorization', authHeader(testMember));
 
       expect(response.status).toBe(200);
-      expect(response.headers['content-type']).toBe('image/svg+xml');
-      expect(response.text).toContain('<svg');
-      expect(response.text).toContain('TM'); // Initials of "Test Member"
+      expect(response.headers['content-type']).toContain('image/svg+xml');
+      const svgText = response.body.toString('utf8');
+      expect(svgText).toContain('<svg');
+      expect(svgText).toContain('TM'); // Initials of "Test Member"
     });
 
     it('should allow admin to get member profile picture', async () => {
@@ -332,9 +339,9 @@ describe('Members Routes', () => {
     it('should detect JPEG images correctly', async () => {
       // JPEG magic bytes: FF D8 FF
       const jpegBuffer = Buffer.from([0xFF, 0xD8, 0xFF, 0xE0, 0x00]);
-      await prisma.member.update({
-        where: { userId: testMember.id },
-        data: { profilePicture: jpegBuffer }
+      await prisma.user.update({
+        where: { id: testMember.id },
+        data: { profileImage: jpegBuffer }
       });
 
       const response = await request(app)
@@ -348,9 +355,9 @@ describe('Members Routes', () => {
     it('should detect PNG images correctly', async () => {
       // PNG magic bytes: 89 50 4E 47
       const pngBuffer = Buffer.from([0x89, 0x50, 0x4E, 0x47, 0x0D]);
-      await prisma.member.update({
-        where: { userId: testMember.id },
-        data: { profilePicture: pngBuffer }
+      await prisma.user.update({
+        where: { id: testMember.id },
+        data: { profileImage: pngBuffer }
       });
 
       const response = await request(app)
@@ -366,9 +373,9 @@ describe('Members Routes', () => {
     beforeEach(async () => {
       // Add a profile picture to testMember
       const imageBuffer = Buffer.from('fake image data');
-      await prisma.member.update({
-        where: { userId: testMember.id },
-        data: { profilePicture: imageBuffer }
+      await prisma.user.update({
+        where: { id: testMember.id },
+        data: { profileImage: imageBuffer }
       });
     });
 
@@ -378,13 +385,13 @@ describe('Members Routes', () => {
         .set('Authorization', authHeader(testMember));
 
       expect(response.status).toBe(200);
-      expect(response.body.message).toContain('supprimée');
+      expect(response.body.message).toContain('deleted');
 
       // Verify picture was deleted
-      const member = await prisma.member.findUnique({
-        where: { userId: testMember.id }
+      const user = await prisma.user.findUnique({
+        where: { id: testMember.id }
       });
-      expect(member.profilePicture).toBeNull();
+      expect(user.profileImage).toBeNull();
     });
 
     it('should allow admin to delete member profile picture', async () => {
@@ -413,9 +420,9 @@ describe('Members Routes', () => {
 
     it('should succeed even if no picture exists', async () => {
       // Delete picture first
-      await prisma.member.update({
-        where: { userId: testMember.id },
-        data: { profilePicture: null }
+      await prisma.user.update({
+        where: { id: testMember.id },
+        data: { profileImage: null }
       });
 
       // Try to delete again
@@ -496,6 +503,7 @@ describe('Members Routes', () => {
       const owner = await prisma.user.create({
         data: {
           displayId: 'OWN123',
+          uniqueCode: `OWN${Date.now().toString().slice(-6)}`,
           email: 'owner@test.com',
           phoneNumber: '+33600000000',
           password: '$2a$10$hash',
