@@ -5,6 +5,7 @@ const bcrypt = require('bcryptjs');
 const crypto = require('crypto');
 const { sendPasswordResetEmail } = require('../services/emailService');
 const { splitFullName, getFullName } = require('../utils/nameUtils');
+const { generateUserId } = require('../utils/idGenerator');
 
 const router = express.Router();
 const prisma = new PrismaClient();
@@ -382,6 +383,11 @@ router.post('/', auth, async (req, res) => {
       console.log(`🔐 Mot de passe temporaire généré, email sera envoyé: ${shouldSendSetupEmail}`);
     }
 
+    // Générer uniqueCode et displayId
+    const uniqueCode = crypto.randomUUID().substring(0, 8).toUpperCase();
+    const displayId = generateUserId();
+    console.log(`🔑 Codes générés - uniqueCode: ${uniqueCode}, displayId: ${displayId}`);
+
     const user = await prisma.user.create({
       data: {
         email: sanitizedEmail,
@@ -390,6 +396,8 @@ router.post('/', auth, async (req, res) => {
         lastName,
         role,
         gymId,
+        uniqueCode,
+        displayId,
       },
       include: {
         Gym: true
@@ -1796,14 +1804,21 @@ router.post('/create-owner', auth, requireOwner, async (req, res) => {
 
     const hashedPassword = await bcrypt.hash(password, 10);
 
+    // Générer uniqueCode et displayId
+    const uniqueCode = crypto.randomUUID().substring(0, 8).toUpperCase();
+    const displayId = generateUserId();
+    console.log(`🔑 Codes générés - uniqueCode: ${uniqueCode}, displayId: ${displayId}`);
+
     const user = await prisma.user.create({
       data: {
         email: sanitizedEmail,
         password: hashedPassword,
-        firstName: finalFirstName,
-        lastName: finalLastName,
+        firstName,
+        lastName,
         role: 'owner',
         gymId,
+        uniqueCode,
+        displayId,
       },
       include: {
         Gym: true
@@ -2005,6 +2020,11 @@ router.post('/create-admin', auth, requireOwner, async (req, res) => {
       console.log(`🔐 Mot de passe temporaire généré, email sera envoyé: ${shouldSendSetupEmail}`);
     }
 
+    // Générer uniqueCode et displayId
+    const uniqueCode = crypto.randomUUID().substring(0, 8).toUpperCase();
+    const displayId = generateUserId();
+    console.log(`🔑 Codes générés - uniqueCode: ${uniqueCode}, displayId: ${displayId}`);
+
     const user = await prisma.user.create({
       data: {
         email: sanitizedEmail,
@@ -2013,6 +2033,8 @@ router.post('/create-admin', auth, requireOwner, async (req, res) => {
         lastName,
         role: 'admin',
         gymId,
+        uniqueCode,
+        displayId,
       },
       include: {
         Gym: true

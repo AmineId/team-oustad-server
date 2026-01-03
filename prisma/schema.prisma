@@ -51,7 +51,6 @@ model Gym {
 model Member {
   joinedAt                    DateTime            @default(now())
   userId                      Int                 @id
-  uniqueCode                  String              @unique
   birthDate                   DateTime?
   phone                       String?
   profession                  String?

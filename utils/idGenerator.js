@@ -23,6 +23,14 @@ function generateRandomHex() {
 }
 
 /**
+ * Génère un ID avec préfixe pour un utilisateur (générique)
+ * @returns {string} Format: USER-XXXXXXXXXXXXXXXX
+ */
+function generateUserId() {
+  return `USER-${generateRandomHex()}`;
+}
+
+/**
  * Génère un ID avec préfixe pour un membre
  * @returns {string} Format: MEMBER-XXXXXXXXXXXXXXXX
  */
@@ -197,6 +205,7 @@ function generateDisplayId(prefix) {
 }
 
 module.exports = {
+  generateUserId,
   generateMemberId,
   generateAdminId,
   generateOwnerId,
