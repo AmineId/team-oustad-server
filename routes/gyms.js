@@ -580,6 +580,58 @@ router.delete('/:id', auth, requireOwner, apiLimiter, async (req, res) => {
 
     logger.debug(`✅ Gym trouvé: ${gym.name} (${id}) - prêt pour suppression`);
 
+    // Récupérer tous les utilisateurs de ce gym
+    const gymUsers = await prisma.user.findMany({
+      where: { gymId: id },
+      select: { id: true, role: true }
+    });
+
+    logger.info(`🗑️ Suppression de ${gymUsers.length} utilisateurs du gym ${gym.name}...`);
+
+    // Supprimer tous les utilisateurs et leurs données liées
+    for (const user of gymUsers) {
+      // Supprimer les tokens de réinitialisation
+      await prisma.passwordResetToken.deleteMany({ where: { userId: user.id } });
+
+      // Supprimer le profil spécifique selon le rôle
+      if (user.role === 'admin') {
+        await prisma.admin.deleteMany({ where: { userId: user.id } });
+      } else if (user.role === 'member') {
+        await prisma.member.deleteMany({ where: { userId: user.id } });
+      } else if (user.role === 'owner') {
+        await prisma.owner.deleteMany({ where: { userId: user.id } });
+      }
+
+      // Supprimer l'utilisateur
+      await prisma.user.delete({ where: { id: user.id } });
+    }
+
+    // Supprimer les banners du gym
+    logger.info(`🗑️ Suppression des banners du gym ${gym.name}...`);
+    const banners = await prisma.banner.findMany({
+      where: { gymId: id },
+      include: { BannerVariant: true }
+    });
+    
+    for (const banner of banners) {
+      // Supprimer les variants d'abord
+      await prisma.bannerVariant.deleteMany({ where: { bannerId: banner.id } });
+      // Supprimer le banner
+      await prisma.banner.delete({ where: { id: banner.id } });
+    }
+
+    // Supprimer les check-ins du gym
+    logger.info(`🗑️ Suppression des check-ins du gym ${gym.name}...`);
+    await prisma.gymCheckIn.deleteMany({ where: { gymId: id } });
+
+    // Supprimer les produits store du gym
+    logger.info(`🗑️ Suppression des produits store du gym ${gym.name}...`);
+    const storeProducts = await prisma.storeProduct.findMany({ where: { gymId: id } });
+    for (const product of storeProducts) {
+      await prisma.storeReservation.deleteMany({ where: { productId: product.id } });
+      await prisma.storeProduct.delete({ where: { id: product.id } });
+    }
+
     // Supprimer la salle (les heures d'ouverture seront supprimées automatiquement grâce à onDelete: Cascade)
     logger.info(`🗑️ Suppression gym ${gym.name} (${id})...`);
     await prisma.gym.delete({ where: { id } });
