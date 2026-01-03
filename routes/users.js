@@ -1962,9 +1962,20 @@ router.post('/create-owner', auth, requireOwner, async (req, res) => {
  *                   example: "Erreur lors de la création de l'admin"
  */
 router.post('/create-admin', auth, requireOwner, async (req, res) => {
+  console.log('📝 CREATE-ADMIN - Body reçu:', JSON.stringify(req.body, null, 2));
+  
   const { email, password, firstName, lastName, gymId } = req.body;
 
+  console.log('📋 CREATE-ADMIN - Données extraites:', { 
+    email, 
+    password: password ? '***' : undefined, 
+    firstName, 
+    lastName, 
+    gymId 
+  });
+
   if (!email || !password || !firstName || !lastName || !gymId) {
+    console.log('❌ CREATE-ADMIN - Validation échouée, données manquantes');
     return res.status(400).json({ error: 'Email, password, firstName, lastName et gymId requis' });
   }
 
