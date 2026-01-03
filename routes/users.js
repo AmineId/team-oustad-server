@@ -568,19 +568,7 @@ router.get('/', auth, async (req, res) => {
       include: {
         Gym: { select: { id: true, name: true } },
         Member: {
-          select: {
-            id: true,
-            userId: true,
-            onboarding: true,
-            birthDate: true,
-            phone: true,
-            profession: true,
-            fitnessLevel: true,
-            preferredTrainingDays: true,
-            joinedAt: true,
-            createdAt: true,
-            updatedAt: true,
-            workoutNotificationsEnabled: true,
+          include: {
             Subscription: { where: { status: 'active' } },
             Payment: { orderBy: { createdAt: 'desc' }, take: 3 }
           }
@@ -1558,19 +1546,7 @@ router.get('/:id', auth, async (req, res) => {
       include: {
         Gym: { select: { id: true, name: true } },
         Member: {
-          select: {
-            id: true,
-            userId: true,
-            onboarding: true,
-            birthDate: true,
-            phone: true,
-            profession: true,
-            fitnessLevel: true,
-            preferredTrainingDays: true,
-            joinedAt: true,
-            createdAt: true,
-            updatedAt: true,
-            workoutNotificationsEnabled: true,
+          include: {
             Subscription: {
               where: { status: 'active' }
             },
@@ -2376,19 +2352,7 @@ router.get('/gym/:gymId/members', auth, async (req, res) => {
       },
       include: {
         Member: {
-          select: {
-            id: true,
-            userId: true,
-            onboarding: true,
-            birthDate: true,
-            phone: true,
-            profession: true,
-            fitnessLevel: true,
-            preferredTrainingDays: true,
-            joinedAt: true,
-            createdAt: true,
-            updatedAt: true,
-            workoutNotificationsEnabled: true,
+          include: {
             Subscription: {
               where: { status: 'active' },
               include: {
