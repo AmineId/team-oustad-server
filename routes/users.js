@@ -1008,11 +1008,11 @@ router.delete('/:id', auth, async (req, res) => {
 
     // Supprimer d'abord les profils spécifiques
     if (targetUser.role === 'admin') {
-      await prisma.admin.delete({ where: { userId: id } });
+      await prisma.admin.deleteMany({ where: { userId: id } });
     } else if (targetUser.role === 'member') {
-      await prisma.member.delete({ where: { userId: id } });
+      await prisma.member.deleteMany({ where: { userId: id } });
     } else if (targetUser.role === 'owner') {
-      await prisma.owner.delete({ where: { userId: id } });
+      await prisma.owner.deleteMany({ where: { userId: id } });
     }
 
     // Supprimer l'utilisateur
