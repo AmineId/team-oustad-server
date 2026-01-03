@@ -285,6 +285,7 @@ model User {
   lastLoginAt          DateTime?
   notificationsEnabled Boolean              @default(true)
   phoneNumber          String?              @unique
+  address              String?
   Admin                Admin?
   Member               Member?
   Owner                Owner?

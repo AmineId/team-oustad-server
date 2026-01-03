@@ -325,7 +325,7 @@ router.delete('/fcm-token', auth, async (req, res) => {
  */
 router.post('/', auth, async (req, res) => {
   try {
-    const { email, password, firstName, lastName, role, gymId, permissions, sendSetupEmail = true } = req.body;
+    const { email, password, firstName, lastName, role, gymId, address, permissions, sendSetupEmail = true } = req.body;
     console.log(`👤 Création utilisateur - Email: ${email}, Role: ${role}, Gym: ${gymId}`);
 
     if (!email || !firstName || !lastName || !role || !gymId) {
@@ -398,6 +398,7 @@ router.post('/', auth, async (req, res) => {
         gymId,
         uniqueCode,
         displayId,
+        ...(address && { address }),
       },
       include: {
         Gym: true
@@ -1982,7 +1983,7 @@ router.post('/create-owner', auth, requireOwner, async (req, res) => {
 router.post('/create-admin', auth, requireOwner, async (req, res) => {
   console.log('📝 CREATE-ADMIN - Body reçu:', JSON.stringify(req.body, null, 2));
   
-  const { email, password, firstName, lastName, gymId, sendSetupEmail = true } = req.body;
+  const { email, password, firstName, lastName, gymId, address, sendSetupEmail = true } = req.body;
 
   console.log('📋 CREATE-ADMIN - Données extraites:', { 
     email, 
@@ -2038,6 +2039,7 @@ router.post('/create-admin', auth, requireOwner, async (req, res) => {
         gymId,
         uniqueCode,
         displayId,
+        ...(address && { address }),
       },
       include: {
         Gym: true
