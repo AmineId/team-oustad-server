@@ -1678,7 +1678,7 @@ router.post('/:id/change-password', auth, async (req, res) => {
   }
 });
 
-router.post('/create-owner', requireOwner, async (req, res) => {
+router.post('/create-owner', auth, requireOwner, async (req, res) => {
   const { email, password, fullName, gymId, permissions } = req.body;
 
   if (!email || !password || !fullName || !gymId) {
@@ -1864,7 +1864,7 @@ router.post('/create-owner', requireOwner, async (req, res) => {
  *                   type: string
  *                   example: "Erreur lors de la création de l'admin"
  */
-router.post('/create-admin', requireOwner, async (req, res) => {
+router.post('/create-admin', auth, requireOwner, async (req, res) => {
   const { email, password, fullName, gymId } = req.body;
 
   if (!email || !password || !fullName || !gymId) {
@@ -2133,6 +2133,109 @@ router.get('/stats', requireOwner, async (req, res) => {
       }
     });
   } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// ==========================================
+// FCM TOKEN MANAGEMENT
+// ==========================================
+
+/**
+ * @swagger
+ * /users/fcm-token:
+ *   put:
+ *     summary: Update FCM token for push notifications
+ *     tags: [Users]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - fcmToken
+ *             properties:
+ *               fcmToken:
+ *                 type: string
+ *                 example: "dGVzdF90b2tlbl9mb3JfZmNt..."
+ *     responses:
+ *       200:
+ *         description: FCM token updated successfully
+ *       400:
+ *         description: Invalid input - FCM token is required
+ *       401:
+ *         description: Unauthorized
+ */
+router.put('/fcm-token', auth, async (req, res) => {
+  try {
+    const { fcmToken } = req.body;
+    const userId = req.user.sub;
+
+    console.log(`📱 Mise à jour FCM Token - User ID: ${userId}`);
+    console.log(`   Token: ${fcmToken ? fcmToken.substring(0, 30) + '...' : 'null'}`);
+
+    if (!fcmToken) {
+      console.log(`❌ FCM Token manquant`);
+      return res.status(400).json({ error: 'fcmToken is required' });
+    }
+
+    const updatedUser = await prisma.user.update({
+      where: { id: userId },
+      data: { fcmToken },
+      select: {
+        id: true,
+        email: true,
+        firstName: true,
+        lastName: true,
+        fcmToken: true
+      }
+    });
+
+    console.log(`✅ FCM Token mis à jour pour ${updatedUser.firstName} ${updatedUser.lastName}`);
+
+    res.json({
+      message: 'FCM token mis à jour avec succès',
+      user: updatedUser
+    });
+  } catch (error) {
+    console.error('💥 Erreur mise à jour FCM Token:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+/**
+ * @swagger
+ * /users/fcm-token:
+ *   delete:
+ *     summary: Remove FCM token (logout from notifications)
+ *     tags: [Users]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: FCM token removed successfully
+ *       401:
+ *         description: Unauthorized
+ */
+router.delete('/fcm-token', auth, async (req, res) => {
+  try {
+    const userId = req.user.sub;
+
+    console.log(`🗑️ Suppression FCM Token - User ID: ${userId}`);
+
+    await prisma.user.update({
+      where: { id: userId },
+      data: { fcmToken: null }
+    });
+
+    console.log(`✅ FCM Token supprimé pour User ID: ${userId}`);
+
+    res.json({ message: 'FCM token supprimé avec succès' });
+  } catch (error) {
+    console.error('💥 Erreur suppression FCM Token:', error);
     res.status(500).json({ error: error.message });
   }
 });
