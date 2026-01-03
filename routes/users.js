@@ -1964,19 +1964,20 @@ router.post('/create-owner', auth, requireOwner, async (req, res) => {
 router.post('/create-admin', auth, requireOwner, async (req, res) => {
   console.log('📝 CREATE-ADMIN - Body reçu:', JSON.stringify(req.body, null, 2));
   
-  const { email, password, firstName, lastName, gymId } = req.body;
+  const { email, password, firstName, lastName, gymId, sendSetupEmail = true } = req.body;
 
   console.log('📋 CREATE-ADMIN - Données extraites:', { 
     email, 
     password: password ? '***' : undefined, 
     firstName, 
     lastName, 
-    gymId 
+    gymId,
+    sendSetupEmail 
   });
 
-  if (!email || !password || !firstName || !lastName || !gymId) {
+  if (!email || !firstName || !lastName || !gymId) {
     console.log('❌ CREATE-ADMIN - Validation échouée, données manquantes');
-    return res.status(400).json({ error: 'Email, password, firstName, lastName et gymId requis' });
+    return res.status(400).json({ error: 'Email, firstName, lastName et gymId requis' });
   }
 
   const sanitizedEmail = sanitizeEmail(email);
@@ -1988,7 +1989,21 @@ router.post('/create-admin', auth, requireOwner, async (req, res) => {
       return res.status(400).json({ error: 'Cet email est déjà utilisé' });
     }
 
-    const hashedPassword = await bcrypt.hash(password, 10);
+    // Si pas de mot de passe fourni, on génère un mot de passe temporaire
+    // et on enverra un email pour que l'utilisateur crée son propre mot de passe
+    let hashedPassword;
+    let shouldSendSetupEmail = false;
+    
+    if (password) {
+      hashedPassword = await bcrypt.hash(password, 10);
+      console.log(`🔐 Mot de passe fourni et hashé`);
+    } else {
+      // Générer un mot de passe temporaire aléatoire
+      const tempPassword = crypto.randomBytes(32).toString('hex');
+      hashedPassword = await bcrypt.hash(tempPassword, 10);
+      shouldSendSetupEmail = sendSetupEmail !== false; // Par défaut, on envoie l'email
+      console.log(`🔐 Mot de passe temporaire généré, email sera envoyé: ${shouldSendSetupEmail}`);
+    }
 
     const user = await prisma.user.create({
       data: {
@@ -2038,13 +2053,42 @@ router.post('/create-admin', auth, requireOwner, async (req, res) => {
       console.error(`⚠️ Erreur génération QR code pour admin ${getFullName(user)}:`, qrError);
     }
 
+    // Si pas de mot de passe fourni, envoyer l'email d'activation
+    if (shouldSendSetupEmail) {
+      try {
+        // Générer un token unique (6 chiffres)
+        const setupToken = crypto.randomInt(100000, 999999).toString();
+
+        // Créer le token en base avec expiration dans 24 heures
+        await prisma.passwordResetToken.create({
+          data: {
+            userId: user.id,
+            token: setupToken,
+            expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000), // 24 heures
+          },
+        });
+
+        // Envoyer l'email avec le token
+        await sendPasswordResetEmail(email, setupToken, true); // true = setup mode
+
+        console.log(`📧 Email d'activation envoyé à ${email}`);
+      } catch (emailError) {
+        console.error(`⚠️ Erreur envoi email d'activation:`, emailError);
+        // Ne pas échouer la création si l'email échoue
+      }
+    }
+
     res.status(201).json({
-      message: 'Admin créé avec succès',
+      message: shouldSendSetupEmail 
+        ? 'Admin créé avec succès. Un email d\'activation a été envoyé.'
+        : 'Admin créé avec succès',
       admin: {
         id: user.id,
         email: user.email,
-        fullName: getFullName(user),
-      }
+        firstName: user.firstName,
+        lastName: user.lastName,
+      },
+      setupEmailSent: shouldSendSetupEmail
     });
   } catch (error) {
     console.error('Erreur création admin:', error);
