@@ -45,7 +45,7 @@ async function sendPasswordResetEmail(email, resetToken, isSetup = false) {
   const mobileAppLink = process.env.MOBILE_APP_LINK || '';
   
   const mailOptions = isSetup ? {
-    from: `"Team Fitness" <${process.env.SMTP_USER}>`,
+    from: `"Team Fitness" <no-reply@team-oustad.com>`,
     to: email,
     subject: '🎉 Bienvenue sur Team Fitness - Créez votre mot de passe',
     html: `
@@ -104,7 +104,7 @@ async function sendPasswordResetEmail(email, resetToken, isSetup = false) {
       </html>
     `,
   } : {
-    from: `"Team Fitness" <${process.env.SMTP_USER}>`,
+    from: `"Team Fitness" <no-reply@team-oustad.com>`,
     to: email,
     subject: '🔐 Réinitialisation de votre mot de passe - Team Fitness',
     html: `
@@ -193,7 +193,7 @@ async function sendAccountSetupEmail(email, fullName, setupToken) {
   console.log(`📱 Lien app mobile: ${mobileAppLink || 'Non configuré'}`);
 
   const mailOptions = {
-    from: `"Team Fitness" <${process.env.SMTP_USER}>`,
+    from: `"Team Fitness" <no-reply@team-oustad.com>`,
     to: email,
     subject: '🎉 Bienvenue sur Team Fitness - Configurez votre compte',
     html: `
@@ -336,7 +336,7 @@ async function sendBetaAccessEmail(email, fullName) {
   console.log(`🔗 URL bêta: ${betaUrl}`);
 
   const mailOptions = {
-    from: `"Team Fitness" <${process.env.SMTP_USER}>`,
+    from: `"Team Fitness" <no-reply@team-oustad.com>`,
     to: email,
     subject: '🎉 Vous êtes invité(e) à la Bêta Team Fitness !',
     html: `
@@ -504,7 +504,7 @@ async function sendLowQuotaEmail(email, data) {
   const logoUrl = `${baseUrl}/android/assets/logo.png`;
 
   const mailOptions = {
-    from: `"Team Fitness" <${process.env.SMTP_USER}>`,
+    from: `"Team Fitness" <no-reply@team-oustad.com>`,
     to: email,
     subject: '⚠️ Quota de séances faible - Team Fitness',
     html: `
