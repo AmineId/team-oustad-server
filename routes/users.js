@@ -599,7 +599,7 @@ router.get('/:id/qr', auth, async (req, res) => {
       where: { id },
       include: {
         Gym: { select: { id: true, name: true } },
-        member: true,
+        Member: true,
         Admin: true,
         Owner: true
       }
