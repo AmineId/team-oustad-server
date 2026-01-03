@@ -106,6 +106,109 @@ router.get('/me', auth, async (req, res) => {
   }
 });
 
+// ==========================================
+// FCM TOKEN MANAGEMENT (must be before /:id routes)
+// ==========================================
+
+/**
+ * @swagger
+ * /users/fcm-token:
+ *   put:
+ *     summary: Update FCM token for push notifications
+ *     tags: [Users]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - fcmToken
+ *             properties:
+ *               fcmToken:
+ *                 type: string
+ *                 example: "dGVzdF90b2tlbl9mb3JfZmNt..."
+ *     responses:
+ *       200:
+ *         description: FCM token updated successfully
+ *       400:
+ *         description: Invalid input - FCM token is required
+ *       401:
+ *         description: Unauthorized
+ */
+router.put('/fcm-token', auth, async (req, res) => {
+  try {
+    const { fcmToken } = req.body;
+    const userId = req.user.sub;
+
+    console.log(`📱 Mise à jour FCM Token - User ID: ${userId}`);
+    console.log(`   Token: ${fcmToken ? fcmToken.substring(0, 30) + '...' : 'null'}`);
+
+    if (!fcmToken) {
+      console.log(`❌ FCM Token manquant`);
+      return res.status(400).json({ error: 'fcmToken is required' });
+    }
+
+    const updatedUser = await prisma.user.update({
+      where: { id: userId },
+      data: { fcmToken },
+      select: {
+        id: true,
+        email: true,
+        firstName: true,
+        lastName: true,
+        fcmToken: true
+      }
+    });
+
+    console.log(`✅ FCM Token mis à jour pour ${updatedUser.firstName} ${updatedUser.lastName}`);
+
+    res.json({
+      message: 'FCM token mis à jour avec succès',
+      user: updatedUser
+    });
+  } catch (error) {
+    console.error('💥 Erreur mise à jour FCM Token:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+/**
+ * @swagger
+ * /users/fcm-token:
+ *   delete:
+ *     summary: Remove FCM token (logout from notifications)
+ *     tags: [Users]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: FCM token removed successfully
+ *       401:
+ *         description: Unauthorized
+ */
+router.delete('/fcm-token', auth, async (req, res) => {
+  try {
+    const userId = req.user.sub;
+
+    console.log(`🗑️ Suppression FCM Token - User ID: ${userId}`);
+
+    await prisma.user.update({
+      where: { id: userId },
+      data: { fcmToken: null }
+    });
+
+    console.log(`✅ FCM Token supprimé pour User ID: ${userId}`);
+
+    res.json({ message: 'FCM token supprimé avec succès' });
+  } catch (error) {
+    console.error('💥 Erreur suppression FCM Token:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // Create user (admin can create members, owner can create admins/members)
 /**
  * @swagger
@@ -221,12 +324,12 @@ router.get('/me', auth, async (req, res) => {
  */
 router.post('/', auth, async (req, res) => {
   try {
-    const { email, password, fullName, role, gymId, permissions, sendSetupEmail = true } = req.body;
+    const { email, password, firstName, lastName, role, gymId, permissions, sendSetupEmail = true } = req.body;
     console.log(`👤 Création utilisateur - Email: ${email}, Role: ${role}, Gym: ${gymId}`);
 
-    if (!email || !fullName || !role || !gymId) {
+    if (!email || !firstName || !lastName || !role || !gymId) {
       console.log(`❌ Champs manquants pour création utilisateur`);
-      return res.status(400).json({ error: 'Email, fullName, role et gymId requis' });
+      return res.status(400).json({ error: 'Email, firstName, lastName, role et gymId requis' });
     }
 
     // Vérifier les permissions selon le rôle du créateur
@@ -278,9 +381,6 @@ router.post('/', auth, async (req, res) => {
       shouldSendSetupEmail = sendSetupEmail !== false; // Par défaut, on envoie l'email
       console.log(`🔐 Mot de passe temporaire généré, email sera envoyé: ${shouldSendSetupEmail}`);
     }
-
-    // Séparer fullName en firstName et lastName
-    const { firstName, lastName } = splitFullName(fullName);
 
     const user = await prisma.user.create({
       data: {
@@ -1145,7 +1245,7 @@ router.get('/:id/profile-image', auth, async (req, res) => {
 
     const targetUser = await prisma.user.findUnique({
       where: { id },
-      select: { id: true, fullName: true, gymId: true, role: true, profileImage: true }
+      select: { id: true, firstName: true, lastName: true, gymId: true, role: true, profileImage: true }
     });
 
     if (!targetUser) {
@@ -1679,10 +1779,10 @@ router.post('/:id/change-password', auth, async (req, res) => {
 });
 
 router.post('/create-owner', auth, requireOwner, async (req, res) => {
-  const { email, password, fullName, gymId, permissions } = req.body;
+  const { email, password, firstName, lastName, gymId, permissions } = req.body;
 
-  if (!email || !password || !fullName || !gymId) {
-    return res.status(400).json({ error: 'Email, password, fullName et gymId requis' });
+  if (!email || !password || !firstName || !lastName || !gymId) {
+    return res.status(400).json({ error: 'Email, password, firstName, lastName et gymId requis' });
   }
 
   const sanitizedEmail = sanitizeEmail(email);
@@ -1696,15 +1796,12 @@ router.post('/create-owner', auth, requireOwner, async (req, res) => {
 
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    // Séparer fullName en firstName et lastName
-    const { firstName, lastName } = splitFullName(fullName);
-
     const user = await prisma.user.create({
       data: {
         email: sanitizedEmail,
         password: hashedPassword,
-        firstName,
-        lastName,
+        firstName: finalFirstName,
+        lastName: finalLastName,
         role: 'owner',
         gymId,
       },
@@ -1865,10 +1962,10 @@ router.post('/create-owner', auth, requireOwner, async (req, res) => {
  *                   example: "Erreur lors de la création de l'admin"
  */
 router.post('/create-admin', auth, requireOwner, async (req, res) => {
-  const { email, password, fullName, gymId } = req.body;
+  const { email, password, firstName, lastName, gymId } = req.body;
 
-  if (!email || !password || !fullName || !gymId) {
-    return res.status(400).json({ error: 'Email, password, fullName et gymId requis' });
+  if (!email || !password || !firstName || !lastName || !gymId) {
+    return res.status(400).json({ error: 'Email, password, firstName, lastName et gymId requis' });
   }
 
   const sanitizedEmail = sanitizeEmail(email);
@@ -1881,9 +1978,6 @@ router.post('/create-admin', auth, requireOwner, async (req, res) => {
     }
 
     const hashedPassword = await bcrypt.hash(password, 10);
-
-    // Séparer fullName en firstName et lastName
-    const { firstName, lastName } = splitFullName(fullName);
 
     const user = await prisma.user.create({
       data: {
@@ -2021,7 +2115,8 @@ router.get('/gyms/all', requireOwner, async (req, res) => {
           select: {
             id: true,
             email: true,
-            fullName: true,
+            firstName: true,
+            lastName: true,
             role: true,
           }
         },
@@ -2137,105 +2232,101 @@ router.get('/stats', requireOwner, async (req, res) => {
   }
 });
 
-// ==========================================
-// FCM TOKEN MANAGEMENT
-// ==========================================
-
-/**
- * @swagger
- * /users/fcm-token:
- *   put:
- *     summary: Update FCM token for push notifications
- *     tags: [Users]
- *     security:
- *       - bearerAuth: []
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             required:
- *               - fcmToken
- *             properties:
- *               fcmToken:
- *                 type: string
- *                 example: "dGVzdF90b2tlbl9mb3JfZmNt..."
- *     responses:
- *       200:
- *         description: FCM token updated successfully
- *       400:
- *         description: Invalid input - FCM token is required
- *       401:
- *         description: Unauthorized
- */
-router.put('/fcm-token', auth, async (req, res) => {
+// Get all members of a specific gym
+router.get('/gym/:gymId/members', auth, async (req, res) => {
   try {
-    const { fcmToken } = req.body;
-    const userId = req.user.sub;
+    const gymId = Number(req.params.gymId);
+    console.log(`📋 Liste membres de la salle - Gym ID: ${gymId}, Requester: ${req.user?.email}`);
 
-    console.log(`📱 Mise à jour FCM Token - User ID: ${userId}`);
-    console.log(`   Token: ${fcmToken ? fcmToken.substring(0, 30) + '...' : 'null'}`);
-
-    if (!fcmToken) {
-      console.log(`❌ FCM Token manquant`);
-      return res.status(400).json({ error: 'fcmToken is required' });
+    // Vérifier les permissions
+    const requester = await prisma.user.findUnique({ where: { id: req.user.sub } });
+    if (!requester) {
+      console.log(`❌ Requester non trouvé: ID ${req.user.sub}`);
+      return res.status(403).json({ error: 'Forbidden' });
     }
 
-    const updatedUser = await prisma.user.update({
-      where: { id: userId },
-      data: { fcmToken },
-      select: {
-        id: true,
-        email: true,
-        firstName: true,
-        lastName: true,
-        fcmToken: true
-      }
+    // Vérifier que la salle existe
+    const gym = await prisma.gym.findUnique({ where: { id: gymId } });
+    if (!gym) {
+      console.log(`❌ Salle non trouvée: ID ${gymId}`);
+      return res.status(404).json({ error: `Gym with id ${gymId} not found` });
+    }
+
+    // Vérifier les permissions d'accès
+    let hasAccess = false;
+    if (requester.role === 'owner') {
+      hasAccess = true;
+      console.log(`👑 Owner ${getFullName(requester)} accède aux membres de la salle ${gymId}`);
+    } else if (requester.role === 'admin' && requester.gymId === gymId) {
+      hasAccess = true;
+      console.log(`👨‍💼 Admin ${getFullName(requester)} accède aux membres de sa salle`);
+    }
+
+    if (!hasAccess) {
+      console.log(`🚫 Accès refusé - ${requester.role} ne peut pas voir les membres de la salle ${gymId}`);
+      return res.status(403).json({ error: 'Vous n\'avez pas accès aux membres de cette salle' });
+    }
+
+    // Récupérer tous les membres de la salle
+    const members = await prisma.user.findMany({
+      where: {
+        gymId: gymId,
+        role: 'member'
+      },
+      include: {
+        Member: {
+          include: {
+            Subscription: {
+              where: { status: 'active' },
+              include: {
+                Payment: {
+                  orderBy: { createdAt: 'desc' },
+                  take: 3
+                }
+              }
+            },
+            Payment: {
+              orderBy: { createdAt: 'desc' },
+              take: 5
+            }
+          }
+        }
+      },
+      orderBy: { createdAt: 'desc' }
     });
 
-    console.log(`✅ FCM Token mis à jour pour ${updatedUser.firstName} ${updatedUser.lastName}`);
+    // Formater la réponse
+    const formattedMembers = members.map(user => {
+      const activeSubscription = user.Member?.Subscription?.find(sub => sub.status === 'active');
+      
+      return {
+        id: user.id,
+        email: user.email,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        displayId: user.displayId,
+        uniqueCode: user.uniqueCode,
+        createdAt: user.createdAt,
+        activeSubscription: activeSubscription ? {
+          id: activeSubscription.id,
+          type: activeSubscription.type,
+          status: activeSubscription.status,
+          startDate: activeSubscription.startDate,
+          endDate: activeSubscription.endDate
+        } : null,
+        recentPayments: user.Member?.Payment?.slice(0, 3) || []
+      };
+    });
+
+    console.log(`✅ ${formattedMembers.length} membres trouvés pour la salle ${gym.name}`);
 
     res.json({
-      message: 'FCM token mis à jour avec succès',
-      user: updatedUser
-    });
-  } catch (error) {
-    console.error('💥 Erreur mise à jour FCM Token:', error);
-    res.status(500).json({ error: error.message });
-  }
-});
-
-/**
- * @swagger
- * /users/fcm-token:
- *   delete:
- *     summary: Remove FCM token (logout from notifications)
- *     tags: [Users]
- *     security:
- *       - bearerAuth: []
- *     responses:
- *       200:
- *         description: FCM token removed successfully
- *       401:
- *         description: Unauthorized
- */
-router.delete('/fcm-token', auth, async (req, res) => {
-  try {
-    const userId = req.user.sub;
-
-    console.log(`🗑️ Suppression FCM Token - User ID: ${userId}`);
-
-    await prisma.user.update({
-      where: { id: userId },
-      data: { fcmToken: null }
+      members: formattedMembers,
+      count: formattedMembers.length
     });
 
-    console.log(`✅ FCM Token supprimé pour User ID: ${userId}`);
-
-    res.json({ message: 'FCM token supprimé avec succès' });
   } catch (error) {
-    console.error('💥 Erreur suppression FCM Token:', error);
+    console.error('💥 Erreur liste membres salle:', error);
     res.status(500).json({ error: error.message });
   }
 });

@@ -37,9 +37,12 @@ components:
           type: string
           example: "+33612345678"
           description: "Numéro de téléphone de l'utilisateur"
-        fullName:
+        firstName:
           type: string
-          example: "John Doe"
+          example: "John"
+        lastName:
+          type: string
+          example: "Doe"
         role:
           type: string
           enum: [member, admin, owner]
@@ -54,7 +57,8 @@ components:
           $ref: '#/components/schemas/Gym'
       required:
         - id
-        - fullName
+        - firstName
+        - lastName
         - role
         - displayId
         - gymId
@@ -1817,6 +1821,94 @@ paths:
               schema:
                 $ref: '#/components/schemas/Error'
 
+  /users/me:
+    get:
+      summary: Get current user profile
+      description: Returns the profile information of the currently authenticated user
+      tags: [Users]
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: User profile retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '401':
+          description: Unauthorized - Invalid or missing token
+        '404':
+          description: User not found
+        '500':
+          description: Server error
+
+  /users/fcm-token:
+    put:
+      summary: Update FCM token for push notifications
+      description: Update the Firebase Cloud Messaging token for the authenticated user
+      tags: [Users, Notifications]
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - fcmToken
+              properties:
+                fcmToken:
+                  type: string
+                  example: "dGVzdF90b2tlbl9mb3JfZmNt..."
+      responses:
+        '200':
+          description: FCM token updated successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "FCM token mis à jour avec succès"
+                  user:
+                    type: object
+                    properties:
+                      id:
+                        type: integer
+                      email:
+                        type: string
+                      firstName:
+                        type: string
+                      lastName:
+                        type: string
+                      fcmToken:
+                        type: string
+        '400':
+          description: Invalid input - FCM token is required
+        '401':
+          description: Unauthorized
+    delete:
+      summary: Remove FCM token (logout from notifications)
+      description: Remove the FCM token for the authenticated user (typically on logout)
+      tags: [Users, Notifications]
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: FCM token removed successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "FCM token supprimé avec succès"
+        '401':
+          description: Unauthorized
+
   /users:
     post:
       summary: Create a new user
@@ -1837,7 +1929,8 @@ paths:
             schema:
               type: object
               required:
-                - fullName
+                - firstName
+                - lastName
                 - role
                 - gymId
               properties:
@@ -1857,10 +1950,14 @@ paths:
                     User's password (optionnel si email fourni - email de bienvenue sera envoyé)
                     OBLIGATOIRE si phoneNumber uniquement (pas d'email de bienvenue)
                   example: "password123"
-                fullName:
+                firstName:
                   type: string
-                  description: User's full name
-                  example: "John Doe"
+                  description: User's first name
+                  example: "John"
+                lastName:
+                  type: string
+                  description: User's last name
+                  example: "Doe"
                 role:
                   type: string
                   enum: [admin, member]
@@ -1919,7 +2016,7 @@ paths:
                     type: string
                     examples:
                       missing_fields:
-                        value: "Email, fullName, role et gymId requis"
+                        value: "Email, firstName, lastName, role et gymId requis"
                       email_exists:
                         value: "Cet email est déjà utilisé"
         '403':
@@ -2121,10 +2218,14 @@ paths:
                   format: email
                   description: New email address
                   example: "newemail@example.com"
-                fullName:
+                firstName:
                   type: string
-                  description: New full name
-                  example: "Jane Doe"
+                  description: New first name
+                  example: "Jane"
+                lastName:
+                  type: string
+                  description: New last name
+                  example: "Doe"
                 password:
                   type: string
                   minLength: 6
@@ -2220,6 +2321,69 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+
+  /users/{id}/change-password:
+    post:
+      summary: Change user password
+      description: Change the password for a specific user. Users can change their own password, admins and owners can change passwords for users in their scope.
+      tags: [Users, Authentication]
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+          description: User ID
+          example: 1
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - currentPassword
+                - newPassword
+              properties:
+                currentPassword:
+                  type: string
+                  minLength: 6
+                  description: Current password (required for verification)
+                  example: "oldpassword123"
+                newPassword:
+                  type: string
+                  minLength: 6
+                  description: New password
+                  example: "newpassword123"
+      responses:
+        '200':
+          description: Password changed successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "password changed successfully"
+        '400':
+          description: Invalid input or current password incorrect
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: "Current password is incorrect"
+        '403':
+          description: Insufficient permissions
+        '404':
+          description: User not found
+        '500':
+          description: Server error
 
   /users/{id}/profile-image:
     put:
@@ -2427,7 +2591,8 @@ paths:
               required:
                 - email
                 - password
-                - fullName
+                - firstName
+                - lastName
                 - gymId
               properties:
                 email:
@@ -2440,10 +2605,14 @@ paths:
                   minLength: 6
                   description: Owner's password
                   example: "password123"
-                fullName:
+                firstName:
                   type: string
-                  description: Owner's full name
-                  example: "John Owner"
+                  description: Owner's first name
+                  example: "John"
+                lastName:
+                  type: string
+                  description: Owner's last name
+                  example: "Owner"
                 gymId:
                   type: integer
                   description: ID of the gym the owner belongs to
@@ -2485,9 +2654,12 @@ paths:
                         type: string
                         format: email
                         example: "owner@example.com"
-                      fullName:
+                      firstName:
                         type: string
-                        example: "John Owner"
+                        example: "John"
+                      lastName:
+                        type: string
+                        example: "Owner"
                       permissions:
                         type: object
                         properties:
@@ -2530,7 +2702,8 @@ paths:
               required:
                 - email
                 - password
-                - fullName
+                - firstName
+                - lastName
                 - gymId
               properties:
                 email:
@@ -2543,10 +2716,14 @@ paths:
                   minLength: 6
                   description: Admin's password
                   example: "password123"
-                fullName:
+                firstName:
                   type: string
-                  description: Admin's full name
-                  example: "Jane Admin"
+                  description: Admin's first name
+                  example: "Jane"
+                lastName:
+                  type: string
+                  description: Admin's last name
+                  example: "Admin"
                 gymId:
                   type: integer
                   description: ID of the gym the admin belongs to
@@ -2572,9 +2749,12 @@ paths:
                         type: string
                         format: email
                         example: "admin@example.com"
-                      fullName:
+                      firstName:
                         type: string
-                        example: "Jane Admin"
+                        example: "Jane"
+                      lastName:
+                        type: string
+                        example: "Admin"
         '400':
           description: Invalid input or email already exists
           content:
@@ -3963,7 +4143,148 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Error'# Ajout à faire dans swagger.yml après la dernière ligne
+                $ref: '#/components/schemas/Error'
+
+  /plannings/request-help:
+    post:
+      summary: Request help from coach (Member only)
+      description: Member can request help from their coach during a training session
+      tags: [Plannings]
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - exerciseName
+              properties:
+                exerciseName:
+                  type: string
+                  description: Name of the exercise needing help
+                  example: "Squat"
+                notes:
+                  type: string
+                  description: Additional notes about the help request
+                  example: "Besoin d'aide sur la posture"
+      responses:
+        '200':
+          description: Help request sent successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "Demande d'aide envoyée avec succès"
+                  request:
+                    type: object
+                    properties:
+                      memberId:
+                        type: integer
+                      exerciseName:
+                        type: string
+                      notes:
+                        type: string
+        '400':
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Access denied - not a member or no active planning
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /plannings/respond-help:
+    post:
+      summary: Respond to member help request (Coach only)
+      description: Coach can respond to a member's help request with status (coming/busy)
+      tags: [Plannings]
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - memberId
+                - response
+                - exerciseName
+              properties:
+                memberId:
+                  type: integer
+                  description: ID of the member requesting help
+                  example: 123
+                response:
+                  type: string
+                  enum: [coming, busy]
+                  description: Coach's response status
+                  example: "coming"
+                exerciseName:
+                  type: string
+                  description: Name of the exercise
+                  example: "Squat"
+      responses:
+        '200':
+          description: Response sent successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "Réponse envoyée avec succès"
+                  response:
+                    type: object
+                    properties:
+                      coachId:
+                        type: integer
+                      memberId:
+                        type: integer
+                      response:
+                        type: string
+                      exerciseName:
+                        type: string
+        '400':
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Access denied - not a coach or not authorized for this gym
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Member not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
 
   /subscription-types:
     get:

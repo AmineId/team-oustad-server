@@ -418,7 +418,7 @@ router.get('/payments/upcoming', auth, async (req, res) => {
       Payment: upcomingPayments.map(p => ({
         id: p.id,
         memberId: p.memberId,
-        memberName: p.member.user.fullName,
+        memberName: `${p.member.user.firstName} ${p.member.user.lastName}`,
         memberEmail: p.member.user.email,
         amount: p.amount,
         dueDate: p.dueDate,
