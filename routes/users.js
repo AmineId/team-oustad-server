@@ -1003,6 +1003,9 @@ router.delete('/:id', auth, async (req, res) => {
       return res.status(403).json({ error: "Vous n'avez pas les permissions pour supprimer cet utilisateur" });
     }
 
+    // Supprimer les tokens de réinitialisation de mot de passe
+    await prisma.passwordResetToken.deleteMany({ where: { userId: id } });
+
     // Supprimer d'abord les profils spécifiques
     if (targetUser.role === 'admin') {
       await prisma.admin.delete({ where: { userId: id } });
