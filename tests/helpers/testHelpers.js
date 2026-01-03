@@ -142,7 +142,6 @@ async function createTestMember(gymId, data = {}) {
       gymId: gymId,
       Member: {
         create: {
-          uniqueCode: uniqueCode,
           onboarding: data.onboarding !== undefined ? data.onboarding : false,
           birthDate: data.birthDate || new Date('1990-01-01'),
           phone: data.phone || '+1234567890',

@@ -268,7 +268,6 @@ async function main() {
   const bobMember = await prisma.member.create({
     data: {
       userId: bobUser.id,
-      uniqueCode: crypto.randomUUID().substring(0, 8).toUpperCase(),
       workoutNotificationsEnabled: true
     }
   });
@@ -277,7 +276,6 @@ async function main() {
   const charlieMember = await prisma.member.create({
     data: {
       userId: charlieUser.id,
-      uniqueCode: crypto.randomUUID().substring(0, 8).toUpperCase(),
       workoutNotificationsEnabled: true
     }
   });
@@ -286,7 +284,6 @@ async function main() {
   const aliceMember = await prisma.member.create({
     data: {
       userId: aliceUser.id,
-      uniqueCode: crypto.randomUUID().substring(0, 8).toUpperCase(),
       workoutNotificationsEnabled: true
     }
   });
@@ -295,7 +292,6 @@ async function main() {
   const davidMember = await prisma.member.create({
     data: {
       userId: davidUser.id,
-      uniqueCode: crypto.randomUUID().substring(0, 8).toUpperCase(),
       workoutNotificationsEnabled: true
     }
   });
@@ -304,7 +300,6 @@ async function main() {
   const emmaMember = await prisma.member.create({
     data: {
       userId: emmaUser.id,
-      uniqueCode: crypto.randomUUID().substring(0, 8).toUpperCase(),
       workoutNotificationsEnabled: false
     }
   });
@@ -520,7 +515,6 @@ async function main() {
   const testMember1 = await prisma.member.create({
     data: {
       userId: testMember1User.id,
-      uniqueCode: crypto.randomUUID().substring(0, 8).toUpperCase(),
       workoutNotificationsEnabled: true
     }
   });
@@ -561,7 +555,6 @@ async function main() {
   const testMember2 = await prisma.member.create({
     data: {
       userId: testMember2User.id,
-      uniqueCode: crypto.randomUUID().substring(0, 8).toUpperCase(),
       workoutNotificationsEnabled: true
     }
   });
@@ -603,7 +596,6 @@ async function main() {
   const testMember3 = await prisma.member.create({
     data: {
       userId: testMember3User.id,
-      uniqueCode: crypto.randomUUID().substring(0, 8).toUpperCase(),
       workoutNotificationsEnabled: true
     }
   });
@@ -645,7 +637,6 @@ async function main() {
   const testMember4 = await prisma.member.create({
     data: {
       userId: testMember4User.id,
-      uniqueCode: crypto.randomUUID().substring(0, 8).toUpperCase(),
       workoutNotificationsEnabled: true
     }
   });
@@ -687,7 +678,6 @@ async function main() {
   const testMember5 = await prisma.member.create({
     data: {
       userId: testMember5User.id,
-      uniqueCode: crypto.randomUUID().substring(0, 8).toUpperCase(),
       workoutNotificationsEnabled: true
     }
   });
@@ -731,7 +721,6 @@ async function main() {
   const oliviaMember = await prisma.member.create({
     data: {
       userId: oliviaUser.id,
-      uniqueCode: crypto.randomUUID().substring(0, 8).toUpperCase(),
       workoutNotificationsEnabled: true
     }
   });
@@ -1008,7 +997,6 @@ async function main() {
   const peterMember = await prisma.member.create({
     data: {
       userId: peterUser.id,
-      uniqueCode: crypto.randomUUID().substring(0, 8).toUpperCase(),
       workoutNotificationsEnabled: true
     }
   });
@@ -1065,7 +1053,6 @@ async function main() {
   const maryMember = await prisma.member.create({
     data: {
       userId: maryUser.id,
-      uniqueCode: crypto.randomUUID().substring(0, 8).toUpperCase(),
       workoutNotificationsEnabled: true
     }
   });
@@ -1122,7 +1109,6 @@ async function main() {
   const nathanMember = await prisma.member.create({
     data: {
       userId: nathanUser.id,
-      uniqueCode: crypto.randomUUID().substring(0, 8).toUpperCase(),
       workoutNotificationsEnabled: true
     }
   });
@@ -1179,7 +1165,6 @@ async function main() {
   const sarahMember = await prisma.member.create({
     data: {
       userId: sarahUser.id,
-      uniqueCode: crypto.randomUUID().substring(0, 8).toUpperCase(),
       workoutNotificationsEnabled: true
     }
   });

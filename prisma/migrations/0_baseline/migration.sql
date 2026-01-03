@@ -40,7 +40,6 @@ CREATE TABLE "Gym" (
 CREATE TABLE "Member" (
     "joinedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "userId" INTEGER NOT NULL,
-    "uniqueCode" TEXT NOT NULL,
     "birthDate" TIMESTAMP(3),
     "phone" TEXT,
     "profession" TEXT,
@@ -412,9 +411,6 @@ CREATE UNIQUE INDEX "Gym_displayId_key" ON "Gym"("displayId");
 
 -- CreateIndex
 CREATE INDEX "Gym_name_idx" ON "Gym"("name");
-
--- CreateIndex
-CREATE UNIQUE INDEX "Member_uniqueCode_key" ON "Member"("uniqueCode");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "MemberGoal_displayId_key" ON "MemberGoal"("displayId");
