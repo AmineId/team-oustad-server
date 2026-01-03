@@ -580,30 +580,20 @@ router.delete('/:id', auth, requireOwner, apiLimiter, async (req, res) => {
 
     logger.debug(`✅ Gym trouvé: ${gym.name} (${id}) - prêt pour suppression`);
 
-    // Récupérer tous les utilisateurs de ce gym
-    const gymUsers = await prisma.user.findMany({
-      where: { gymId: id },
-      select: { id: true, role: true }
+    // Vérifier si le gym a des admins ou membres
+    const gymUsersCount = await prisma.user.count({
+      where: { 
+        gymId: id,
+        role: { in: ['admin', 'member'] }
+      }
     });
 
-    logger.info(`🗑️ Suppression de ${gymUsers.length} utilisateurs du gym ${gym.name}...`);
-
-    // Supprimer tous les utilisateurs et leurs données liées
-    for (const user of gymUsers) {
-      // Supprimer les tokens de réinitialisation
-      await prisma.passwordResetToken.deleteMany({ where: { userId: user.id } });
-
-      // Supprimer le profil spécifique selon le rôle
-      if (user.role === 'admin') {
-        await prisma.admin.deleteMany({ where: { userId: user.id } });
-      } else if (user.role === 'member') {
-        await prisma.member.deleteMany({ where: { userId: user.id } });
-      } else if (user.role === 'owner') {
-        await prisma.owner.deleteMany({ where: { userId: user.id } });
-      }
-
-      // Supprimer l'utilisateur
-      await prisma.user.delete({ where: { id: user.id } });
+    if (gymUsersCount > 0) {
+      logger.warn(`❌ Impossible de supprimer le gym ${gym.name}: ${gymUsersCount} utilisateurs affectés`);
+      return res.status(400).json({ 
+        error: `Impossible de supprimer cette salle: ${gymUsersCount} utilisateur(s) y sont affectés. Veuillez d'abord réaffecter ou supprimer les utilisateurs.`,
+        usersCount: gymUsersCount
+      });
     }
 
     // Supprimer les banners du gym
