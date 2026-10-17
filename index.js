@@ -1,3 +1,4 @@
+require('dotenv').config();
 const express = require('express');
 const prisma = require('./utils/prismaClient');
 const helmet = require('helmet');
@@ -5,7 +6,6 @@ const cors = require('cors');
 const compression = require('compression');
 const morgan = require('morgan');
 const logger = require('./utils/logger');
-require('dotenv').config();
 
 logger.info('🚀 Démarrage du serveur Team Fitness...');
 

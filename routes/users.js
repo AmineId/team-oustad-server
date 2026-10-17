@@ -1,14 +1,13 @@
 const express = require('express');
-const { PrismaClient } = require('@prisma/client');
 const QRCode = require('qrcode');
 const bcrypt = require('bcryptjs');
 const crypto = require('crypto');
 const { sendPasswordResetEmail } = require('../services/emailService');
 const { splitFullName, getFullName } = require('../utils/nameUtils');
 const { generateUserId } = require('../utils/idGenerator');
+const prisma = require('../utils/prismaClient');
 
 const router = express.Router();
-const prisma = new PrismaClient();
 const auth = require('../middleware/auth');
 
 // Utility helpers

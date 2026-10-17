@@ -1,7 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const { PrismaClient } = require('@prisma/client');
-const prisma = new PrismaClient();
+const prisma = require('../utils/prismaClient');
 const auth = require('../middleware/auth');
 
 /**
@@ -60,8 +59,6 @@ router.get('/:id', async (req, res) => {
  */
 router.post('/', auth, async (req, res) => {
   try {
-    const { PrismaClient } = require('@prisma/client');
-    const prisma = new PrismaClient();
 
     // Récupérer l'utilisateur qui fait la requête
     const requester = await prisma.user.findUnique({
@@ -122,8 +119,6 @@ router.post('/', auth, async (req, res) => {
  */
 router.put('/:id', auth, async (req, res) => {
   try {
-    const { PrismaClient } = require('@prisma/client');
-    const prisma = new PrismaClient();
 
     // Récupérer l'utilisateur qui fait la requête
     const requester = await prisma.user.findUnique({
@@ -180,8 +175,6 @@ router.put('/:id', auth, async (req, res) => {
  */
 router.delete('/:id', auth, async (req, res) => {
   try {
-    const { PrismaClient } = require('@prisma/client');
-    const prisma = new PrismaClient();
 
     // Récupérer l'utilisateur qui fait la requête
     const requester = await prisma.user.findUnique({
@@ -238,8 +231,6 @@ router.delete('/:id', auth, async (req, res) => {
  */
 router.get('/:id/subscriptions', auth, async (req, res) => {
   try {
-    const { PrismaClient } = require('@prisma/client');
-    const prisma = new PrismaClient();
 
     // Récupérer l'utilisateur qui fait la requête
     const requester = await prisma.user.findUnique({

@@ -1,13 +1,11 @@
 const express = require('express');
 const router = express.Router();
-const { PrismaClient } = require('@prisma/client');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
 const { sendPasswordResetEmail } = require('../services/emailService');
 const { getActiveSubscription, getSubscriptionsWithStatus } = require('../utils/subscriptionUtils');
-
-const prisma = new PrismaClient();
+const prisma = require('../utils/prismaClient');
 
 const JWT_SECRET = process.env.JWT_SECRET || 'change_this_secret';
 

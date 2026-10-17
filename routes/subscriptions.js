@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const auth = require('../middleware/auth');
+const prisma = require('../utils/prismaClient');
 const { 
   createYearlySubscriptionWithPayments,
   markPaymentAsCompleted,
@@ -24,8 +25,6 @@ router.post('/', auth, async (req, res) => {
     }
     
     // Récupérer l'utilisateur qui fait la requête
-    const { PrismaClient } = require('@prisma/client');
-    const prisma = new PrismaClient();
     
     const requester = await prisma.user.findUnique({
       where: { id: req.user.sub },
@@ -89,8 +88,6 @@ router.post('/:id/renew', auth, async (req, res) => {
   try {
     const subscriptionId = parseInt(req.params.id);
     
-    const { PrismaClient } = require('@prisma/client');
-    const prisma = new PrismaClient();
     
     const subscription = await prisma.subscription.findUnique({
       where: { id: subscriptionId },
@@ -143,8 +140,6 @@ router.get('/:id', auth, async (req, res) => {
     const status = await getSubscriptionStatus(subscriptionId);
     
     // Récupérer l'utilisateur qui fait la requête
-    const { PrismaClient } = require('@prisma/client');
-    const prisma = new PrismaClient();
     
     const requester = await prisma.user.findUnique({
       where: { id: req.user.sub },
@@ -181,8 +176,6 @@ router.get('/member/:memberId', auth, async (req, res) => {
     const memberId = parseInt(req.params.memberId);
     
     // Récupérer l'utilisateur qui fait la requête
-    const { PrismaClient } = require('@prisma/client');
-    const prisma = new PrismaClient();
     
     const requester = await prisma.user.findUnique({
       where: { id: req.user.sub },
@@ -241,8 +234,6 @@ router.post('/payments/:paymentId/acknowledge', auth, async (req, res) => {
     }
     
     // Vérifier les permissions
-    const { PrismaClient } = require('@prisma/client');
-    const prisma = new PrismaClient();
     
     const payment = await prisma.payment.findUnique({
       where: { id: paymentId },
@@ -313,8 +304,6 @@ router.post('/payments/:paymentId/complete', auth, async (req, res) => {
     }
     
     // Vérifier les permissions
-    const { PrismaClient } = require('@prisma/client');
-    const prisma = new PrismaClient();
     
     const payment = await prisma.payment.findUnique({
       where: { id: paymentId },
@@ -362,8 +351,6 @@ router.post('/payments/:paymentId/complete', auth, async (req, res) => {
 router.get('/payments/upcoming', auth, async (req, res) => {
   try {
     // Récupérer l'utilisateur qui fait la requête
-    const { PrismaClient } = require('@prisma/client');
-    const prisma = new PrismaClient();
     
     const requester = await prisma.user.findUnique({
       where: { id: req.user.sub },
