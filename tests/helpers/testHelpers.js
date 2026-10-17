@@ -1,7 +1,10 @@
+const { randomUUID } = require('crypto');
 const prisma = require('../../utils/prismaClient');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const JWT_SECRET = process.env.JWT_SECRET || 'test_jwt_secret_key_for_testing_purposes';
+
+const uid = () => randomUUID().replace(/-/g, '').slice(0, 10);
 
 /**
  * Clean database - Remove all test data
@@ -46,7 +49,7 @@ async function disconnectDatabase() {
 async function createTestGym(data = {}) {
   return await prisma.gym.create({
     data: {
-      displayId: data.displayId || `GYM${Date.now()}`,
+      displayId: data.displayId || `GYM${uid()}`,
       name: data.name || 'Test Gym',
       address: data.address || '123 Test Street',
       phone: data.phone || '+1234567890',
@@ -60,13 +63,13 @@ async function createTestGym(data = {}) {
  */
 async function createTestOwner(gymId, data = {}) {
   const password = await bcrypt.hash(data.password || 'password123', 10);
-  const uniqueCode = data.uniqueCode || `OWN${Date.now().toString().slice(-6)}`;
-  
+  const uniqueCode = data.uniqueCode || `OWN${uid()}`;
+
   const user = await prisma.user.create({
     data: {
-      displayId: data.displayId || `OWN${Date.now()}`,
-      email: data.email || `owner${Date.now()}@test.com`,
-      phoneNumber: data.phoneNumber || `+33${Date.now().toString().slice(-9)}`,
+      displayId: data.displayId || `OWN${uid()}`,
+      email: data.email || `owner${uid()}@test.com`,
+      phoneNumber: data.phoneNumber || `+336${uid().slice(0, 8)}`,
       password: password,
       uniqueCode: uniqueCode,
       firstName: data.firstName || 'Test',
@@ -96,13 +99,13 @@ async function createTestOwner(gymId, data = {}) {
  */
 async function createTestAdmin(gymId, data = {}) {
   const password = await bcrypt.hash(data.password || 'password123', 10);
-  const uniqueCode = data.uniqueCode || `ADM${Date.now().toString().slice(-6)}`;
-  
+  const uniqueCode = data.uniqueCode || `ADM${uid()}`;
+
   const user = await prisma.user.create({
     data: {
-      displayId: data.displayId || `ADM${Date.now()}`,
-      email: data.email || `admin${Date.now()}@test.com`,
-      phoneNumber: data.phoneNumber || `+33${Date.now().toString().slice(-9)}`,
+      displayId: data.displayId || `ADM${uid()}`,
+      email: data.email || `admin${uid()}@test.com`,
+      phoneNumber: data.phoneNumber || `+336${uid().slice(0, 8)}`,
       password: password,
       uniqueCode: uniqueCode,
       firstName: data.firstName || 'Test',
@@ -127,13 +130,13 @@ async function createTestAdmin(gymId, data = {}) {
  */
 async function createTestMember(gymId, data = {}) {
   const password = await bcrypt.hash(data.password || 'password123', 10);
-  const uniqueCode = data.uniqueCode || `MEM${Date.now().toString().slice(-6)}`;
-  
+  const uniqueCode = data.uniqueCode || `MEM${uid()}`;
+
   const user = await prisma.user.create({
     data: {
-      displayId: data.displayId || `MEM${Date.now()}`,
-      email: data.email || `member${Date.now()}@test.com`,
-      phoneNumber: data.phoneNumber || `+33${Date.now().toString().slice(-9)}`,
+      displayId: data.displayId || `MEM${uid()}`,
+      email: data.email || `member${uid()}@test.com`,
+      phoneNumber: data.phoneNumber || `+336${uid().slice(0, 8)}`,
       password: password,
       uniqueCode: uniqueCode,
       firstName: data.firstName || 'Test',
@@ -167,8 +170,8 @@ async function createTestMember(gymId, data = {}) {
 async function createTestSubscriptionType(data = {}) {
   return await prisma.subscriptionType.create({
     data: {
-      displayId: data.displayId || `SUBT${Date.now()}`,
-      name: data.name || `Test Subscription ${Date.now()}`,
+      displayId: data.displayId || `SUBT${uid()}`,
+      name: data.name || `Test Subscription ${uid()}`,
       description: data.description || 'Test subscription description',
       monthlyPrice: data.monthlyPrice || data.price || 50.00,
       features: data.features || ['Access to gym', 'Locker'],
@@ -190,7 +193,7 @@ async function createTestSubscription(memberId, subscriptionTypeId, data = {}) {
 
   return await prisma.subscription.create({
     data: {
-      displayId: data.displayId || `SUBS${Date.now()}`,
+      displayId: data.displayId || `SUBS${uid()}`,
       memberId: memberId,
       subscriptionTypeId: subscriptionTypeId,
       startDate: startDate,
@@ -215,7 +218,7 @@ async function createTestSubscription(memberId, subscriptionTypeId, data = {}) {
 async function createTestPayment(memberId, subscriptionId, data = {}) {
   return await prisma.payment.create({
     data: {
-      displayId: data.displayId || `PAY${Date.now()}`,
+      displayId: data.displayId || `PAY${uid()}`,
       memberId: memberId,
       subscriptionId: subscriptionId,
       amount: data.amount || 50.00,
@@ -223,7 +226,7 @@ async function createTestPayment(memberId, subscriptionId, data = {}) {
       status: data.status || 'completed',
       type: data.type || 'subscription',
       paymentMethod: data.paymentMethod || data.method || 'cash',
-      transactionId: data.transactionId || `TXN${Date.now()}`,
+      transactionId: data.transactionId || `TXN${uid()}`,
       description: data.description || null,
       dueDate: data.dueDate || new Date(),
       monthNumber: data.monthNumber || null,
@@ -239,7 +242,7 @@ async function createTestPayment(memberId, subscriptionId, data = {}) {
 async function createTestPlanning(coachId, memberId, data = {}) {
   return await prisma.planning.create({
     data: {
-      displayId: data.displayId || `PLN${Date.now()}`,
+      displayId: data.displayId || `PLN${uid()}`,
       coachId: coachId,
       memberId: memberId,
       title: data.title || 'Test Planning',
@@ -258,7 +261,7 @@ async function createTestPlanning(coachId, memberId, data = {}) {
 async function createTestExercise(data = {}) {
   return await prisma.exercise.create({
     data: {
-      displayId: data.displayId || `EXE${Date.now()}`,
+      displayId: data.displayId || `EXE${uid()}`,
       name: data.name || 'Test Exercise',
       description: data.description || 'Test exercise description',
       category: data.category || 'strength',
