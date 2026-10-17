@@ -238,8 +238,8 @@ router.post('/payments/:paymentId/acknowledge', auth, async (req, res) => {
     const payment = await prisma.payment.findUnique({
       where: { id: paymentId },
       include: {
-        subscription: true,
-        member: {
+        Subscription: true,
+        Member: {
           include: { User: true }
         }
       }
@@ -254,7 +254,7 @@ router.post('/payments/:paymentId/acknowledge', auth, async (req, res) => {
       return res.status(403).json({ error: 'Accès refusé' });
     }
 
-    if (requester.role === 'admin' && payment.member.User.gymId !== requester.gymId) {
+    if (requester.role === 'admin' && payment.Member.User.gymId !== requester.gymId) {
       return res.status(403).json({ error: 'Accès refusé' });
     }
 
@@ -308,7 +308,7 @@ router.post('/payments/:paymentId/complete', auth, async (req, res) => {
     const payment = await prisma.payment.findUnique({
       where: { id: paymentId },
       include: {
-        member: {
+        Member: {
           include: { User: true }
         }
       }
@@ -323,7 +323,7 @@ router.post('/payments/:paymentId/complete', auth, async (req, res) => {
       return res.status(403).json({ error: 'Accès refusé' });
     }
 
-    if (requester.role === 'admin' && payment.member.User.gymId !== requester.gymId) {
+    if (requester.role === 'admin' && payment.Member.User.gymId !== requester.gymId) {
       return res.status(403).json({ error: 'Accès refusé' });
     }
     
@@ -380,7 +380,7 @@ router.get('/payments/upcoming', auth, async (req, res) => {
     
     // Si admin, filtrer par salle
     if (requester.role === 'admin') {
-      whereClause.member = {
+      whereClause.Member = {
         User: {
           gymId: requester.gymId
         }
@@ -390,8 +390,8 @@ router.get('/payments/upcoming', auth, async (req, res) => {
     const upcomingPayments = await prisma.payment.findMany({
       where: whereClause,
       include: {
-        subscription: true,
-        member: {
+        Subscription: true,
+        Member: {
           include: {
             User: true
           }
@@ -405,8 +405,8 @@ router.get('/payments/upcoming', auth, async (req, res) => {
       Payment: upcomingPayments.map(p => ({
         id: p.id,
         memberId: p.memberId,
-        memberName: `${p.member.User.firstName} ${p.member.User.lastName}`,
-        memberEmail: p.member.User.email,
+        memberName: `${p.Member.User.firstName} ${p.Member.User.lastName}`,
+        memberEmail: p.Member.User.email,
         amount: p.amount,
         dueDate: p.dueDate,
         monthNumber: p.monthNumber,
