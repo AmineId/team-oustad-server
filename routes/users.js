@@ -626,10 +626,9 @@ router.get('/:id/qr', auth, async (req, res) => {
       hasAccess = true; // Owner can access all QR codes
       console.log(`👑 Owner ${getFullName(requester)} a accès à tous les QR codes`);
     } else if (requester.role === 'admin') {
-      // Admin can only access QR codes of users in their gym
-      const admin = await prisma.admin.findUnique({ where: { userId: req.user.sub } });
-      hasAccess = admin && user.gymId === admin.gymId;
-      console.log(`👨‍💼 Admin ${getFullName(requester)} - Accès: ${hasAccess} (admin.gymId: ${admin?.gymId}, user.gymId: ${user.gymId})`);
+      // Admin can only access QR codes of users in their gym (gymId is on the User model, not Admin)
+      hasAccess = user.gymId === requester.gymId;
+      console.log(`👨‍💼 Admin ${getFullName(requester)} - Accès: ${hasAccess} (requester.gymId: ${requester?.gymId}, user.gymId: ${user.gymId})`);
     } else if (requester.role === 'member') {
       // Member can only access their own QR code
       hasAccess = req.user.sub === id;

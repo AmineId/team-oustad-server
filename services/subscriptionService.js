@@ -266,7 +266,7 @@ async function markPaymentAsCompleted(paymentId, paymentMethod, transactionId = 
       paidAt: new Date()
     },
     include: {
-      subscription: true
+      Subscription: true
     }
   });
   
