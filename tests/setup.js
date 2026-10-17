@@ -30,7 +30,8 @@ jest.mock('../services/pushNotificationService', () => ({
 
 // Mock QRCode generation
 jest.mock('qrcode', () => ({
-  toDataURL: jest.fn().mockResolvedValue('data:image/png;base64,mock-qr-code')
+  toDataURL: jest.fn().mockResolvedValue('data:image/png;base64,mock-qr-code'),
+  toBuffer: jest.fn().mockResolvedValue(Buffer.from('mock-qr-buffer'))
 }));
 
 // Suppress console logs during tests (optional, comment out for debugging)

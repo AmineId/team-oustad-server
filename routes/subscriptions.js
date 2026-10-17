@@ -240,24 +240,24 @@ router.post('/payments/:paymentId/acknowledge', auth, async (req, res) => {
       include: {
         subscription: true,
         member: {
-          include: { user: true }
+          include: { User: true }
         }
       }
     });
-    
+
     if (!payment) {
       return res.status(404).json({ error: 'Paiement non trouvé' });
     }
-    
+
     const requester = req.user;
     if (requester.role === 'member' && payment.memberId !== requester.id) {
       return res.status(403).json({ error: 'Accès refusé' });
     }
-    
-    if (requester.role === 'admin' && payment.member.user.gymId !== requester.gymId) {
+
+    if (requester.role === 'admin' && payment.member.User.gymId !== requester.gymId) {
       return res.status(403).json({ error: 'Accès refusé' });
     }
-    
+
     const updatedPayment = await acknowledgePayment(
       paymentId,
       paymentMethod,
@@ -278,7 +278,7 @@ router.post('/payments/:paymentId/acknowledge', auth, async (req, res) => {
       subscription: subscription ? {
         id: subscription.id,
         status: subscription.status,
-        type: subscription.subscriptionType.name,
+        type: subscription.SubscriptionType.name,
         startDate: subscription.startDate,
         endDate: subscription.endDate
       } : null
@@ -309,21 +309,21 @@ router.post('/payments/:paymentId/complete', auth, async (req, res) => {
       where: { id: paymentId },
       include: {
         member: {
-          include: { user: true }
+          include: { User: true }
         }
       }
     });
-    
+
     if (!payment) {
       return res.status(404).json({ error: 'Paiement non trouvé' });
     }
-    
+
     const requester = req.user;
     if (requester.role === 'member' && payment.memberId !== requester.id) {
       return res.status(403).json({ error: 'Accès refusé' });
     }
-    
-    if (requester.role === 'admin' && payment.member.user.gymId !== requester.gymId) {
+
+    if (requester.role === 'admin' && payment.member.User.gymId !== requester.gymId) {
       return res.status(403).json({ error: 'Accès refusé' });
     }
     
@@ -381,32 +381,32 @@ router.get('/payments/upcoming', auth, async (req, res) => {
     // Si admin, filtrer par salle
     if (requester.role === 'admin') {
       whereClause.member = {
-        user: {
+        User: {
           gymId: requester.gymId
         }
       };
     }
-    
+
     const upcomingPayments = await prisma.payment.findMany({
       where: whereClause,
       include: {
         subscription: true,
         member: {
           include: {
-            user: true
+            User: true
           }
         }
       },
       orderBy: { dueDate: 'asc' }
     });
-    
+
     res.json({
       count: upcomingPayments.length,
       Payment: upcomingPayments.map(p => ({
         id: p.id,
         memberId: p.memberId,
-        memberName: `${p.member.user.firstName} ${p.member.user.lastName}`,
-        memberEmail: p.member.user.email,
+        memberName: `${p.member.User.firstName} ${p.member.User.lastName}`,
+        memberEmail: p.member.User.email,
         amount: p.amount,
         dueDate: p.dueDate,
         monthNumber: p.monthNumber,

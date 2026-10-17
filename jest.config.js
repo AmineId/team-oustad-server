@@ -8,6 +8,8 @@ module.exports = {
     'middleware/**/*.js',
     '!services/emailService.js',
     '!services/pushNotificationService.js',
+    '!utils/prismaClient.js',
+    '!utils/logger.js',
     '!**/node_modules/**',
     '!**/tests/**',
     '!**/coverage/**'

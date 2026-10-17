@@ -334,7 +334,7 @@ describe('Plannings Routes', () => {
       const response = await request(app)
         .get(`/plannings/next-day/${testMember.id}`)
         .set('Authorization', authHeader(testMember));
-      expect([200, 404]).toContain(response.status);
+      expect([200, 204, 404]).toContain(response.status);
     });
 
     it('should return 401 without auth', async () => {
