@@ -38,7 +38,7 @@
     "test:subscriptionTypes": "cross-env NODE_ENV=test jest tests/routes/subscriptionTypes.test.js --runInBand",
     "test:users": "cross-env NODE_ENV=test jest tests/routes/users.test.js --runInBand",
     "test:emailService": "cross-env NODE_ENV=test jest tests/services/emailService.test.js --runInBand",
-    "test:ci": "cross-env NODE_ENV=test jest --ci --coverage --maxWorkers=2",
+    "test:ci": "cross-env NODE_ENV=test jest --ci --coverage --runInBand",
     "test:legacy": "node tests/unit/test-api-quick.js",
     "test:payment": "node tests/unit/test-acknowledge-olivia.js",
     "test:planning-notif": "node scripts/dev/test-daily-planning-notification.js",
