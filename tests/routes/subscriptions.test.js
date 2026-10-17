@@ -289,6 +289,104 @@ describe('Subscriptions Routes', () => {
     });
   });
 
+  describe('POST /subscriptions/payments/:id/acknowledge', () => {
+    let subscription;
+    let payment;
+
+    beforeEach(async () => {
+      subscription = await createTestSubscription(testMember.id, testSubscriptionType.id, {
+        status: 'active'
+      });
+      payment = await createTestPayment(testMember.id, subscription.id, {
+        status: 'pending',
+        amount: 50
+      });
+    });
+
+    it('should return 400 when paymentMethod is missing', async () => {
+      const response = await request(app)
+        .post(`/subscriptions/payments/${payment.id}/acknowledge`)
+        .set('Authorization', authHeader(testAdmin))
+        .send({});
+      expect(response.status).toBe(400);
+    });
+
+    it('should return 404 for non-existent payment', async () => {
+      const response = await request(app)
+        .post('/subscriptions/payments/99999/acknowledge')
+        .set('Authorization', authHeader(testAdmin))
+        .send({ paymentMethod: 'cash' });
+      expect(response.status).toBe(404);
+    });
+
+    it('should acknowledge payment as admin', async () => {
+      const response = await request(app)
+        .post(`/subscriptions/payments/${payment.id}/acknowledge`)
+        .set('Authorization', authHeader(testAdmin))
+        .send({ paymentMethod: 'cash', transactionId: 'TXN-TEST' });
+      expect([200, 201]).toContain(response.status);
+      expect(response.body.payment).toBeDefined();
+    });
+  });
+
+  describe('POST /subscriptions/payments/:id/complete', () => {
+    let subscription;
+    let payment;
+
+    beforeEach(async () => {
+      subscription = await createTestSubscription(testMember.id, testSubscriptionType.id, {
+        status: 'active'
+      });
+      payment = await createTestPayment(testMember.id, subscription.id, {
+        status: 'pending',
+        amount: 50
+      });
+    });
+
+    it('should return 400 when paymentMethod is missing', async () => {
+      const response = await request(app)
+        .post(`/subscriptions/payments/${payment.id}/complete`)
+        .set('Authorization', authHeader(testAdmin))
+        .send({});
+      expect(response.status).toBe(400);
+    });
+
+    it('should return 404 for non-existent payment', async () => {
+      const response = await request(app)
+        .post('/subscriptions/payments/99999/complete')
+        .set('Authorization', authHeader(testAdmin))
+        .send({ paymentMethod: 'cash' });
+      expect(response.status).toBe(404);
+    });
+
+    it('should complete payment as admin', async () => {
+      const response = await request(app)
+        .post(`/subscriptions/payments/${payment.id}/complete`)
+        .set('Authorization', authHeader(testAdmin))
+        .send({ paymentMethod: 'card', transactionId: 'TXN-CARD' });
+      expect([200, 201]).toContain(response.status);
+      expect(response.body.payment).toBeDefined();
+    });
+  });
+
+  describe('GET /subscriptions/payments/upcoming', () => {
+    it('should return upcoming payments for admin', async () => {
+      const response = await request(app)
+        .get('/subscriptions/payments/upcoming')
+        .set('Authorization', authHeader(testAdmin));
+      expect([200, 201]).toContain(response.status);
+      expect(response.body.count).toBeDefined();
+      expect(Array.isArray(response.body.Payment)).toBe(true);
+    });
+
+    it('should return 403 for members', async () => {
+      const response = await request(app)
+        .get('/subscriptions/payments/upcoming')
+        .set('Authorization', authHeader(testMember));
+      expect(response.status).toBe(403);
+    });
+  });
+
   describe('Subscription Status', () => {
     it('should correctly identify active subscription', async () => {
       const subscription = await createTestSubscription(testMember.id, testSubscriptionType.id, {

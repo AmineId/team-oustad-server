@@ -7,6 +7,7 @@ const {
   createTestGym,
   createTestAdmin,
   createTestMember,
+  createTestOwner,
   authHeader,
   prisma
 } = require('../helpers/testHelpers');
@@ -194,8 +195,7 @@ describe('Users Routes', () => {
         .set('Authorization', authHeader(testAdmin));
 
       expect(response.status).toBe(200);
-      
-      // Verify deletion
+
       const deletedUser = await prisma.user.findUnique({
         where: { id: testMember.id }
       });
@@ -208,6 +208,167 @@ describe('Users Routes', () => {
         .set('Authorization', authHeader(testMember));
 
       expect(response.status).toBe(403);
+    });
+  });
+
+  describe('PUT /users/fcm-token', () => {
+    it('should update FCM token', async () => {
+      const response = await request(app)
+        .put('/users/fcm-token')
+        .set('Authorization', authHeader(testMember))
+        .send({ fcmToken: 'new-fcm-token-xyz' });
+      expect(response.status).toBe(200);
+      expect(response.body.user).toBeDefined();
+    });
+
+    it('should return 400 when fcmToken is missing', async () => {
+      const response = await request(app)
+        .put('/users/fcm-token')
+        .set('Authorization', authHeader(testMember))
+        .send({});
+      expect(response.status).toBe(400);
+    });
+
+    it('should return 401 without auth', async () => {
+      const response = await request(app)
+        .put('/users/fcm-token')
+        .send({ fcmToken: 'token' });
+      expect(response.status).toBe(401);
+    });
+  });
+
+  describe('DELETE /users/fcm-token', () => {
+    it('should remove FCM token', async () => {
+      const response = await request(app)
+        .delete('/users/fcm-token')
+        .set('Authorization', authHeader(testMember));
+      expect(response.status).toBe(200);
+    });
+
+    it('should return 401 without auth', async () => {
+      const response = await request(app).delete('/users/fcm-token');
+      expect(response.status).toBe(401);
+    });
+  });
+
+  describe('GET /users/:id/qr', () => {
+    it('should generate QR code for own user', async () => {
+      const response = await request(app)
+        .get(`/users/${testMember.id}/qr`)
+        .set('Authorization', authHeader(testMember));
+      expect([200, 403]).toContain(response.status);
+      if (response.status === 200) {
+        expect(response.body.qrCode || response.body.qrCodeBase64).toBeDefined();
+      }
+    });
+
+    it('should return QR as admin for gym member', async () => {
+      const response = await request(app)
+        .get(`/users/${testMember.id}/qr`)
+        .set('Authorization', authHeader(testAdmin));
+      expect([200]).toContain(response.status);
+    });
+
+    it('should return 403 for member accessing other user QR', async () => {
+      const otherMember = await createTestMember(testGym.id);
+      const response = await request(app)
+        .get(`/users/${otherMember.id}/qr`)
+        .set('Authorization', authHeader(testMember));
+      expect(response.status).toBe(403);
+    });
+
+    it('should return 404 for non-existent user', async () => {
+      const response = await request(app)
+        .get('/users/99999/qr')
+        .set('Authorization', authHeader(testAdmin));
+      expect(response.status).toBe(404);
+    });
+  });
+
+  describe('POST /users - create user', () => {
+    it('should return 400 when required fields missing', async () => {
+      const response = await request(app)
+        .post('/users')
+        .set('Authorization', authHeader(testAdmin))
+        .send({ email: 'new@test.com' });
+      expect(response.status).toBe(400);
+    });
+
+    it('should allow admin to create member in same gym', async () => {
+      const response = await request(app)
+        .post('/users')
+        .set('Authorization', authHeader(testAdmin))
+        .send({
+          email: 'newmember@test.com',
+          firstName: 'New',
+          lastName: 'Member',
+          role: 'member',
+          gymId: testGym.id,
+          sendSetupEmail: false
+        });
+      expect([200, 201]).toContain(response.status);
+    });
+
+    it('should return 403 when admin creates member in different gym', async () => {
+      const otherGym = await createTestGym({ name: 'Other Gym' });
+      const response = await request(app)
+        .post('/users')
+        .set('Authorization', authHeader(testAdmin))
+        .send({
+          email: 'othergym@test.com',
+          firstName: 'Other',
+          lastName: 'Gym',
+          role: 'member',
+          gymId: otherGym.id,
+          sendSetupEmail: false
+        });
+      expect(response.status).toBe(403);
+    });
+
+    it('should return 400 for duplicate email', async () => {
+      const response = await request(app)
+        .post('/users')
+        .set('Authorization', authHeader(testAdmin))
+        .send({
+          email: 'member@test.com', // already exists
+          firstName: 'Dup',
+          lastName: 'Email',
+          role: 'member',
+          gymId: testGym.id,
+          sendSetupEmail: false
+        });
+      expect(response.status).toBe(400);
+    });
+
+    it('should return 403 for member trying to create user', async () => {
+      const response = await request(app)
+        .post('/users')
+        .set('Authorization', authHeader(testMember))
+        .send({
+          email: 'hack@test.com',
+          firstName: 'H',
+          lastName: 'K',
+          role: 'member',
+          gymId: testGym.id,
+          sendSetupEmail: false
+        });
+      expect(response.status).toBe(403);
+    });
+  });
+
+  describe('GET /users/gym/:gymId/members', () => {
+    it('should return members of gym as admin', async () => {
+      const response = await request(app)
+        .get(`/users/gym/${testGym.id}/members`)
+        .set('Authorization', authHeader(testAdmin));
+      expect([200, 201]).toContain(response.status);
+    });
+
+    it('should return 404 for non-existent gym', async () => {
+      const response = await request(app)
+        .get('/users/gym/99999/members')
+        .set('Authorization', authHeader(testAdmin));
+      expect(response.status).toBe(404);
     });
   });
 });

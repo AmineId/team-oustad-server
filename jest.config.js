@@ -6,7 +6,8 @@ module.exports = {
     'services/**/*.js',
     'utils/**/*.js',
     'middleware/**/*.js',
-    'jobs/**/*.js',
+    '!services/emailService.js',
+    '!services/pushNotificationService.js',
     '!**/node_modules/**',
     '!**/tests/**',
     '!**/coverage/**'

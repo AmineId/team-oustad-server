@@ -220,4 +220,144 @@ describe('Plannings Routes', () => {
       expect(Array.isArray(response.body.plannings)).toBe(true);
     });
   });
+
+  describe('GET /plannings', () => {
+    beforeEach(async () => {
+      await prisma.planning.create({
+        data: {
+          displayId: `PLAN${Date.now()}-list`,
+          title: 'List Test Planning',
+          description: 'desc',
+          memberId: testMember.id,
+          coachId: testAdmin.id,
+          startDate: new Date(),
+          endDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
+        }
+      });
+    });
+
+    it('should list all plannings for admin/coach', async () => {
+      const response = await request(app)
+        .get('/plannings')
+        .set('Authorization', authHeader(testAdmin));
+      expect(response.status).toBe(200);
+    });
+
+    it('should list own plannings for member', async () => {
+      const response = await request(app)
+        .get('/plannings')
+        .set('Authorization', authHeader(testMember));
+      expect([200, 403]).toContain(response.status);
+    });
+  });
+
+  describe('DELETE /plannings/:planningId', () => {
+    let planningToDelete;
+
+    beforeEach(async () => {
+      planningToDelete = await prisma.planning.create({
+        data: {
+          displayId: `PLAN${Date.now()}-del`,
+          title: 'To Delete',
+          description: 'desc',
+          memberId: testMember.id,
+          coachId: testAdmin.id,
+          startDate: new Date(),
+          endDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
+        }
+      });
+    });
+
+    it('should delete planning as coach/admin', async () => {
+      const response = await request(app)
+        .delete(`/plannings/${planningToDelete.id}`)
+        .set('Authorization', authHeader(testAdmin));
+      expect(response.status).toBe(200);
+    });
+
+    it('should return 403 for member trying to delete', async () => {
+      const response = await request(app)
+        .delete(`/plannings/${planningToDelete.id}`)
+        .set('Authorization', authHeader(testMember));
+      expect(response.status).toBe(403);
+    });
+
+    it('should return 404 for non-existent planning', async () => {
+      const response = await request(app)
+        .delete('/plannings/99999')
+        .set('Authorization', authHeader(testAdmin));
+      expect(response.status).toBe(404);
+    });
+  });
+
+  describe('POST /plannings/:planningId/days/:dayOfWeek/exercises', () => {
+    let testPlanning;
+
+    beforeEach(async () => {
+      testPlanning = await prisma.planning.create({
+        data: {
+          displayId: `PLAN${Date.now()}-ex`,
+          title: 'Exercise Test',
+          description: 'desc',
+          memberId: testMember.id,
+          coachId: testAdmin.id,
+          startDate: new Date(),
+          endDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
+        }
+      });
+    });
+
+    it('should add exercise to planning day', async () => {
+      const response = await request(app)
+        .post(`/plannings/${testPlanning.id}/days/1/exercises`)
+        .set('Authorization', authHeader(testAdmin))
+        .send({
+          exerciseId: testExercise.id,
+          sets: 3,
+          reps: 10,
+          restSeconds: 60
+        });
+      expect([200, 201]).toContain(response.status);
+    });
+
+    it('should return 403 for member', async () => {
+      const response = await request(app)
+        .post(`/plannings/${testPlanning.id}/days/1/exercises`)
+        .set('Authorization', authHeader(testMember))
+        .send({ exerciseId: testExercise.id, sets: 3, reps: 10 });
+      expect(response.status).toBe(403);
+    });
+  });
+
+  describe('GET /plannings/next-day/:memberId', () => {
+    it('should get next training day info', async () => {
+      const response = await request(app)
+        .get(`/plannings/next-day/${testMember.id}`)
+        .set('Authorization', authHeader(testMember));
+      expect([200, 404]).toContain(response.status);
+    });
+
+    it('should return 401 without auth', async () => {
+      const response = await request(app)
+        .get(`/plannings/next-day/${testMember.id}`);
+      expect(response.status).toBe(401);
+    });
+  });
+
+  describe('POST /plannings/request-help', () => {
+    it('should return 400 when required fields missing', async () => {
+      const response = await request(app)
+        .post('/plannings/request-help')
+        .set('Authorization', authHeader(testMember))
+        .send({});
+      expect([400, 500]).toContain(response.status);
+    });
+
+    it('should return 401 without auth', async () => {
+      const response = await request(app)
+        .post('/plannings/request-help')
+        .send({ message: 'Need help' });
+      expect(response.status).toBe(401);
+    });
+  });
 });
