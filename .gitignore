@@ -108,3 +108,4 @@ tests/coverage/
 
 google-services.json.env.ota-token
 graphify-out/
+.wwebjs_auth

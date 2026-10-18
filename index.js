@@ -9,12 +9,23 @@ const logger = require('./utils/logger');
 
 logger.info('🚀 Démarrage du serveur Team Fitness...');
 
+const rateLimit = require('express-rate-limit');
+
 const app = express();
 
 // Trust proxy (nécessaire quand derrière nginx/reverse proxy)
 app.set('trust proxy', 1);
 
 logger.info('📦 Configuration Express...');
+
+// Rate limiting global — bloque les scanners et abus
+app.use(rateLimit({
+  windowMs: 60_000,
+  max: 100,
+  standardHeaders: true,
+  legacyHeaders: false,
+  handler: (req, res) => res.status(429).json({ error: 'Too Many Requests' }),
+}));
 
 // Security Middleware avec CSP personnalisée pour permettre Tailwind CDN
 app.use(helmet({
@@ -82,6 +93,7 @@ const membersRoutes = require('./routes/members');
 const bannersRoutes = require('./routes/banners');
 const checkInRoutes = require('./routes/checkIn');
 const storeRoutes = require('./routes/store');
+const whatsappRoutes = require('./routes/whatsapp');
 
 // Use routes
 console.log('🔗 Configuration des routes API...');
@@ -96,7 +108,8 @@ app.use('/members', membersRoutes);
 app.use('/banners', bannersRoutes);
 app.use('/check-in', checkInRoutes);
 app.use('/store', storeRoutes);
-console.log('✅ Routes configurées: /gyms, /users, /auth, /plannings, /subscriptions, /subscription-types, /android, /members, /banners, /check-in, /store');
+app.use('/whatsapp', whatsappRoutes);
+console.log('✅ Routes configurées: /gyms, /users, /auth, /plannings, /subscriptions, /subscription-types, /android, /members, /banners, /check-in, /store, /whatsapp');
 
 // Redirection Beta Download vers Google Play Internal Testing
 app.get('/beta/download', (req, res) => {

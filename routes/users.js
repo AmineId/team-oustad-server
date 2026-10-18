@@ -2,7 +2,7 @@ const express = require('express');
 const QRCode = require('qrcode');
 const bcrypt = require('bcryptjs');
 const crypto = require('crypto');
-const { sendPasswordResetEmail } = require('../services/emailService');
+const { sendPasswordResetNotification } = require('../services/notificationService');
 const { splitFullName, getFullName } = require('../utils/nameUtils');
 const { generateUserId } = require('../utils/idGenerator');
 const prisma = require('../utils/prismaClient');
@@ -477,12 +477,11 @@ router.post('/', auth, async (req, res) => {
           },
         });
 
-        // Envoyer l'email avec le token
-        await sendPasswordResetEmail(email, setupToken, true); // true = setup mode
+        await sendPasswordResetNotification(user, setupToken, true);
 
-        console.log(`📧 Email d'activation envoyé à ${email}`);
+        console.log(`📧 Notification d'activation envoyée à ${email}`);
       } catch (emailError) {
-        console.error(`⚠️ Erreur envoi email d'activation:`, emailError);
+        console.error(`⚠️ Erreur envoi notification d'activation:`, emailError);
         // Ne pas échouer la création si l'email échoue
       }
     }
@@ -2132,12 +2131,11 @@ router.post('/create-admin', auth, requireOwner, async (req, res) => {
           },
         });
 
-        // Envoyer l'email avec le token
-        await sendPasswordResetEmail(email, setupToken, true); // true = setup mode
+        await sendPasswordResetNotification(user, setupToken, true);
 
-        console.log(`📧 Email d'activation envoyé à ${email}`);
+        console.log(`📧 Notification d'activation envoyée à ${email}`);
       } catch (emailError) {
-        console.error(`⚠️ Erreur envoi email d'activation:`, emailError);
+        console.error(`⚠️ Erreur envoi notification d'activation:`, emailError);
         // Ne pas échouer la création si l'email échoue
       }
     }

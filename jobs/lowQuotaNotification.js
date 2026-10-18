@@ -1,5 +1,5 @@
 const prisma = require('../utils/prismaClient');
-const emailService = require('../services/emailService');
+const notificationService = require('../services/notificationService');
 const pushNotificationService = require('../services/pushNotificationService');
 
 /**
@@ -23,6 +23,7 @@ async function checkLowQuotaSubscriptions() {
             user: {
               select: {
                 email: true,
+                phoneNumber: true,
                 firstName: true,
                 lastName: true,
                 notificationsEnabled: true,
@@ -90,10 +91,10 @@ async function checkLowQuotaSubscriptions() {
           }
         }
 
-        // Envoyer email
+        // Envoyer notification (WhatsApp ou email)
         try {
-          await emailService.sendLowQuotaEmail(
-            subscription.member.user.email,
+          await notificationService.sendLowQuotaNotification(
+            subscription.member.user,
             {
               firstName: subscription.member.user.firstName,
               lastName: subscription.member.user.lastName,
@@ -105,9 +106,9 @@ async function checkLowQuotaSubscriptions() {
             }
           );
           emailsSent++;
-          console.log(`   ✅ Email envoyé`);
+          console.log(`   ✅ Notification envoyée`);
         } catch (error) {
-          console.error(`   ❌ Erreur envoi email:`, error.message);
+          console.error(`   ❌ Erreur envoi notification:`, error.message);
         }
 
         // Enregistrer la notification envoyée

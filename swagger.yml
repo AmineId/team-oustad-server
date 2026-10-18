@@ -1239,6 +1239,36 @@ paths:
         '500':
           description: Server error
 
+  /android/config:
+    get:
+      tags:
+        - Android OTA Updates
+      summary: Get Android app configuration
+      description: Returns app configuration including API URL, minimum supported version, and enabled features
+      responses:
+        '200':
+          description: App configuration
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  apiUrl:
+                    type: string
+                    example: "http://localhost:3000"
+                  minVersion:
+                    type: integer
+                    example: 1
+                  features:
+                    type: object
+                    properties:
+                      offlineMode:
+                        type: boolean
+                        example: true
+                      pushNotifications:
+                        type: boolean
+                        example: true
+
   /health:
     get:
       summary: Health check
@@ -1841,73 +1871,6 @@ paths:
           description: User not found
         '500':
           description: Server error
-
-  /users/fcm-token:
-    put:
-      summary: Update FCM token for push notifications
-      description: Update the Firebase Cloud Messaging token for the authenticated user
-      tags: [Users, Notifications]
-      security:
-        - bearerAuth: []
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              required:
-                - fcmToken
-              properties:
-                fcmToken:
-                  type: string
-                  example: "dGVzdF90b2tlbl9mb3JfZmNt..."
-      responses:
-        '200':
-          description: FCM token updated successfully
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  message:
-                    type: string
-                    example: "FCM token mis à jour avec succès"
-                  user:
-                    type: object
-                    properties:
-                      id:
-                        type: integer
-                      email:
-                        type: string
-                      firstName:
-                        type: string
-                      lastName:
-                        type: string
-                      fcmToken:
-                        type: string
-        '400':
-          description: Invalid input - FCM token is required
-        '401':
-          description: Unauthorized
-    delete:
-      summary: Remove FCM token (logout from notifications)
-      description: Remove the FCM token for the authenticated user (typically on logout)
-      tags: [Users, Notifications]
-      security:
-        - bearerAuth: []
-      responses:
-        '200':
-          description: FCM token removed successfully
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  message:
-                    type: string
-                    example: "FCM token supprimé avec succès"
-        '401':
-          description: Unauthorized
 
   /users:
     post:
@@ -3452,6 +3415,125 @@ paths:
               schema:
                 $ref: '#/components/schemas/Error'
 
+  /gyms/{id}/image:
+    put:
+      summary: Upload gym image
+      description: Upload or update a gym's image (base64). Owners can update any gym, admins can only update their own gym.
+      tags: [Gyms, Images]
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+          description: Gym ID
+          example: 1
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - imageData
+              properties:
+                imageData:
+                  type: string
+                  description: Base64 encoded image data (with or without data URI prefix)
+                  example: "data:image/jpeg;base64,/9j/4AAQSkZJRg..."
+      responses:
+        '200':
+          description: Gym image updated successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "Image de salle mise à jour avec succès"
+        '400':
+          description: Invalid image data
+        '403':
+          description: Insufficient permissions
+        '404':
+          description: Gym not found
+        '500':
+          description: Server error
+    get:
+      summary: Get gym image
+      description: Retrieve the image for a gym. Returns a generated SVG placeholder with gym initials if no image has been uploaded.
+      tags: [Gyms, Images]
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+          description: Gym ID
+          example: 1
+      responses:
+        '200':
+          description: Gym image (binary data or generated SVG placeholder)
+          content:
+            image/jpeg:
+              schema:
+                type: string
+                format: binary
+            image/png:
+              schema:
+                type: string
+                format: binary
+            image/gif:
+              schema:
+                type: string
+                format: binary
+            image/svg+xml:
+              schema:
+                type: string
+                format: binary
+        '403':
+          description: Insufficient permissions
+        '404':
+          description: Gym not found
+        '500':
+          description: Server error
+    delete:
+      summary: Delete gym image
+      description: Delete a gym's image. Owners can delete any gym image, admins can only delete their own gym's image.
+      tags: [Gyms, Images]
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+          description: Gym ID
+          example: 1
+      responses:
+        '200':
+          description: Gym image deleted successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "Image de salle supprimée avec succès"
+        '403':
+          description: Insufficient permissions
+        '404':
+          description: Gym not found
+        '500':
+          description: Server error
+
   /plannings/exercises:
     post:
       summary: Create a new exercise
@@ -4089,6 +4171,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/Error'
 
+  /plannings/{planningId}/days/{dayOfWeek}/exercises/{exerciseId}:
     delete:
       summary: Remove exercise from planning day
       description: Remove a specific exercise from a specific day in a workout plan. Only the coach who created the plan can modify it.
@@ -4275,6 +4358,53 @@ paths:
                 $ref: '#/components/schemas/Error'
         '404':
           description: Member not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /plannings/{planningId}:
+    delete:
+      summary: Delete a planning
+      description: Delete a workout plan. Only the coach who created the plan can delete it. Cascades to all days and exercises.
+      tags: [Plannings]
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: planningId
+          required: true
+          schema:
+            type: integer
+          description: Planning ID
+          example: 1
+      responses:
+        '200':
+          description: Planning deleted successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "Planning supprimé avec succès"
+        '400':
+          description: Invalid planning ID
+        '403':
+          description: Access denied - not the coach who created this plan
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Planning not found
           content:
             application/json:
               schema:
@@ -4769,6 +4899,53 @@ paths:
                       progressPercentage:
                         type: number
                         example: 25
+        '403':
+          description: Access denied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Subscription not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /subscriptions/{id}/renew:
+    post:
+      summary: Renew a subscription
+      description: Create a new subscription of the same type starting from today. Admins/owners can renew any subscription; members can only renew their own.
+      tags: [Subscriptions]
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+          description: Subscription ID to renew
+          example: 1
+      responses:
+        '201':
+          description: Subscription renewed successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "Abonnement renouvelé avec succès"
+                  newSubscription:
+                    $ref: '#/components/schemas/Subscription'
         '403':
           description: Access denied
           content:
@@ -7507,3 +7684,77 @@ paths:
           description: Non autorisé
         '500':
           description: Erreur serveur
+
+  /whatsapp/status:
+    get:
+      summary: Statut de la connexion WhatsApp
+      description: Retourne si le client WhatsApp est connecté et le numéro expéditeur actif. Réservé aux propriétaires.
+      tags: [WhatsApp]
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Statut de connexion
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  connected:
+                    type: boolean
+                    example: true
+                  phone:
+                    type: string
+                    nullable: true
+                    example: "212600123456"
+        '403':
+          description: Accès réservé aux propriétaires
+
+  /whatsapp/qr:
+    get:
+      summary: QR code de connexion WhatsApp
+      description: Retourne le QR code à scanner pour connecter un numéro WhatsApp. Disponible uniquement si le client n'est pas encore connecté. Réservé aux propriétaires.
+      tags: [WhatsApp]
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: QR code en base64
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  qr:
+                    type: string
+                    description: Image PNG encodée en base64 (data URL)
+                    example: "data:image/png;base64,iVBORw0KGgo..."
+        '204':
+          description: WhatsApp déjà connecté, pas de QR disponible
+        '503':
+          description: QR pas encore généré, réessayez dans quelques secondes
+        '403':
+          description: Accès réservé aux propriétaires
+
+  /whatsapp/session:
+    delete:
+      summary: Déconnecter WhatsApp
+      description: Déconnecte le client WhatsApp et supprime la session. Un nouveau scan QR sera nécessaire. Réservé aux propriétaires.
+      tags: [WhatsApp]
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Session supprimée avec succès
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "Session WhatsApp supprimée"
+        '403':
+          description: Accès réservé aux propriétaires
+        '500':
+          description: Erreur lors de la déconnexion

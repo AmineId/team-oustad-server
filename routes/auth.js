@@ -3,7 +3,7 @@ const router = express.Router();
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
-const { sendPasswordResetEmail } = require('../services/emailService');
+const { sendPasswordResetNotification } = require('../services/notificationService');
 const { getActiveSubscription, getSubscriptionsWithStatus } = require('../utils/subscriptionUtils');
 const prisma = require('../utils/prismaClient');
 
@@ -723,8 +723,7 @@ router.post('/forgot-password', async (req, res) => {
       },
     });
 
-    // Envoyer l'email
-    await sendPasswordResetEmail(user.email, resetToken);
+    await sendPasswordResetNotification(user, resetToken);
 
     const responseData = { message: 'Password reset code sent successfully' };
     console.log(`📤 Réponse forgot-password:`, responseData);
@@ -978,10 +977,9 @@ router.post('/send-setup-email', auth, async (req, res) => {
       },
     });
 
-    // Envoyer l'email avec le token
-    await sendPasswordResetEmail(user.email, setupToken, true); // true = setup mode
+    await sendPasswordResetNotification(user, setupToken, true);
 
-    console.log(`✅ Email d'activation envoyé à ${user.email}`);
+    console.log(`✅ Notification d'activation envoyée à ${user.email}`);
     res.json({ 
       message: "Email d'activation envoyé",
       user: {

@@ -16,7 +16,14 @@ jest.mock('../services/emailService', () => ({
   sendPasswordResetEmail: jest.fn().mockResolvedValue(true),
   sendAccountSetupEmail: jest.fn().mockResolvedValue(true),
   sendPaymentConfirmationEmail: jest.fn().mockResolvedValue(true),
-  sendPaymentReminderEmail: jest.fn().mockResolvedValue(true)
+  sendPaymentReminderEmail: jest.fn().mockResolvedValue(true),
+  sendLowQuotaEmail: jest.fn().mockResolvedValue(true),
+}));
+
+// Mock notification service (WhatsApp + email routing)
+jest.mock('../services/notificationService', () => ({
+  sendPasswordResetNotification: jest.fn().mockResolvedValue(undefined),
+  sendLowQuotaNotification: jest.fn().mockResolvedValue(undefined),
 }));
 
 // Mock push notification service to prevent actual notifications during tests
