@@ -528,14 +528,14 @@ router.get('/me', auth, async (req, res) => {
       // Pour les owners : retourner toutes les salles avec statistiques
       const allGyms = await prisma.gym.findMany({
         include: {
-          users: {
+          User: {
             select: {
               role: true
             }
           },
           _count: {
             select: {
-              users: true
+              User: true
             }
           }
         }
@@ -552,10 +552,10 @@ router.get('/me', auth, async (req, res) => {
         createdAt: gym.createdAt,
         updatedAt: gym.updatedAt,
         stats: {
-          totalUsers: gym._count.users,
-          members: gym.users.filter(u => u.role === 'member').length,
-          admins: gym.users.filter(u => u.role === 'admin').length,
-          owners: gym.users.filter(u => u.role === 'owner').length
+          totalUsers: gym._count.User,
+          members: gym.User.filter(u => u.role === 'member').length,
+          admins: gym.User.filter(u => u.role === 'admin').length,
+          owners: gym.User.filter(u => u.role === 'owner').length
         }
       }));
 

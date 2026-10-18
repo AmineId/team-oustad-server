@@ -525,6 +525,18 @@ router.get('/', auth, async (req, res) => {
       });
       whereClause.memberId = member.userId;
       logger.debug(`👤 Filtre automatique appliqué: memberId = ${member.userId}`);
+    } else if (requester.role === 'owner') {
+      logger.debug(`👑 Mode owner - Tous les plannings de la salle`);
+      // Owner voit tous les plannings de sa salle
+      whereClause.Member = {
+        User: {
+          gymId: requester.gymId
+        }
+      };
+      if (memberId) {
+        whereClause.memberId = parseInt(memberId);
+        logger.debug(`👑 Filtre membre appliqué: ${memberId}`);
+      }
     } else {
       logger.warn(`❓ Rôle non supporté: ${requester.role}`);
       return res.status(403).json({ error: 'Forbidden' });
