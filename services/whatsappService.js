@@ -27,9 +27,6 @@ if (process.env.NODE_ENV === 'test') {
 
   client.on('qr', (qr) => {
     currentQr = qr;
-    console.log('\n📱 WHATSAPP — Scannez ce QR code avec votre téléphone :');
-    qrcode.generate(qr, { small: true });
-    console.log('En attente du scan...\n');
   });
 
   client.on('ready', () => {
