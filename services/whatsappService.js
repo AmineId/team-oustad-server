@@ -6,6 +6,7 @@ if (process.env.NODE_ENV === 'test') {
   module.exports = {
     getStatus: () => ({ connected: false, phone: null }),
     getQrBase64: async () => null,
+    getPairingCode: async () => { throw new Error('WhatsApp indisponible'); },
     logout: async () => {},
     sendPasswordResetWhatsApp: async () => {},
     sendLowQuotaWhatsApp: async () => {},
@@ -106,5 +107,11 @@ if (process.env.NODE_ENV === 'test') {
     console.log(`✅ WhatsApp: message envoyé`);
   }
 
-  module.exports = { getStatus, getQrBase64, logout, sendPasswordResetWhatsApp, sendLowQuotaWhatsApp };
+  async function getPairingCode(phoneNumber) {
+    if (isReady) throw new Error('WhatsApp déjà connecté');
+    const normalized = phoneNumber.replace(/[\s+\-().]/g, '');
+    return await client.authenticateWithPairingCode(normalized);
+  }
+
+  module.exports = { getStatus, getQrBase64, getPairingCode, logout, sendPasswordResetWhatsApp, sendLowQuotaWhatsApp };
 }

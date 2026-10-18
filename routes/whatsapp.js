@@ -123,4 +123,64 @@ router.delete('/session', auth, requireOwner, async (req, res) => {
   }
 });
 
+/**
+ * @swagger
+ * /whatsapp/pairing-code:
+ *   post:
+ *     summary: Obtenir un code de couplage WhatsApp
+ *     description: |
+ *       Génère un code à 8 caractères pour coupler WhatsApp sans scanner de QR.
+ *       L'owner ouvre WhatsApp → Appareils couplés → Coupler un appareil → Coupler avec un numéro, puis entre ce code.
+ *       Réservé aux propriétaires. Impossible si WhatsApp est déjà connecté.
+ *     tags: [WhatsApp]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [phoneNumber]
+ *             properties:
+ *               phoneNumber:
+ *                 type: string
+ *                 description: Numéro WhatsApp de l'expéditeur (format international, sans +)
+ *                 example: "212600123456"
+ *     responses:
+ *       '200':
+ *         description: Code de couplage généré
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 code:
+ *                   type: string
+ *                   description: Code à 8 caractères à entrer dans WhatsApp
+ *                   example: "ABC1-2DEF"
+ *       '400':
+ *         description: phoneNumber manquant
+ *       '409':
+ *         description: WhatsApp déjà connecté
+ *       '403':
+ *         description: Accès réservé aux propriétaires
+ *       '500':
+ *         description: Erreur génération du code
+ */
+router.post('/pairing-code', auth, requireOwner, async (req, res) => {
+  const { phoneNumber } = req.body;
+  if (!phoneNumber) return res.status(400).json({ error: 'phoneNumber requis' });
+
+  const { connected } = whatsappService.getStatus();
+  if (connected) return res.status(409).json({ error: 'WhatsApp déjà connecté' });
+
+  try {
+    const code = await whatsappService.getPairingCode(phoneNumber);
+    res.json({ code });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
 module.exports = router;
