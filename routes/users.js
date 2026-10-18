@@ -1540,6 +1540,45 @@ router.delete('/:id/profile-image', auth, async (req, res) => {
  *                 error:
  *                   type: string
  */
+router.get('/stats', auth, requireOwner, async (req, res) => {
+  try {
+    const [
+      totalGyms,
+      totalUsers,
+      totalAdmins,
+      totalMembers,
+      totalOwners,
+      totalPayments,
+      totalRevenue
+    ] = await Promise.all([
+      prisma.gym.count(),
+      prisma.user.count(),
+      prisma.admin.count(),
+      prisma.member.count(),
+      prisma.owner.count(),
+      prisma.payment.count(),
+      prisma.payment.aggregate({
+        _sum: { amount: true },
+        where: { status: 'completed' }
+      })
+    ]);
+
+    res.json({
+      stats: {
+        totalGyms,
+        totalUsers,
+        totalAdmins,
+        totalMembers,
+        totalOwners,
+        totalPayments,
+        totalRevenue: totalRevenue._sum.amount || 0
+      }
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 router.get('/:id', auth, async (req, res) => {
   try {
     const id = Number(req.params.id);
@@ -2187,7 +2226,7 @@ router.post('/create-admin', auth, requireOwner, async (req, res) => {
  *                 error:
  *                   type: string
  */
-router.get('/gyms/all', requireOwner, async (req, res) => {
+router.get('/gyms/all', auth, requireOwner, async (req, res) => {
   try {
     const gyms = await prisma.gym.findMany({
       include: {
@@ -2273,45 +2312,6 @@ router.get('/gyms/all', requireOwner, async (req, res) => {
  *                 error:
  *                   type: string
  */
-router.get('/stats', requireOwner, async (req, res) => {
-  try {
-    const [
-      totalGyms,
-      totalUsers,
-      totalAdmins,
-      totalMembers,
-      totalOwners,
-      totalPayments,
-      totalRevenue
-    ] = await Promise.all([
-      prisma.gym.count(),
-      prisma.user.count(),
-      prisma.admin.count(),
-      prisma.member.count(),
-      prisma.owner.count(),
-      prisma.payment.count(),
-      prisma.payment.aggregate({
-        _sum: { amount: true },
-        where: { status: 'completed' }
-      })
-    ]);
-
-    res.json({
-      stats: {
-        totalGyms,
-        totalUsers,
-        totalAdmins,
-        totalMembers,
-        totalOwners,
-        totalPayments,
-        totalRevenue: totalRevenue._sum.amount || 0
-      }
-    });
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-});
-
 // Get all members of a specific gym
 router.get('/gym/:gymId/members', auth, async (req, res) => {
   try {

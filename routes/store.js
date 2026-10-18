@@ -112,7 +112,7 @@ router.post('/reservations', authenticateToken, async (req, res) => {
       });
     }
 
-    const memberId = req.user.role === 'member' ? req.user.id : req.body.memberId;
+    const memberId = req.user.type === 'member' ? req.user.sub : req.body.memberId;
     if (!memberId) {
       return res.status(400).json({ 
         success: false, 
@@ -140,16 +140,16 @@ router.post('/reservations', authenticateToken, async (req, res) => {
  */
 router.get('/reservations/my', authenticateToken, async (req, res) => {
   try {
-    if (req.user.role !== 'member') {
-      return res.status(403).json({ 
-        success: false, 
-        error: 'Accessible uniquement aux membres' 
+    if (req.user.type !== 'member') {
+      return res.status(403).json({
+        success: false,
+        error: 'Accessible uniquement aux membres'
       });
     }
 
     const { status } = req.query;
     const reservations = await storeService.getMemberReservations(
-      req.user.id, 
+      req.user.sub,
       status
     );
     res.json({ success: true, reservations });
@@ -167,8 +167,8 @@ router.patch('/reservations/:id/cancel', authenticateToken, async (req, res) => 
   try {
     const reservation = await storeService.cancelReservation(
       req.params.id,
-      req.user.id,
-      req.user.role
+      req.user.sub,
+      req.user.type
     );
     res.json({ success: true, reservation });
   } catch (error) {
@@ -328,10 +328,10 @@ router.delete('/products/:id', authenticateToken, async (req, res) => {
  */
 router.get('/reservations', authenticateToken, async (req, res) => {
   try {
-    if (!['admin', 'owner'].includes(req.user.role)) {
-      return res.status(403).json({ 
-        success: false, 
-        error: 'Accessible uniquement aux admin et owner' 
+    if (!['admin', 'owner'].includes(req.user.type)) {
+      return res.status(403).json({
+        success: false,
+        error: 'Accessible uniquement aux admin et owner'
       });
     }
 
@@ -355,10 +355,10 @@ router.get('/reservations', authenticateToken, async (req, res) => {
  */
 router.patch('/reservations/:id/complete', authenticateToken, async (req, res) => {
   try {
-    if (!['admin', 'owner'].includes(req.user.role)) {
-      return res.status(403).json({ 
-        success: false, 
-        error: 'Accessible uniquement aux admin et owner' 
+    if (!['admin', 'owner'].includes(req.user.type)) {
+      return res.status(403).json({
+        success: false,
+        error: 'Accessible uniquement aux admin et owner'
       });
     }
 
@@ -376,10 +376,10 @@ router.patch('/reservations/:id/complete', authenticateToken, async (req, res) =
  */
 router.get('/stats', authenticateToken, async (req, res) => {
   try {
-    if (!['admin', 'owner'].includes(req.user.role)) {
-      return res.status(403).json({ 
-        success: false, 
-        error: 'Accessible uniquement aux admin et owner' 
+    if (!['admin', 'owner'].includes(req.user.type)) {
+      return res.status(403).json({
+        success: false,
+        error: 'Accessible uniquement aux admin et owner'
       });
     }
 

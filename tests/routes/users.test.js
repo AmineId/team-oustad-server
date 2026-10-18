@@ -368,4 +368,139 @@ describe('Users Routes', () => {
       expect(response.status).toBe(404);
     });
   });
+
+  describe('Owner Routes', () => {
+    let testOwner;
+
+    beforeEach(async () => {
+      testOwner = await createTestOwner(testGym.id, {
+        email: 'owner@test.com'
+      });
+    });
+
+    afterEach(async () => {
+      await prisma.owner.deleteMany({});
+      await prisma.user.deleteMany({ where: { role: 'owner' } });
+    });
+
+    describe('GET /users/stats', () => {
+      it('should return 401 without auth', async () => {
+        const res = await request(app).get('/users/stats');
+        expect(res.status).toBe(401);
+      });
+
+      it('should return 403 for admin', async () => {
+        const res = await request(app)
+          .get('/users/stats')
+          .set('Authorization', authHeader(testAdmin));
+        expect(res.status).toBe(403);
+      });
+
+      it('should return stats for owner', async () => {
+        const res = await request(app)
+          .get('/users/stats')
+          .set('Authorization', authHeader(testOwner));
+        expect(res.status).toBe(200);
+        expect(res.body.stats).toBeDefined();
+        expect(res.body.stats.totalGyms).toBeDefined();
+        expect(res.body.stats.totalUsers).toBeDefined();
+      });
+    });
+
+    describe('GET /users/gyms/all', () => {
+      it('should return 401 without auth', async () => {
+        const res = await request(app).get('/users/gyms/all');
+        expect(res.status).toBe(401);
+      });
+
+      it('should return 403 for admin', async () => {
+        const res = await request(app)
+          .get('/users/gyms/all')
+          .set('Authorization', authHeader(testAdmin));
+        expect(res.status).toBe(403);
+      });
+
+      it('should return all gyms for owner', async () => {
+        const res = await request(app)
+          .get('/users/gyms/all')
+          .set('Authorization', authHeader(testOwner));
+        expect(res.status).toBe(200);
+        expect(Array.isArray(res.body.gyms)).toBe(true);
+      });
+    });
+
+    describe('POST /users/create-owner', () => {
+      it('should return 400 with missing required fields', async () => {
+        const res = await request(app)
+          .post('/users/create-owner')
+          .set('Authorization', authHeader(testOwner))
+          .send({ email: 'new@test.com' });
+        expect(res.status).toBe(400);
+      });
+
+      it('should return 403 for non-owner', async () => {
+        const res = await request(app)
+          .post('/users/create-owner')
+          .set('Authorization', authHeader(testAdmin))
+          .send({ email: 'new@test.com', password: 'pass123', firstName: 'New', lastName: 'Owner', gymId: testGym.id });
+        expect(res.status).toBe(403);
+      });
+
+      it('should create a new owner', async () => {
+        const res = await request(app)
+          .post('/users/create-owner')
+          .set('Authorization', authHeader(testOwner))
+          .send({ email: 'newowner@test.com', password: 'pass123', firstName: 'New', lastName: 'Owner', gymId: testGym.id });
+        expect(res.status).toBe(201);
+        expect(res.body.user.role).toBe('owner');
+        await prisma.owner.deleteMany({ where: { User: { email: 'newowner@test.com' } } });
+        await prisma.user.deleteMany({ where: { email: 'newowner@test.com' } });
+      });
+
+      it('should return 400 for duplicate email', async () => {
+        const res = await request(app)
+          .post('/users/create-owner')
+          .set('Authorization', authHeader(testOwner))
+          .send({ email: 'owner@test.com', password: 'pass123', firstName: 'Dup', lastName: 'Owner', gymId: testGym.id });
+        expect(res.status).toBe(400);
+      });
+    });
+
+    describe('POST /users/create-admin', () => {
+      it('should return 400 with missing required fields', async () => {
+        const res = await request(app)
+          .post('/users/create-admin')
+          .set('Authorization', authHeader(testOwner))
+          .send({ email: 'admin@new.com' });
+        expect(res.status).toBe(400);
+      });
+
+      it('should return 403 for non-owner', async () => {
+        const res = await request(app)
+          .post('/users/create-admin')
+          .set('Authorization', authHeader(testAdmin))
+          .send({ email: 'admin@new.com', firstName: 'New', lastName: 'Admin', gymId: testGym.id });
+        expect(res.status).toBe(403);
+      });
+
+      it('should create a new admin', async () => {
+        const res = await request(app)
+          .post('/users/create-admin')
+          .set('Authorization', authHeader(testOwner))
+          .send({ email: 'newadmin@test.com', firstName: 'New', lastName: 'Admin', gymId: testGym.id, password: 'admin123', sendSetupEmail: false });
+        expect(res.status).toBe(201);
+        expect(res.body.user.role).toBe('admin');
+        await prisma.admin.deleteMany({ where: { User: { email: 'newadmin@test.com' } } });
+        await prisma.user.deleteMany({ where: { email: 'newadmin@test.com' } });
+      });
+
+      it('should return 400 for duplicate email', async () => {
+        const res = await request(app)
+          .post('/users/create-admin')
+          .set('Authorization', authHeader(testOwner))
+          .send({ email: 'admin@test.com', firstName: 'Dup', lastName: 'Admin', gymId: testGym.id });
+        expect(res.status).toBe(400);
+      });
+    });
+  });
 });

@@ -269,4 +269,178 @@ describe('Store Routes', () => {
       expect(response.status).toBe(403);
     });
   });
+
+  describe('Reservations', () => {
+    let testProduct;
+
+    beforeEach(async () => {
+      testProduct = await prisma.storeProduct.create({
+        data: {
+          displayId: `PROD${Date.now()}`,
+          name: 'Reserve Me',
+          description: 'Test product for reservations',
+          price: 15.00,
+          stock: 10,
+          category: 'supplements',
+          gymId: testGym.id,
+          createdBy: testAdmin.id,
+          isActive: true
+        }
+      });
+    });
+
+    describe('POST /store/reservations', () => {
+      it('should return 400 when productId or quantity missing', async () => {
+        const res = await request(app)
+          .post('/store/reservations')
+          .set('Authorization', authHeader(testMember))
+          .send({ notes: 'no fields' });
+        expect(res.status).toBe(400);
+      });
+
+      it('should create a reservation as member', async () => {
+        const res = await request(app)
+          .post('/store/reservations')
+          .set('Authorization', authHeader(testMember))
+          .send({ productId: testProduct.id, quantity: 2 });
+        expect(res.status).toBe(201);
+        expect(res.body.reservation.quantity).toBe(2);
+      });
+
+      it('should return 400 when admin posts without memberId', async () => {
+        const res = await request(app)
+          .post('/store/reservations')
+          .set('Authorization', authHeader(testAdmin))
+          .send({ productId: testProduct.id, quantity: 1 });
+        expect(res.status).toBe(400);
+        expect(res.body.error).toMatch(/memberId/);
+      });
+
+      it('should create a reservation as admin with memberId', async () => {
+        const res = await request(app)
+          .post('/store/reservations')
+          .set('Authorization', authHeader(testAdmin))
+          .send({ productId: testProduct.id, quantity: 1, memberId: testMember.id });
+        expect(res.status).toBe(201);
+      });
+    });
+
+    describe('GET /store/reservations/my', () => {
+      it('should return 403 for admins', async () => {
+        const res = await request(app)
+          .get('/store/reservations/my')
+          .set('Authorization', authHeader(testAdmin));
+        expect(res.status).toBe(403);
+      });
+
+      it('should return member reservations', async () => {
+        await prisma.storeReservation.create({
+          data: {
+            displayId: `RES${Date.now()}`,
+            productId: testProduct.id,
+            memberId: testMember.id,
+            quantity: 1,
+            totalPrice: 15.00,
+            status: 'pending'
+          }
+        });
+        const res = await request(app)
+          .get('/store/reservations/my')
+          .set('Authorization', authHeader(testMember));
+        expect(res.status).toBe(200);
+        expect(Array.isArray(res.body.reservations)).toBe(true);
+      });
+    });
+
+    describe('PATCH /store/reservations/:id/cancel', () => {
+      it('should cancel a reservation as member', async () => {
+        const reservation = await prisma.storeReservation.create({
+          data: {
+            displayId: `RES${Date.now()}`,
+            productId: testProduct.id,
+            memberId: testMember.id,
+            quantity: 1,
+            totalPrice: 15.00,
+            status: 'pending'
+          }
+        });
+        const res = await request(app)
+          .patch(`/store/reservations/${reservation.displayId}/cancel`)
+          .set('Authorization', authHeader(testMember));
+        expect(res.status).toBe(200);
+        expect(res.body.reservation.status).toBe('cancelled');
+      });
+    });
+
+    describe('GET /store/reservations', () => {
+      it('should return 403 for members', async () => {
+        const res = await request(app)
+          .get('/store/reservations')
+          .set('Authorization', authHeader(testMember));
+        expect(res.status).toBe(403);
+      });
+
+      it('should return all reservations for admin', async () => {
+        const res = await request(app)
+          .get('/store/reservations')
+          .set('Authorization', authHeader(testAdmin));
+        expect(res.status).toBe(200);
+        expect(Array.isArray(res.body.reservations)).toBe(true);
+      });
+    });
+
+    describe('PATCH /store/reservations/:id/complete', () => {
+      it('should return 403 for members', async () => {
+        const reservation = await prisma.storeReservation.create({
+          data: {
+            displayId: `RES${Date.now()}`,
+            productId: testProduct.id,
+            memberId: testMember.id,
+            quantity: 1,
+            totalPrice: 15.00,
+            status: 'pending'
+          }
+        });
+        const res = await request(app)
+          .patch(`/store/reservations/${reservation.displayId}/complete`)
+          .set('Authorization', authHeader(testMember));
+        expect(res.status).toBe(403);
+      });
+
+      it('should complete a reservation as admin', async () => {
+        const reservation = await prisma.storeReservation.create({
+          data: {
+            displayId: `RES${Date.now()}`,
+            productId: testProduct.id,
+            memberId: testMember.id,
+            quantity: 1,
+            totalPrice: 15.00,
+            status: 'pending'
+          }
+        });
+        const res = await request(app)
+          .patch(`/store/reservations/${reservation.displayId}/complete`)
+          .set('Authorization', authHeader(testAdmin));
+        expect(res.status).toBe(200);
+        expect(res.body.reservation.status).toBe('completed');
+      });
+    });
+  });
+
+  describe('GET /store/stats', () => {
+    it('should return 403 for members', async () => {
+      const res = await request(app)
+        .get('/store/stats')
+        .set('Authorization', authHeader(testMember));
+      expect(res.status).toBe(403);
+    });
+
+    it('should return store stats for admin', async () => {
+      const res = await request(app)
+        .get('/store/stats')
+        .set('Authorization', authHeader(testAdmin));
+      expect(res.status).toBe(200);
+      expect(res.body.stats).toBeDefined();
+    });
+  });
 });
