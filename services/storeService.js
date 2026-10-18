@@ -282,7 +282,7 @@ async function createReservation(data) {
           id: true,
           displayId: true,
           name: true,
-          imageUrl: true,
+          imagesBase64: true,
           price: true
         }
       },
@@ -322,7 +322,7 @@ async function getMemberReservations(memberId, status = null) {
           id: true,
           displayId: true,
           name: true,
-          imageUrl: true,
+          imagesBase64: true,
           price: true,
           category: true
         }
@@ -356,7 +356,7 @@ async function getAllReservations(filters = {}) {
           id: true,
           displayId: true,
           name: true,
-          imageUrl: true,
+          imagesBase64: true,
           price: true,
           category: true
         }
@@ -413,7 +413,7 @@ async function cancelReservation(reservationId, userId, userRole) {
           id: true,
           displayId: true,
           name: true,
-          imageUrl: true,
+          imagesBase64: true,
           price: true
         }
       }

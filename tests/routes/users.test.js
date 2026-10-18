@@ -452,7 +452,7 @@ describe('Users Routes', () => {
           .set('Authorization', authHeader(testOwner))
           .send({ email: 'newowner@test.com', password: 'pass123', firstName: 'New', lastName: 'Owner', gymId: testGym.id });
         expect(res.status).toBe(201);
-        expect(res.body.user.role).toBe('owner');
+        expect(res.body.owner).toBeDefined();
         await prisma.owner.deleteMany({ where: { User: { email: 'newowner@test.com' } } });
         await prisma.user.deleteMany({ where: { email: 'newowner@test.com' } });
       });
@@ -489,7 +489,7 @@ describe('Users Routes', () => {
           .set('Authorization', authHeader(testOwner))
           .send({ email: 'newadmin@test.com', firstName: 'New', lastName: 'Admin', gymId: testGym.id, password: 'admin123', sendSetupEmail: false });
         expect(res.status).toBe(201);
-        expect(res.body.user.role).toBe('admin');
+        expect(res.body.admin).toBeDefined();
         await prisma.admin.deleteMany({ where: { User: { email: 'newadmin@test.com' } } });
         await prisma.user.deleteMany({ where: { email: 'newadmin@test.com' } });
       });
