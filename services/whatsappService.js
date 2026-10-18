@@ -20,6 +20,7 @@ if (process.env.NODE_ENV === 'test') {
   });
 
   let isReady = false;
+  let initFailed = false;
   let connectedPhone = null;
   let currentQr = null;
   const readyCallbacks = [];
@@ -36,7 +37,7 @@ if (process.env.NODE_ENV === 'test') {
     currentQr = null;
     connectedPhone = client.info?.wid?.user ?? null;
     console.log(`✅ WhatsApp client prêt (${connectedPhone})`);
-    readyCallbacks.splice(0).forEach(cb => cb());
+    readyCallbacks.splice(0).forEach(cb => cb(null));
   });
 
   client.on('auth_failure', (msg) => {
@@ -49,13 +50,21 @@ if (process.env.NODE_ENV === 'test') {
     console.warn('⚠️ WhatsApp déconnecté:', reason);
   });
 
-  client.initialize();
+  client.initialize().catch((err) => {
+    initFailed = true;
+    readyCallbacks.splice(0).forEach(cb => cb(new Error(err.message)));
+    console.error('⚠️ WhatsApp: impossible de démarrer le client (Puppeteer/Chrome manquant ?):', err.message);
+  });
 
   function waitReady(timeoutMs = 60000) {
     if (isReady) return Promise.resolve();
+    if (initFailed) return Promise.reject(new Error('WhatsApp client indisponible'));
     return new Promise((resolve, reject) => {
       const t = setTimeout(() => reject(new Error('WhatsApp client pas prêt (timeout)')), timeoutMs);
-      readyCallbacks.push(() => { clearTimeout(t); resolve(); });
+      readyCallbacks.push((err) => {
+        clearTimeout(t);
+        err ? reject(err) : resolve();
+      });
     });
   }
 
