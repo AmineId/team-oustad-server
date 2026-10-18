@@ -360,4 +360,116 @@ describe('Plannings Routes', () => {
       expect(response.status).toBe(401);
     });
   });
+
+  describe('DELETE /plannings/:planningId/days/:dayOfWeek/exercises/:exerciseId', () => {
+    let testPlanning;
+
+    beforeEach(async () => {
+      testPlanning = await prisma.planning.create({
+        data: {
+          displayId: `PLAN${Date.now()}-delex`,
+          title: 'Delete Exercise Test',
+          description: 'desc',
+          memberId: testMember.id,
+          coachId: testAdmin.id,
+          startDate: new Date(),
+          endDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
+        }
+      });
+      const day = await prisma.planningDay.create({
+        data: { planningId: testPlanning.id, dayOfWeek: 1 }
+      });
+      await prisma.planningExercise.create({
+        data: { planningDayId: day.id, exerciseId: testExercise.id, sets: 3, reps: 10, restTime: 60 }
+      });
+    });
+
+    it('should return 403 for member', async () => {
+      const res = await request(app)
+        .delete(`/plannings/${testPlanning.id}/days/1/exercises/${testExercise.id}`)
+        .set('Authorization', authHeader(testMember));
+      expect(res.status).toBe(403);
+    });
+
+    it('should return 404 for non-existent planning', async () => {
+      const res = await request(app)
+        .delete(`/plannings/99999/days/1/exercises/${testExercise.id}`)
+        .set('Authorization', authHeader(testAdmin));
+      expect(res.status).toBe(404);
+    });
+
+    it('should return 404 when day not found in planning', async () => {
+      const res = await request(app)
+        .delete(`/plannings/${testPlanning.id}/days/99/exercises/${testExercise.id}`)
+        .set('Authorization', authHeader(testAdmin));
+      expect(res.status).toBe(404);
+    });
+
+    it('should return 404 when exercise not in day', async () => {
+      const res = await request(app)
+        .delete(`/plannings/${testPlanning.id}/days/1/exercises/99999`)
+        .set('Authorization', authHeader(testAdmin));
+      expect(res.status).toBe(404);
+    });
+
+    it('should delete exercise from planning day successfully', async () => {
+      const res = await request(app)
+        .delete(`/plannings/${testPlanning.id}/days/1/exercises/${testExercise.id}`)
+        .set('Authorization', authHeader(testAdmin));
+      expect(res.status).toBe(200);
+      expect(res.body.message).toBeDefined();
+    });
+  });
+
+  describe('POST /plannings/respond-help', () => {
+    it('should return 403 for member', async () => {
+      const res = await request(app)
+        .post('/plannings/respond-help')
+        .set('Authorization', authHeader(testMember))
+        .send({ memberId: testMember.id, response: 'coming' });
+      expect(res.status).toBe(403);
+    });
+
+    it('should return 400 when required fields missing', async () => {
+      const res = await request(app)
+        .post('/plannings/respond-help')
+        .set('Authorization', authHeader(testAdmin))
+        .send({});
+      expect(res.status).toBe(400);
+    });
+
+    it('should return 400 for invalid response value', async () => {
+      const res = await request(app)
+        .post('/plannings/respond-help')
+        .set('Authorization', authHeader(testAdmin))
+        .send({ memberId: testMember.id, response: 'invalid' });
+      expect(res.status).toBe(400);
+    });
+
+    it('should return 404 when member not found', async () => {
+      const res = await request(app)
+        .post('/plannings/respond-help')
+        .set('Authorization', authHeader(testAdmin))
+        .send({ memberId: 99999, response: 'coming' });
+      expect(res.status).toBe(404);
+    });
+
+    it('should respond to help request successfully', async () => {
+      const res = await request(app)
+        .post('/plannings/respond-help')
+        .set('Authorization', authHeader(testAdmin))
+        .send({ memberId: testMember.id, response: 'coming', exerciseName: 'Push-ups' });
+      expect(res.status).toBe(200);
+      expect(res.body.success).toBe(true);
+    });
+
+    it('should respond with busy status', async () => {
+      const res = await request(app)
+        .post('/plannings/respond-help')
+        .set('Authorization', authHeader(testAdmin))
+        .send({ memberId: testMember.id, response: 'busy' });
+      expect(res.status).toBe(200);
+      expect(res.body.success).toBe(true);
+    });
+  });
 });

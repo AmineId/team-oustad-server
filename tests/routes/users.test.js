@@ -503,4 +503,117 @@ describe('Users Routes', () => {
       });
     });
   });
+
+  describe('PUT /users/:id/profile-image', () => {
+    const validImageData = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==';
+
+    it('should return 400 when imageData is missing', async () => {
+      const res = await request(app)
+        .put(`/users/${testMember.id}/profile-image`)
+        .set('Authorization', authHeader(testMember))
+        .send({});
+      expect(res.status).toBe(400);
+    });
+
+    it('should return 403 when member tries to update other user', async () => {
+      const res = await request(app)
+        .put(`/users/${testAdmin.id}/profile-image`)
+        .set('Authorization', authHeader(testMember))
+        .send({ imageData: validImageData });
+      expect(res.status).toBe(403);
+    });
+
+    it('should return 404 for non-existent user', async () => {
+      const res = await request(app)
+        .put('/users/99999/profile-image')
+        .set('Authorization', authHeader(testAdmin))
+        .send({ imageData: validImageData });
+      expect(res.status).toBe(404);
+    });
+
+    it('should update own profile image as member', async () => {
+      const res = await request(app)
+        .put(`/users/${testMember.id}/profile-image`)
+        .set('Authorization', authHeader(testMember))
+        .send({ imageData: validImageData });
+      expect(res.status).toBe(200);
+    });
+
+    it('should update profile image as admin for gym member', async () => {
+      const res = await request(app)
+        .put(`/users/${testMember.id}/profile-image`)
+        .set('Authorization', authHeader(testAdmin))
+        .send({ imageData: validImageData });
+      expect(res.status).toBe(200);
+    });
+
+    it('should accept plain base64 without data URI prefix', async () => {
+      const res = await request(app)
+        .put(`/users/${testMember.id}/profile-image`)
+        .set('Authorization', authHeader(testMember))
+        .send({ imageData: 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==' });
+      expect(res.status).toBe(200);
+    });
+  });
+
+  describe('GET /users/:id/profile-image', () => {
+    it('should return 403 when member accesses other user image', async () => {
+      const res = await request(app)
+        .get(`/users/${testAdmin.id}/profile-image`)
+        .set('Authorization', authHeader(testMember));
+      expect(res.status).toBe(403);
+    });
+
+    it('should return 404 for non-existent user', async () => {
+      const res = await request(app)
+        .get('/users/99999/profile-image')
+        .set('Authorization', authHeader(testAdmin));
+      expect(res.status).toBe(404);
+    });
+
+    it('should return SVG avatar when member has no profile image', async () => {
+      const res = await request(app)
+        .get(`/users/${testMember.id}/profile-image`)
+        .set('Authorization', authHeader(testMember));
+      expect(res.status).toBe(200);
+      expect(res.headers['content-type']).toMatch(/svg/);
+    });
+
+    it('should return image when admin accesses gym member', async () => {
+      const res = await request(app)
+        .get(`/users/${testMember.id}/profile-image`)
+        .set('Authorization', authHeader(testAdmin));
+      expect(res.status).toBe(200);
+    });
+  });
+
+  describe('DELETE /users/:id/profile-image', () => {
+    it('should return 403 when member tries to delete other user image', async () => {
+      const res = await request(app)
+        .delete(`/users/${testAdmin.id}/profile-image`)
+        .set('Authorization', authHeader(testMember));
+      expect(res.status).toBe(403);
+    });
+
+    it('should return 404 for non-existent user', async () => {
+      const res = await request(app)
+        .delete('/users/99999/profile-image')
+        .set('Authorization', authHeader(testAdmin));
+      expect(res.status).toBe(404);
+    });
+
+    it('should delete own profile image as member', async () => {
+      const res = await request(app)
+        .delete(`/users/${testMember.id}/profile-image`)
+        .set('Authorization', authHeader(testMember));
+      expect(res.status).toBe(200);
+    });
+
+    it('should delete profile image as admin for gym member', async () => {
+      const res = await request(app)
+        .delete(`/users/${testMember.id}/profile-image`)
+        .set('Authorization', authHeader(testAdmin));
+      expect(res.status).toBe(200);
+    });
+  });
 });

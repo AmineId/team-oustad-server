@@ -260,4 +260,43 @@ describe('Subscription Types Routes', () => {
       expect(response.status).toBe(403);
     });
   });
+
+  describe('GET /subscription-types/:id/subscriptions', () => {
+    let testSubscriptionType;
+
+    beforeEach(async () => {
+      testSubscriptionType = await prisma.subscriptionType.create({
+        data: {
+          displayId: `SUBTYPE${Date.now()}`,
+          name: 'Test Sub Type',
+          description: 'For subscriptions test',
+          monthlyPrice: 49.99,
+          features: ['Feature 1'],
+          sessionQuota: 20
+        }
+      });
+    });
+
+    it('should return 401 without auth', async () => {
+      const res = await request(app)
+        .get(`/subscription-types/${testSubscriptionType.id}/subscriptions`);
+      expect(res.status).toBe(401);
+    });
+
+    it('should return 403 for members', async () => {
+      const res = await request(app)
+        .get(`/subscription-types/${testSubscriptionType.id}/subscriptions`)
+        .set('Authorization', authHeader(testMember));
+      expect(res.status).toBe(403);
+    });
+
+    it('should return subscriptions list for admin', async () => {
+      const res = await request(app)
+        .get(`/subscription-types/${testSubscriptionType.id}/subscriptions`)
+        .set('Authorization', authHeader(testAdmin));
+      expect(res.status).toBe(200);
+      expect(Array.isArray(res.body.subscriptions)).toBe(true);
+      expect(res.body.count).toBeDefined();
+    });
+  });
 });
