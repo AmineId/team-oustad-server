@@ -2851,7 +2851,7 @@ paths:
   /users/fcm-token:
     put:
       summary: Update FCM token for push notifications
-      description: Update the Firebase Cloud Messaging token for the authenticated user to enable push notifications
+      description: Update the Firebase Cloud Messaging token for the authenticated user to enable push notifications. If this token is already registered to another account on the same device, it is automatically removed from that account.
       tags: [Users, Notifications]
       security:
         - bearerAuth: []
@@ -4294,7 +4294,7 @@ paths:
   /plannings/respond-help:
     post:
       summary: Respond to member help request (Coach only)
-      description: Coach can respond to a member's help request with status (coming/busy)
+      description: Coach can respond to a member's help request with status (coming/busy). `memberId` can be sent as a string (as received from FCM notification data) or as an integer.
       tags: [Plannings]
       security:
         - bearerAuth: []
@@ -4307,12 +4307,13 @@ paths:
               required:
                 - memberId
                 - response
-                - exerciseName
               properties:
                 memberId:
-                  type: integer
-                  description: ID of the member requesting help
-                  example: 123
+                  oneOf:
+                    - type: integer
+                    - type: string
+                  description: ID of the member requesting help (integer or string as received from FCM data)
+                  example: "123"
                 response:
                   type: string
                   enum: [coming, busy]
@@ -5262,204 +5263,6 @@ paths:
                 $ref: '#/components/schemas/Error'
         '500':
           description: Server error
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Error'
-
-  # ==========================================
-  # Android OTA Updates
-  # ==========================================
-  /android/check-update:
-    get:
-      tags:
-        - Android OTA Updates
-      summary: Vérifier la disponibilité d'une mise à jour
-      description: Vérifie si une nouvelle version de l'application Android est disponible en comparant avec la version actuelle
-      parameters:
-        - in: query
-          name: current_version
-          required: true
-          schema:
-            type: integer
-            example: 1
-          description: Version actuelle installée (version_code)
-        - in: query
-          name: device_id
-          schema:
-            type: string
-            example: "device123abc"
-          description: Identifiant unique de l'appareil (optionnel, pour analytics)
-      responses:
-        '200':
-          description: Informations sur la mise à jour disponible
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  update_available:
-                    type: boolean
-                    example: true
-                  current_version:
-                    type: integer
-                    example: 1
-                  latest_version:
-                    type: object
-                    nullable: true
-                    properties:
-                      version_code:
-                        type: integer
-                        example: 2
-                      version_name:
-                        type: string
-                        example: "1.0.1"
-                      download_url:
-                        type: string
-                        example: "https://app.team-oustam.com/android/app-release.apk"
-                      changelog:
-                        type: string
-                        example: "Corrections de bugs et améliorations de performance"
-                      force_update:
-                        type: boolean
-                        example: false
-                      file_size:
-                        type: integer
-                        example: 25000000
-                      checksum:
-                        type: string
-                        example: "abc123def456789..."
-                      release_date:
-                        type: string
-                        format: date-time
-                        example: "2025-11-15T12:00:00Z"
-        '400':
-          description: Paramètre current_version manquant ou invalide
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Error'
-        '500':
-          description: Erreur serveur
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Error'
-
-  /android/download:
-    get:
-      tags:
-        - Android OTA Updates
-      summary: Télécharger la dernière version APK
-      description: Télécharge le fichier APK de la dernière version disponible
-      parameters:
-        - in: query
-          name: version
-          schema:
-            type: integer
-            example: 2
-          description: Version spécifique à télécharger (optionnel)
-      responses:
-        '200':
-          description: Fichier APK
-          content:
-            application/vnd.android.package-archive:
-              schema:
-                type: string
-                format: binary
-        '404':
-          description: Fichier APK non trouvé
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Error'
-        '500':
-          description: Erreur serveur
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Error'
-
-  /android/version:
-    get:
-      tags:
-        - Android OTA Updates
-      summary: Obtenir les informations de version
-      description: Retourne les métadonnées de la version actuelle disponible sur le serveur
-      responses:
-        '200':
-          description: Informations de version
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  version_code:
-                    type: integer
-                    example: 2
-                  version_name:
-                    type: string
-                    example: "1.0.1"
-                  download_url:
-                    type: string
-                    example: "https://app.team-oustam.com/android/app-release.apk"
-                  changelog:
-                    type: string
-                    example: "Corrections de bugs et améliorations"
-                  min_supported_version:
-                    type: integer
-                    example: 1
-                  force_update:
-                    type: boolean
-                    example: false
-                  release_date:
-                    type: string
-                    format: date-time
-                    example: "2025-11-15T12:00:00Z"
-                  file_size:
-                    type: integer
-                    example: 25000000
-                  checksum:
-                    type: string
-                    example: "abc123def456789..."
-        '500':
-          description: Erreur serveur
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Error'
-
-  /android/checksum:
-    get:
-      tags:
-        - Android OTA Updates
-      summary: Calculer le checksum de l'APK actuel
-      description: Calcule et retourne les checksums MD5 et SHA256 du fichier APK actuellement disponible
-      responses:
-        '200':
-          description: Checksums calculés
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  md5:
-                    type: string
-                    example: "5d41402abc4b2a76b9719d911017c592"
-                  sha256:
-                    type: string
-                    example: "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
-                  file_size:
-                    type: integer
-                    example: 25000000
-        '404':
-          description: Fichier APK non trouvé
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Error'
-        '500':
-          description: Erreur serveur
           content:
             application/json:
               schema:
@@ -7707,6 +7510,11 @@ paths:
                     type: string
                     nullable: true
                     example: "212600123456"
+                  displayName:
+                    type: string
+                    nullable: true
+                    description: Nom d'affichage personnalisé, null si non défini
+                    example: "Team Fitness"
         '403':
           description: Accès réservé aux propriétaires
 
@@ -7782,7 +7590,7 @@ paths:
   /whatsapp/session:
     delete:
       summary: Déconnecter WhatsApp
-      description: Déconnecte le client WhatsApp et supprime la session. Un nouveau scan QR sera nécessaire. Réservé aux propriétaires.
+      description: Déconnecte le client WhatsApp, supprime la session et réinitialise le client. Un nouveau QR ou code de couplage sera généré automatiquement. Réservé aux propriétaires.
       tags: [WhatsApp]
       security:
         - bearerAuth: []
@@ -7801,3 +7609,90 @@ paths:
           description: Accès réservé aux propriétaires
         '500':
           description: Erreur lors de la déconnexion
+
+  /whatsapp/display-name:
+    put:
+      summary: Définir le nom d'affichage WhatsApp
+      description: |
+        Change le nom affiché aux destinataires (pushName). Persisté et réappliqué automatiquement à chaque reconnexion.
+        Passer `null` ou chaîne vide pour revenir au nom du compte. Réservé aux propriétaires.
+      tags: [WhatsApp]
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [displayName]
+              properties:
+                displayName:
+                  type: string
+                  nullable: true
+                  example: "Team Fitness"
+      responses:
+        '200':
+          description: Nom mis à jour
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  displayName:
+                    type: string
+                    nullable: true
+                    example: "Team Fitness"
+                  applied:
+                    type: boolean
+                    description: true si appliqué immédiatement, false si sera appliqué à la prochaine connexion
+                    example: true
+        '403':
+          description: Accès réservé aux propriétaires
+        '500':
+          description: Erreur lors du changement de nom
+
+  /whatsapp/profile-picture:
+    put:
+      summary: Définir la photo de profil WhatsApp
+      description: |
+        Change la photo de profil du compte WhatsApp connecté.
+        L'image doit être envoyée en base64 (sans le préfixe `data:image/...`).
+        WhatsApp doit être connecté. Réservé aux propriétaires.
+      tags: [WhatsApp]
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [image]
+              properties:
+                image:
+                  type: string
+                  description: Image encodée en base64
+                  example: "/9j/4AAQSkZJRgABAQEASABIAAD..."
+                mimeType:
+                  type: string
+                  description: Type MIME (défaut image/jpeg)
+                  enum: [image/jpeg, image/png, image/webp]
+                  example: "image/jpeg"
+      responses:
+        '200':
+          description: Photo de profil mise à jour
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+        '400':
+          description: Image manquante ou WhatsApp non connecté
+        '403':
+          description: Accès réservé aux propriétaires
+        '500':
+          description: Erreur lors du changement de photo

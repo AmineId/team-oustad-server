@@ -128,7 +128,7 @@ const dailyPlanningNotification = cron.schedule('0 6 * * *', async () => {
           title: `🏋️ Entraînement du jour - ${dayNames[currentDayOfWeek]}`,
           body: notificationBody,
           data: {
-            type: 'daily_planning',
+            type: 'planning',
             planningId: planning.id.toString(),
             memberId: member.id.toString(),
             dayOfWeek: currentDayOfWeek.toString(),

@@ -1881,12 +1881,13 @@ router.post('/request-help', auth, apiLimiter, async (req, res) => {
  */
 router.post('/respond-help', auth, requireCoach, apiLimiter, async (req, res) => {
   try {
-    const { memberId, response, exerciseName } = req.body;
+    const { memberId: memberIdRaw, response, exerciseName } = req.body;
+    const memberId = parseInt(memberIdRaw, 10);
 
     logger.info(`💬 Réponse à demande d'aide - Coach: ${req.user.sub}, Membre: ${memberId}, Réponse: ${response}`);
 
     // Validation
-    if (!memberId || !response) {
+    if (!memberIdRaw || !response) {
       logger.warn('❌ Paramètres manquants');
       return res.status(400).json({ error: 'Member ID and response are required' });
     }

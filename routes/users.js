@@ -151,6 +151,12 @@ router.put('/fcm-token', auth, async (req, res) => {
       return res.status(400).json({ error: 'fcmToken is required' });
     }
 
+    // Retirer le token de tout autre compte pour éviter les doublons
+    await prisma.user.updateMany({
+      where: { fcmToken, NOT: { id: userId } },
+      data: { fcmToken: null }
+    });
+
     const updatedUser = await prisma.user.update({
       where: { id: userId },
       data: { fcmToken },

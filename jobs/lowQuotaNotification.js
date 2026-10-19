@@ -77,7 +77,7 @@ async function checkLowQuotaSubscriptions() {
                 title: '⚠️ Quota de séances faible',
                 body: `Il vous reste ${sessionsRemaining} séance(s) sur ${sessionQuota}. Pensez à renouveler votre abonnement !`,
                 data: {
-                  type: 'low_quota',
+                  type: 'subscription',
                   subscriptionId: subscription.displayId,
                   sessionsRemaining: sessionsRemaining.toString()
                 }

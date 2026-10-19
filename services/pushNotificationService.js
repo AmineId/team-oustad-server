@@ -233,7 +233,7 @@ async function notifyPaymentDue(fcmToken, payment) {
     title: '💳 Paiement à effectuer',
     body: `Votre paiement de ${payment.amount}€ est dû le ${new Date(payment.dueDate).toLocaleDateString('fr-FR')}`,
     data: {
-      type: 'payment_due',
+      type: 'payment',
       paymentId: payment.id.toString(),
       amount: payment.amount.toString(),
       dueDate: payment.dueDate.toISOString()
@@ -266,7 +266,7 @@ async function notifyPaymentOverdue(fcmToken, payment) {
     title: '⚠️ Paiement en retard',
     body: `Votre paiement de ${payment.amount}€ est en retard de ${daysOverdue} jour(s)`,
     data: {
-      type: 'payment_overdue',
+      type: 'payment',
       paymentId: payment.id.toString(),
       amount: payment.amount.toString(),
       dueDate: payment.dueDate.toISOString(),
@@ -300,7 +300,7 @@ async function notifyPaymentConfirmed(fcmToken, payment) {
     title: '✅ Paiement confirmé',
     body: `Votre paiement de ${payment.amount}€ a été confirmé avec succès`,
     data: {
-      type: 'payment_confirmed',
+      type: 'payment',
       paymentId: payment.id.toString(),
       amount: payment.amount.toString()
     },
@@ -330,7 +330,7 @@ async function notifyNewTrainingPlan(fcmToken, planning) {
     title: '💪 Nouveau planning d\'entraînement',
     body: `${planning.title} - Du ${new Date(planning.startDate).toLocaleDateString('fr-FR')} au ${new Date(planning.endDate).toLocaleDateString('fr-FR')}`,
     data: {
-      type: 'new_training_plan',
+      type: 'planning',
       planningId: planning.id.toString(),
       title: planning.title
     },
@@ -369,7 +369,7 @@ async function notifyNewSubscription(fcmToken, subscription) {
     title: '📋 Nouvel abonnement créé',
     body: `${subscription.subscriptionType?.name || 'Abonnement'} - ${totalAmount}€ en ${frequencyLabels[frequency]}`,
     data: {
-      type: 'new_subscription',
+      type: 'subscription',
       subscriptionId: subscription.id.toString(),
       subscriptionType: subscription.subscriptionType?.name || '',
       amount: totalAmount.toString(),
@@ -401,7 +401,7 @@ async function notifyNewPayment(fcmToken, payment) {
     title: '💳 Nouveau paiement enregistré',
     body: `Paiement ${payment.monthNumber ? `#${payment.monthNumber}` : ''} de ${payment.amount}€ - Échéance: ${new Date(payment.dueDate).toLocaleDateString('fr-FR')}`,
     data: {
-      type: 'new_payment',
+      type: 'payment',
       paymentId: payment.id.toString(),
       amount: payment.amount.toString(),
       dueDate: payment.dueDate.toISOString(),
@@ -454,7 +454,7 @@ async function notifyPaymentStatusChange(fcmToken, payment, oldStatus, newStatus
     title,
     body,
     data: {
-      type: 'payment_status_change',
+      type: 'payment',
       paymentId: payment.id.toString(),
       amount: payment.amount.toString(),
       oldStatus,
@@ -496,7 +496,7 @@ async function notifyPlanningModified(fcmToken, planning, modificationType = 'up
     title: '📝 Planning modifié',
     body: `${planning.title} - ${modificationLabels[modificationType] || 'Modification effectuée'}`,
     data: {
-      type: 'planning_modified',
+      type: 'planning',
       planningId: planning.id.toString(),
       modificationType,
       title: planning.title
@@ -527,7 +527,7 @@ async function notifyPlanningDeleted(fcmToken, planning) {
     title: '🗑️ Planning supprimé',
     body: `Le planning "${planning.title}" a été supprimé`,
     data: {
-      type: 'planning_deleted',
+      type: 'planning',
       planningId: planning.id.toString(),
       title: planning.title
     },

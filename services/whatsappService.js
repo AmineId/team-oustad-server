@@ -1,52 +1,67 @@
-const { Client, LocalAuth } = require('whatsapp-web.js');
+const { Client, LocalAuth, MessageMedia } = require('whatsapp-web.js');
 const qrcode = require('qrcode-terminal');
 const QRCode = require('qrcode');
 
 if (process.env.NODE_ENV === 'test') {
   module.exports = {
-    getStatus: () => ({ connected: false, phone: null }),
+    getStatus: () => ({ connected: false, phone: null, displayName: null }),
     getQrBase64: async () => null,
     getPairingCode: async () => { throw new Error('WhatsApp indisponible'); },
     logout: async () => {},
+    setCustomDisplayName: async () => false,
+    setProfilePicture: async () => false,
     sendPasswordResetWhatsApp: async () => {},
     sendLowQuotaWhatsApp: async () => {},
   };
 } else {
-  const client = new Client({
-    authStrategy: new LocalAuth({ dataPath: '.wwebjs_auth' }),
-    puppeteer: {
-      headless: true,
-      args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage'],
-    },
-  });
-
+  let client = null;
   let isReady = false;
   let initFailed = false;
   let connectedPhone = null;
   let currentQr = null;
+  let customDisplayName = null;
   const readyCallbacks = [];
 
-  client.on('qr', (qr) => {
-    currentQr = qr;
-  });
+  function createClient() {
+    return new Client({
+      authStrategy: new LocalAuth({ dataPath: '.wwebjs_auth' }),
+      puppeteer: {
+        headless: true,
+        args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage'],
+      },
+    });
+  }
 
-  client.on('ready', () => {
-    isReady = true;
-    currentQr = null;
-    connectedPhone = client.info?.wid?.user ?? null;
-    console.log(`✅ WhatsApp client prêt (${connectedPhone})`);
-    readyCallbacks.splice(0).forEach(cb => cb(null));
-  });
+  function attachEvents(c) {
+    c.on('qr', (qr) => {
+      currentQr = qr;
+    });
 
-  client.on('auth_failure', (msg) => {
-    console.error('❌ WhatsApp auth failure:', msg);
-  });
+    c.on('ready', async () => {
+      isReady = true;
+      currentQr = null;
+      connectedPhone = c.info?.wid?.user ?? null;
+      console.log(`✅ WhatsApp client prêt (${connectedPhone})`);
+      if (customDisplayName) {
+        const ok = await c.setDisplayName(customDisplayName).catch(() => false);
+        if (ok) console.log(`✅ WhatsApp: nom d'affichage appliqué: ${customDisplayName}`);
+      }
+      readyCallbacks.splice(0).forEach(cb => cb(null));
+    });
 
-  client.on('disconnected', (reason) => {
-    isReady = false;
-    connectedPhone = null;
-    console.warn('⚠️ WhatsApp déconnecté:', reason);
-  });
+    c.on('auth_failure', (msg) => {
+      console.error('❌ WhatsApp auth failure:', msg);
+    });
+
+    c.on('disconnected', (reason) => {
+      isReady = false;
+      connectedPhone = null;
+      console.warn('⚠️ WhatsApp déconnecté:', reason);
+    });
+  }
+
+  client = createClient();
+  attachEvents(client);
 
   client.initialize().catch((err) => {
     initFailed = true;
@@ -71,7 +86,7 @@ if (process.env.NODE_ENV === 'test') {
   }
 
   function getStatus() {
-    return { connected: isReady, phone: connectedPhone };
+    return { connected: isReady, phone: connectedPhone, displayName: customDisplayName };
   }
 
   async function getQrBase64() {
@@ -82,8 +97,26 @@ if (process.env.NODE_ENV === 'test') {
   async function logout() {
     await client.logout();
     isReady = false;
+    initFailed = false;
     connectedPhone = null;
     currentQr = null;
+    // Réinitialiser le client pour permettre une nouvelle connexion sans redémarrage
+    client = createClient();
+    attachEvents(client);
+    client.initialize().catch((err) => {
+      initFailed = true;
+      console.error('⚠️ WhatsApp: erreur réinitialisation après logout:', err.message);
+    });
+  }
+
+  async function setCustomDisplayName(name) {
+    customDisplayName = name || null;
+    if (isReady && name) {
+      const ok = await client.setDisplayName(name).catch(() => false);
+      console.log(ok ? `✅ WhatsApp: nom d'affichage mis à jour: ${name}` : `⚠️ WhatsApp: impossible de changer le nom`);
+      return ok;
+    }
+    return true; // sera appliqué au prochain ready
   }
 
   async function sendPasswordResetWhatsApp(phoneNumber, token, isSetup = false) {
@@ -113,5 +146,13 @@ if (process.env.NODE_ENV === 'test') {
     return await client.authenticateWithPairingCode(normalized);
   }
 
-  module.exports = { getStatus, getQrBase64, getPairingCode, logout, sendPasswordResetWhatsApp, sendLowQuotaWhatsApp };
+  async function setProfilePicture(base64Image, mimeType = 'image/jpeg') {
+    if (!isReady) throw new Error('WhatsApp non connecté');
+    const media = new MessageMedia(mimeType, base64Image);
+    const ok = await client.setProfilePicture(media).catch(() => false);
+    console.log(ok ? `✅ WhatsApp: photo de profil mise à jour` : `⚠️ WhatsApp: impossible de changer la photo`);
+    return ok;
+  }
+
+  module.exports = { getStatus, getQrBase64, getPairingCode, logout, setCustomDisplayName, setProfilePicture, sendPasswordResetWhatsApp, sendLowQuotaWhatsApp };
 }

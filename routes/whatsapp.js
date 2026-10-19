@@ -183,4 +183,123 @@ router.post('/pairing-code', auth, requireOwner, async (req, res) => {
   }
 });
 
+/**
+ * @swagger
+ * /whatsapp/display-name:
+ *   put:
+ *     summary: Définir le nom d'affichage WhatsApp
+ *     description: |
+ *       Change le nom affiché aux destinataires des messages WhatsApp (pushName).
+ *       Le nom est persisté et réappliqué automatiquement à chaque reconnexion.
+ *       Passer `null` ou une chaîne vide remet le nom par défaut du compte.
+ *       Réservé aux propriétaires.
+ *     tags: [WhatsApp]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [displayName]
+ *             properties:
+ *               displayName:
+ *                 type: string
+ *                 nullable: true
+ *                 description: Nom à afficher aux destinataires. Null ou vide pour revenir au nom du compte.
+ *                 example: "Team Fitness"
+ *     responses:
+ *       '200':
+ *         description: Nom mis à jour
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 displayName:
+ *                   type: string
+ *                   nullable: true
+ *                   example: "Team Fitness"
+ *                 applied:
+ *                   type: boolean
+ *                   description: true si appliqué immédiatement, false si sera appliqué à la prochaine connexion
+ *                   example: true
+ *       '403':
+ *         description: Accès réservé aux propriétaires
+ *       '500':
+ *         description: Erreur lors du changement de nom
+ */
+router.put('/display-name', auth, requireOwner, async (req, res) => {
+  const { displayName } = req.body;
+  try {
+    const applied = await whatsappService.setCustomDisplayName(displayName || null);
+    res.json({ displayName: displayName || null, applied });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+/**
+ * @swagger
+ * /whatsapp/profile-picture:
+ *   put:
+ *     summary: Définir la photo de profil WhatsApp
+ *     description: |
+ *       Change la photo de profil du compte WhatsApp connecté.
+ *       L'image doit être envoyée en base64 dans le corps JSON.
+ *       Réservé aux propriétaires. WhatsApp doit être connecté.
+ *     tags: [WhatsApp]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [image]
+ *             properties:
+ *               image:
+ *                 type: string
+ *                 description: Image encodée en base64 (sans le préfixe data:image/...)
+ *                 example: "/9j/4AAQSkZJRgABAQEASABIAAD..."
+ *               mimeType:
+ *                 type: string
+ *                 description: Type MIME de l'image (défaut image/jpeg)
+ *                 example: "image/jpeg"
+ *                 enum: [image/jpeg, image/png, image/webp]
+ *     responses:
+ *       '200':
+ *         description: Photo de profil mise à jour
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *       '400':
+ *         description: Image manquante ou WhatsApp non connecté
+ *       '403':
+ *         description: Accès réservé aux propriétaires
+ *       '500':
+ *         description: Erreur lors du changement de photo
+ */
+router.put('/profile-picture', auth, requireOwner, async (req, res) => {
+  const { image, mimeType } = req.body;
+  if (!image) return res.status(400).json({ error: 'image (base64) requise' });
+
+  const { connected } = whatsappService.getStatus();
+  if (!connected) return res.status(400).json({ error: 'WhatsApp non connecté' });
+
+  try {
+    const success = await whatsappService.setProfilePicture(image, mimeType || 'image/jpeg');
+    res.json({ success });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
 module.exports = router;
