@@ -6,6 +6,7 @@ const crypto = require('crypto');
 const { sendPasswordResetNotification } = require('../services/notificationService');
 const { getActiveSubscription, getSubscriptionsWithStatus } = require('../utils/subscriptionUtils');
 const prisma = require('../utils/prismaClient');
+const { authLimiter } = require('../middleware/rateLimiter');
 
 const JWT_SECRET = process.env.JWT_SECRET || 'change_this_secret';
 
@@ -82,7 +83,7 @@ const sanitizeEmail = (email) => {
  *         description: Erreur serveur
  */
 // Login: expect { email, password } or { phoneNumber, password }
-router.post('/login', async (req, res) => {
+router.post('/login', authLimiter, async (req, res) => {
   const { email, phoneNumber, password } = req.body;
   console.log(`🔐 Tentative de connexion - Email: ${email}, Phone: ${phoneNumber}`);
   
@@ -136,11 +137,21 @@ router.post('/login', async (req, res) => {
 
     console.log(`✅ Connexion réussie pour: ${user.firstName} ${user.lastName} (${user.role})`);
 
+    // Generate a unique session ID — invalidates any previous session on another device
+    const sessionId = crypto.randomUUID();
+
+    // Persist session ID so the auth middleware can verify single-device constraint
+    await prisma.user.update({
+      where: { id: user.id },
+      data: { currentSessionId: sessionId, lastLoginAt: new Date() }
+    });
+
     // Token valid for 30 days
     const token = jwt.sign({
       sub: user.id,
       email: user.email,
-      type: user.role
+      type: user.role,
+      sessionId
     }, JWT_SECRET, { expiresIn: '30d' });
 
     console.log(`🎫 Token JWT généré pour: ${user.email}`);
@@ -221,7 +232,7 @@ router.post('/login', async (req, res) => {
     }
   } catch (e) {
     console.error(`💥 Erreur lors de la connexion:`, e);
-    res.status(500).json({ error: e.message });
+    res.status(500).json({ error: 'Internal server error' });
   }
 });
 
@@ -405,7 +416,7 @@ router.post('/scan-qr', auth, async (req, res) => {
 
   } catch (e) {
     console.error(`💥 Erreur dans /scan-qr:`, e);
-    res.status(500).json({ error: e.message });
+    res.status(500).json({ error: 'Internal server error' });
   }
 });
 
@@ -633,7 +644,7 @@ router.get('/me', auth, async (req, res) => {
     }
   } catch (e) {
     console.error(`💥 Erreur dans /me:`, e);
-    res.status(500).json({ error: e.message });
+    res.status(500).json({ error: 'Internal server error' });
   }
 });
 

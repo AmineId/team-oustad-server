@@ -1,28 +1,39 @@
 const jwt = require('jsonwebtoken');
+const prisma = require('../utils/prismaClient');
 
 const JWT_SECRET = process.env.JWT_SECRET || 'change_this_secret';
 
-module.exports = function (req, res, next) {
-  console.log(`🔐 Auth middleware - Route: ${req.method} ${req.path}`);
-
+module.exports = async function (req, res, next) {
   const authHeader = req.headers.authorization || req.headers.Authorization;
-  console.log(`📋 Header Authorization: ${authHeader ? 'présent' : 'absent'}`);
 
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    console.log(`❌ Token manquant - Header: ${authHeader ? 'format invalide' : 'absent'}`);
     return res.status(401).json({ error: 'Missing token' });
   }
 
   const token = authHeader.split(' ')[1];
-  console.log(`🎫 Token extrait: ${token.substring(0, 20)}...`);
 
+  let payload;
   try {
-    const payload = jwt.verify(token, JWT_SECRET);
-    req.user = payload;
-    console.log(`✅ Token valide - User: ${payload.email} (${payload.type}), ID: ${payload.sub}`);
-    next();
+    payload = jwt.verify(token, JWT_SECRET);
   } catch (e) {
-    console.log(`❌ Token invalide - Erreur: ${e.message}`);
     return res.status(401).json({ error: 'Invalid token' });
   }
+
+  // Single-device enforcement: verify the session ID matches the one stored in DB
+  if (payload.sessionId) {
+    try {
+      const user = await prisma.user.findUnique({
+        where: { id: payload.sub },
+        select: { currentSessionId: true }
+      });
+      if (!user || user.currentSessionId !== payload.sessionId) {
+        return res.status(401).json({ error: 'Session expired — please log in again' });
+      }
+    } catch (e) {
+      return res.status(500).json({ error: 'Internal server error' });
+    }
+  }
+
+  req.user = payload;
+  next();
 };

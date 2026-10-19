@@ -109,3 +109,21 @@ tests/coverage/
 google-services.json.env.ota-token
 graphify-out/
 .wwebjs_auth
+
+# Sensitive files that should never be committed
+BEARER_TOKEN_FINAL.txt
+TOKEN_API_SUCCESS.txt
+SETUP_SUCCESS.txt
+*.token.txt
+
+# Sensitive files that should never be committed
+BEARER_TOKEN_FINAL.txt
+TOKEN_API_SUCCESS.txt
+SETUP_SUCCESS.txt
+*.token.txt
+
+# Sensitive files that should never be committed
+BEARER_TOKEN_FINAL.txt
+TOKEN_API_SUCCESS.txt
+SETUP_SUCCESS.txt
+*.token.txt
