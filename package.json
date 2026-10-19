@@ -5,7 +5,7 @@
   "main": "index.js",
   "scripts": {
     "start": "node index.js",
-    "dev": "nodemon -L --config config/nodemon.json",
+    "dev": "cross-env NODE_ENV=development nodemon -L --config config/nodemon.json",
     "dev:full": "npm run db:up && npm run dev",
     "start:preprod": "NODE_ENV=preprod node -r dotenv/config index.js dotenv_config_path=.env.preprod",
     "start:prod": "NODE_ENV=production node -r dotenv/config index.js dotenv_config_path=.env.prod",
