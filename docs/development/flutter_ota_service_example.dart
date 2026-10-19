@@ -1,3 +1,6 @@
+// [OBSOLETE] Ce fichier est conservé à titre d'archive.
+// L'OTA (téléchargement d'APK depuis le serveur) a été retiré.
+// L'app utilise désormais check-update pour rediriger vers le Play Store / App Store.
 // 📱 Team Fitness - Service de mise à jour OTA complet
 // Fichier: lib/services/ota_update_service.dart
 

@@ -1239,6 +1239,100 @@ paths:
         '500':
           description: Server error
 
+  /android/update-version:
+    post:
+      tags:
+        - Android OTA Updates
+      summary: Publier les métadonnées de version (sans APK)
+      description: >
+        Publie les métadonnées de version sans uploader de fichier APK. Utilisé par la CI après
+        une release Play Store pour mettre à jour les réponses de check-update sans générer/uploader un APK.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - version_code
+                - version_name
+              properties:
+                version_code:
+                  type: integer
+                  description: Code de version (numérique, incrémental, doit être > version actuelle)
+                  example: 75
+                version_name:
+                  type: string
+                  description: Nom de version (versionnage sémantique)
+                  example: "1.0.0-beta.70"
+                download_url:
+                  type: string
+                  description: URL du store ou de téléchargement
+                  example: "https://play.google.com/store/apps/details?id=team.fitness.team_fitness_app"
+                changelog:
+                  type: string
+                  description: Changements dans cette version
+                  example: "Corrections de bugs et améliorations"
+                force_update:
+                  type: boolean
+                  description: Forcer la mise à jour
+                  example: false
+                channel:
+                  type: string
+                  enum: [production, beta]
+                  description: Canal de déploiement
+                  default: production
+                min_supported_version:
+                  type: integer
+                  description: Version minimale supportée. Si absent, conserve la valeur actuelle (ou 1 si aucune version publiée).
+                  example: 70
+      responses:
+        '200':
+          description: Métadonnées de version mises à jour avec succès
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "Version metadata updated successfully for beta channel"
+                  version:
+                    type: object
+                    properties:
+                      version_code:
+                        type: integer
+                        example: 75
+                      version_name:
+                        type: string
+                        example: "1.0.0-beta.70"
+                      download_url:
+                        type: string
+                        example: "https://play.google.com/store/apps/details?id=team.fitness.team_fitness_app"
+                      changelog:
+                        type: string
+                        example: "Corrections de bugs"
+                      min_supported_version:
+                        type: integer
+                        example: 70
+                      force_update:
+                        type: boolean
+                        example: false
+                      release_date:
+                        type: string
+                        format: date-time
+                        example: "2025-11-15T12:30:00.000Z"
+        '400':
+          description: Paramètres invalides
+        '401':
+          description: Non autorisé
+        '409':
+          description: Retour arrière de version refusé
+        '500':
+          description: Erreur serveur
+
   /android/config:
     get:
       tags:

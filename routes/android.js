@@ -4,6 +4,7 @@ const path = require('path');
 const fs = require('fs').promises;
 const crypto = require('crypto');
 const multer = require('multer');
+const cors = require('cors');
 const uploadAuth = require('../middleware/uploadAuth');
 const logger = require('../utils/logger');
 const { apiLimiter } = require('../middleware/rateLimiter');
@@ -70,16 +71,25 @@ async function handleCheckUpdate(req, res, channel) {
 
     const channelPath = getChannelPath(channel);
     const versionPath = path.join(channelPath, 'version.json');
-    const versionData = await fs.readFile(versionPath, 'utf-8');
-    const latestVersion = JSON.parse(versionData);
+
+    let latestVersion;
+    try {
+      const versionData = await fs.readFile(versionPath, 'utf-8');
+      latestVersion = JSON.parse(versionData);
+    } catch (err) {
+      if (err.code === 'ENOENT') {
+        return res.json({ update_available: false, current_version: currentVersion, channel });
+      }
+      throw err;
+    }
 
     const updateAvailable = latestVersion.version_code > currentVersion;
     const forceUpdate = currentVersion < latestVersion.min_supported_version;
 
-    // Pour le canal beta, utiliser le lien Google Play Internal Testing et forcer la mise à jour
     const downloadUrl = latestVersion.download_url;
-    
-    const shouldForceUpdate = channel === 'beta' ? true : forceUpdate;
+
+    const betaForceUpdate = process.env.BETA_FORCE_UPDATE === 'true';
+    const shouldForceUpdate = (channel === 'beta' && betaForceUpdate) ? true : forceUpdate;
 
     const response = {
       update_available: updateAvailable,
@@ -301,7 +311,7 @@ async function handleChecksum(req, res, channel) {
  *       500:
  *         description: Erreur serveur
  */
-router.get('/check-update', (req, res) => {
+router.get('/check-update', cors({ origin: '*' }), (req, res) => {
   const channel = req.query.channel || 'production';
   return handleCheckUpdate(req, res, channel);
 });
@@ -673,6 +683,178 @@ router.post('/upload', uploadAuth, apiLimiter, upload.single('apk'), async (req,
   }
 });
 
+/**
+ * @swagger
+ * /android/update-version:
+ *   post:
+ *     tags:
+ *       - Android OTA Updates
+ *     summary: Publish version metadata (no APK upload)
+ *     description: >
+ *       Publishes version metadata without uploading an APK file. Used by CI after
+ *       a Play Store release to update check-update responses without building/uploading an APK.
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - version_code
+ *               - version_name
+ *             properties:
+ *               version_code:
+ *                 type: integer
+ *                 description: Version code (numeric, incremental, must be > current)
+ *                 example: 75
+ *               version_name:
+ *                 type: string
+ *                 description: Version name (semantic versioning)
+ *                 example: "1.0.0-beta.70"
+ *               download_url:
+ *                 type: string
+ *                 description: Store or download URL
+ *                 example: "https://play.google.com/store/apps/details?id=team.fitness.team_fitness_app"
+ *               changelog:
+ *                 type: string
+ *                 description: Changes in this version
+ *               force_update:
+ *                 type: boolean
+ *                 description: Force users to update
+ *                 example: false
+ *               channel:
+ *                 type: string
+ *                 enum: [production, beta]
+ *                 description: Deployment channel
+ *                 default: production
+ *               min_supported_version:
+ *                 type: integer
+ *                 description: Minimum supported version code. If omitted, keeps the current value (or 1 if no prior version).
+ *                 example: 70
+ *     responses:
+ *       200:
+ *         description: Version metadata updated successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                 version:
+ *                   type: object
+ *       400:
+ *         description: Invalid input
+ *       401:
+ *         description: Unauthorized
+ *       409:
+ *         description: Version downgrade not allowed
+ *       500:
+ *         description: Server error
+ */
+router.post('/update-version', uploadAuth, apiLimiter, async (req, res) => {
+  try {
+    const { version_code, version_name, download_url, changelog, force_update, channel, min_supported_version } = req.body;
+    const uploadUser = req.user;
+
+    if (!version_code || !version_name) {
+      return res.status(400).json({ error: 'version_code and version_name are required' });
+    }
+    const versionCodeInt = parseInt(version_code);
+    if (!Number.isInteger(versionCodeInt) || versionCodeInt <= 0) {
+      return res.status(400).json({ error: 'version_code must be a positive integer' });
+    }
+    if (typeof version_name !== 'string' || !version_name.trim()) {
+      return res.status(400).json({ error: 'version_name must be a non-empty string' });
+    }
+
+    const uploadChannel = channel || 'production';
+    if (!['production', 'beta'].includes(uploadChannel)) {
+      return res.status(400).json({ error: 'channel must be either "production" or "beta"' });
+    }
+
+    const channelPath = getChannelPath(uploadChannel);
+    const versionPath = path.join(channelPath, 'version.json');
+    const backupDir = path.join(channelPath, 'backups');
+
+    await fs.mkdir(channelPath, { recursive: true });
+
+    let existingVersion = null;
+    try {
+      const existingData = await fs.readFile(versionPath, 'utf-8');
+      existingVersion = JSON.parse(existingData);
+    } catch (e) {
+      if (e.code !== 'ENOENT') throw e;
+    }
+
+    if (existingVersion && versionCodeInt < existingVersion.version_code) {
+      return res.status(409).json({
+        error: 'Version downgrade not allowed',
+        current_version_code: existingVersion.version_code,
+        requested_version_code: versionCodeInt,
+      });
+    }
+
+    if (existingVersion) {
+      await fs.mkdir(backupDir, { recursive: true });
+      const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+      await fs.copyFile(versionPath, path.join(backupDir, `version-${timestamp}.json`));
+      logger.info(`   ✅ Old version metadata backed up`);
+    }
+
+    let minSupportedVersion;
+    if (min_supported_version !== undefined && min_supported_version !== null && min_supported_version !== '') {
+      minSupportedVersion = parseInt(min_supported_version);
+      if (!Number.isInteger(minSupportedVersion) || minSupportedVersion <= 0) {
+        return res.status(400).json({ error: 'min_supported_version must be a positive integer' });
+      }
+    } else if (existingVersion && existingVersion.min_supported_version) {
+      minSupportedVersion = existingVersion.min_supported_version;
+    } else {
+      minSupportedVersion = 1;
+    }
+
+    const versionMetadata = {
+      version_code: versionCodeInt,
+      version_name: version_name.trim(),
+      download_url: download_url || (existingVersion && existingVersion.download_url) || '',
+      changelog: changelog || 'No changelog provided',
+      min_supported_version: minSupportedVersion,
+      force_update: force_update === true || force_update === 'true',
+      release_date: new Date().toISOString(),
+      uploaded_by: {
+        user_id: uploadUser.sub,
+        email: uploadUser.email,
+        role: uploadUser.type,
+      },
+    };
+
+    if (uploadChannel === 'beta') {
+      versionMetadata.channel = 'beta';
+      versionMetadata.is_beta = true;
+    }
+
+    await fs.writeFile(versionPath, JSON.stringify(versionMetadata, null, 2));
+
+    logger.info(`✅ Version metadata updated for ${uploadChannel} channel`);
+    logger.info(`   Updated by: ${uploadUser.email}`);
+    logger.info(`   Version: ${version_name} (${versionCodeInt})`);
+
+    res.json({
+      message: `Version metadata updated successfully for ${uploadChannel} channel`,
+      version: versionMetadata,
+    });
+  } catch (error) {
+    logger.error('❌ Error updating version metadata:', error);
+    res.status(500).json({
+      error: 'Internal server error',
+      message: error.message,
+    });
+  }
+});
+
 // ==========================================
 // BETA CHANNEL ROUTES (alias pour compatibilité)
 // Les routes /beta/* utilisent les mêmes handlers avec channel='beta'
@@ -702,7 +884,7 @@ router.post('/upload', uploadAuth, apiLimiter, upload.single('apk'), async (req,
  *       200:
  *         description: Informations sur la mise à jour beta disponible
  */
-router.get('/beta/check-update', (req, res) => handleCheckUpdate(req, res, 'beta'));
+router.get('/beta/check-update', cors({ origin: '*' }), (req, res) => handleCheckUpdate(req, res, 'beta'));
 
 /**
  * @swagger

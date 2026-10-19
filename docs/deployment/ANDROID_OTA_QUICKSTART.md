@@ -1,30 +1,46 @@
-# 🚀 Guide de démarrage rapide - Android OTA Updates
+# 🚀 Guide de démarrage rapide - Vérification de version (multi-plateforme)
+
+> **Note (OTA retiré)** : L'upload d'APK n'est plus nécessaire pour publier une version.
+> La CI utilise `POST /android/update-version` (JSON uniquement) pour mettre à jour les métadonnées.
+> L'app lit `check-update` et redirige vers le Play Store / App Store selon la plateforme.
 
 ## ✅ Configuration terminée
 
-Votre serveur est maintenant configuré pour servir les mises à jour OTA Android à l'adresse :
-**`https://app.team-oustam.com/android`**
+Votre serveur est maintenant configuré pour servir les informations de version à l'adresse :
+**`https://app.team-oustad.com/android`**
 
 ## 📍 URLs disponibles
 
-### 1. **Vérifier les mises à jour**
+### 1. **Vérifier les mises à jour** (public, CORS ouvert)
 ```
-GET https://app.team-oustam.com/android/check-update?current_version=1
-```
-
-### 2. **Télécharger l'APK**
-```
-GET https://app.team-oustam.com/android/download
+GET https://app.team-oustad.com/android/check-update?current_version=1
+GET https://app.team-oustad.com/android/beta/check-update?current_version=1
 ```
 
-### 3. **Informations de version**
+### 2. **Publier une nouvelle version** (CI / automatisé, bearer token)
 ```
-GET https://app.team-oustam.com/android/version.json
+POST https://app.team-oustad.com/android/update-version
+Content-Type: application/json
+Authorization: Bearer <OTA_BEARER_TOKEN>
+
+{
+  "version_code": 75,
+  "version_name": "1.0.0-beta.70",
+  "download_url": "https://play.google.com/store/apps/details?id=team.fitness.team_fitness_app",
+  "changelog": "Corrections de bugs et améliorations",
+  "force_update": false,
+  "channel": "beta"
+}
 ```
 
-### 4. **Calculer les checksums**
+### 3. **Informations de version brutes**
 ```
-GET https://app.team-oustam.com/android/checksum
+GET https://app.team-oustad.com/android/version.json
+```
+
+### 4. **Upload APK** (toujours disponible, non requis pour publier une version)
+```
+POST https://app.team-oustad.com/android/upload
 ```
 
 ## 📱 Configuration Flutter
@@ -186,48 +202,29 @@ class UpdateBanner extends StatelessWidget {
 
 ## 🔄 Déployer une nouvelle version
 
-### Méthode 1 : Script automatique (Recommandé)
+### Méthode recommandée : API metadata-only (CI automatisée)
+
+La CI appelle `POST /android/update-version` après chaque release Play Store.
+Aucun build APK ni upload de fichier n'est nécessaire côté serveur.
 
 ```bash
-# Depuis votre machine de développement, après avoir généré l'APK
-cd /root/team-server/db-server
-./scripts/deploy-android-apk.sh \
-  ~/flutter/team-fitness-app/build/app/outputs/flutter-apk/app-release.apk \
-  2 \
-  "1.0.1" \
-  "Corrections de bugs et améliorations de performance"
+curl -X POST https://app.team-oustad.com/android/update-version \
+  -H "Authorization: Bearer $OTA_BEARER_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "version_code": 75,
+    "version_name": "1.0.0",
+    "download_url": "https://play.google.com/store/apps/details?id=team.fitness.team_fitness_app",
+    "changelog": "Corrections de bugs et améliorations de performance",
+    "force_update": false,
+    "channel": "production"
+  }'
 ```
 
-### Méthode 2 : Manuelle
-
-1. **Générer l'APK depuis Flutter**
-   ```bash
-   cd /chemin/vers/flutter/app
-   flutter build apk --release
-   ```
-
-2. **Copier l'APK vers le serveur**
-   ```bash
-   scp build/app/outputs/flutter-apk/app-release.apk \
-       root@app.team-oustam.com:/root/team-server/db-server/public/android/
-   ```
-
-3. **SSH vers le serveur et mettre à jour version.json**
-   ```bash
-   ssh root@app.team-oustam.com
-   cd /root/team-server/db-server/public/android
-   
-   # Calculer le checksum
-   sha256sum app-release.apk
-   
-   # Éditer version.json
-   nano version.json
-   ```
-
-4. **Redémarrer le serveur**
-   ```bash
-   pm2 restart team-fitness
-   ```
+Comportements garantis :
+- Rejet d'un `version_code` inférieur à la version déjà publiée (409)
+- Sauvegarde automatique de l'ancien `version.json` dans `backups/`
+- `min_supported_version` conservé depuis l'ancienne version si non fourni
 
 ## 🧪 Tester la configuration
 
@@ -367,15 +364,10 @@ cat /root/team-server/db-server/public/android/version.json | jq
 
 ## ✅ Checklist de déploiement
 
-- [ ] APK généré et signé correctement
-- [ ] APK copié vers `/root/team-server/db-server/public/android/`
-- [ ] version.json mis à jour avec les bonnes informations
-- [ ] Checksum calculé et ajouté dans version.json
-- [ ] Permissions correctes (644) sur les fichiers
-- [ ] Serveur redémarré si nécessaire
-- [ ] Test de l'URL : `https://app.team-oustam.com/android/version.json`
-- [ ] Test de téléchargement depuis l'app mobile
-- [ ] Monitoring des logs activé
+- [ ] `POST /android/update-version` appelé avec les bonnes métadonnées
+- [ ] Réponse 200 vérifiée (version publiée)
+- [ ] Test de `GET /android/check-update?current_version=<ancienne>` → `update_available: true`
+- [ ] Monitoring des logs activé (`pm2 logs team-fitness`)
 
 ## 🎉 C'est terminé !
 
