@@ -6,25 +6,27 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ```bash
 # Development
-npm run dev                  # Start with nodemon (uses config/nodemon.json)
+npm run dev:full             # Start DB + server in one command (recommended)
+npm run dev                  # Start server only (nodemon)
 npm start                    # Start without nodemon
 
 # Database (local Docker)
 npm run db:up                # Start local PostgreSQL container
 npm run db:down              # Stop local PostgreSQL container
-npm run prisma:migrate       # Create and apply migrations (dev)
+npm run migrate              # Create and apply migrations (dev)
 npm run db:seed              # Seed test data (prisma/seed.js)
-npm run prisma:studio        # Open Prisma Studio GUI
+npm run studio               # Open Prisma Studio GUI
 
 # Tests
 npm test                     # Run all Jest tests
-npm run test:auth            # Run a single route's tests (replace auth with route name)
+npm test -- tests/routes/auth.test.js  # Run a single route's tests
 npm run test:coverage        # Run tests with coverage report (threshold: 70%)
 
 # Environments
 npm run start:preprod        # Start with .env.preprod
 npm run start:prod           # Start with .env.prod
-npm run prisma:migrate:prod  # Apply migrations to production DB
+npm run migrate:prod         # Apply migrations to production DB
+npm run preprod:setup        # First-time preprod setup (DB + migrate + seed)
 ```
 
 Tests require a running PostgreSQL instance configured in `.env.test`. Start it with `npm run db:test:up`.
