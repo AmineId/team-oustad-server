@@ -21,7 +21,7 @@
     "migrate:prod": "dotenv run -f .env.prod -- prisma migrate deploy",
     "studio": "prisma studio",
 
-    "preprod:full": "npm run db:preprod:up && npm run migrate:preprod && dotenv run -f .env.preprod -- npx prisma generate && npm run start:preprod",
+    "preprod:full": "npm run db:preprod:up && npm run migrate:preprod && npm run start:preprod",
     "preprod:setup": "npm run db:preprod:up && npm run migrate:preprod && dotenv run -f .env.preprod -- node prisma/seed.js",
     "prod:deploy": "npm run migrate:prod && npm start",
     "db:preprod:up": "docker compose -f config/docker-compose-multi-env.yml up -d --wait postgres-preprod",
