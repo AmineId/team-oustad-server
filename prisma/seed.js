@@ -77,7 +77,7 @@ async function main() {
           {
             displayId: generateUserIdByRole('owner'),
             uniqueCode: crypto.randomUUID().substring(0, 8).toUpperCase(),
-            email: 'owner@teamfitness.com',
+            email: 'owner@team-oustad.com',
             password: ownerPassword,
             firstName: 'Sarah',
             lastName: 'Johnson',
@@ -87,7 +87,7 @@ async function main() {
           {
             displayId: generateUserIdByRole('admin'),
             uniqueCode: crypto.randomUUID().substring(0, 8).toUpperCase(),
-            email: 'admin@teamfitness.com',
+            email: 'admin@team-oustad.com',
             password: hashed,
             firstName: 'Mike',
             lastName: 'Anderson',
@@ -142,7 +142,7 @@ async function main() {
           {
             displayId: generateUserIdByRole('admin'),
             uniqueCode: crypto.randomUUID().substring(0, 8).toUpperCase(),
-            email: 'admin2@teamfitness.com',
+            email: 'admin2@team-oustad.com',
             password: hashed,
             firstName: 'Lisa',
             lastName: 'Martinez',
@@ -1775,13 +1775,13 @@ async function main() {
   
   console.log('🔐 Identifiants de test:');
   console.log('   Owner:');
-  console.log('     - Email: owner@teamfitness.com');
+  console.log('     - Email: owner@team-oustad.com');
   console.log('     - Password: owner123\n');
   console.log('   Admin (Gym 1):');
-  console.log('     - Email: admin@teamfitness.com');
+  console.log('     - Email: admin@team-oustad.com');
   console.log('     - Password: admin123\n');
   console.log('   Admin (Gym 2):');
-  console.log('     - Email: admin2@teamfitness.com');
+  console.log('     - Email: admin2@team-oustad.com');
   console.log('     - Password: admin123\n');
   console.log('   Members (avec historique):');
   console.log('     - bob@example.com (36 Séances actif, 10/36 utilisées, Gym 1)');

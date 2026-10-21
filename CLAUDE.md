@@ -90,7 +90,7 @@ Minimum required vars: `DATABASE_URL`, `JWT_SECRET`, `PORT`.
 
 | Role | Email | Password |
 |------|-------|----------|
-| Owner | `owner@teamfitness.com` | `owner123` |
-| Admin | `admin@teamfitness.com` | `admin123` |
+| Owner | `owner@team-oustad.com` | `owner123` |
+| Admin | `admin@team-oustad.com` | `admin123` |
 | Member (pending sub) | `olivia@example.com` | `member123` |
 | Member (active sub) | `bob@example.com` | `member123` |
