@@ -78,6 +78,14 @@ components:
         phone:
           type: string
           example: "+1234567890"
+        isPublished:
+          type: boolean
+          default: false
+          example: false
+        slug:
+          type: string
+          nullable: true
+          example: "downtown-fitness-1"
         openingHours:
           type: array
           items:
@@ -94,6 +102,19 @@ components:
         - id
         - name
         - address
+
+    GymPhoto:
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 5
+        position:
+          type: integer
+          example: 0
+        isCover:
+          type: boolean
+          example: true
 
     OpeningHour:
       type: object
@@ -7790,3 +7811,313 @@ paths:
           description: Accès réservé aux propriétaires
         '500':
           description: Erreur lors du changement de photo
+
+  /gyms/{id}/photos:
+    post:
+      summary: Add photo to gym gallery
+      tags: [Gyms, Gallery]
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [imageData]
+              properties:
+                imageData:
+                  type: string
+                  example: "data:image/jpeg;base64,/9j/4AAQ..."
+      responses:
+        '201':
+          description: Photo added
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  photo:
+                    $ref: '#/components/schemas/GymPhoto'
+        '403':
+          description: Insufficient permissions
+    get:
+      summary: List gym gallery photos (metadata only)
+      tags: [Gyms, Gallery]
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: List of photos
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  photos:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/GymPhoto'
+
+  /gyms/{id}/photos/{photoId}/image:
+    get:
+      summary: Get gym gallery photo binary
+      tags: [Gyms, Gallery]
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+        - in: path
+          name: photoId
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Image binary
+          content:
+            image/*:
+              schema:
+                type: string
+                format: binary
+
+  /gyms/{id}/photos/{photoId}:
+    delete:
+      summary: Delete gym gallery photo
+      tags: [Gyms, Gallery]
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+        - in: path
+          name: photoId
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Photo deleted
+
+  /gyms/{id}/photos/reorder:
+    put:
+      summary: Reorder gym gallery photos
+      tags: [Gyms, Gallery]
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [order]
+              properties:
+                order:
+                  type: array
+                  items:
+                    type: integer
+                  example: [5, 2, 7]
+      responses:
+        '200':
+          description: Order updated
+
+  /gyms/{id}/photos/{photoId}/cover:
+    put:
+      summary: Set photo as cover for gym gallery
+      tags: [Gyms, Gallery]
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+        - in: path
+          name: photoId
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Cover updated
+
+  /public/gyms:
+    get:
+      summary: List published gyms (public)
+      tags: [Public]
+      responses:
+        '200':
+          description: List of published gyms
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  gyms:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id:
+                          type: integer
+                        slug:
+                          type: string
+                        name:
+                          type: string
+                        address:
+                          type: string
+                        phone:
+                          type: string
+                          nullable: true
+                        memberCountDisplay:
+                          type: string
+                          example: "40+"
+                        coverPhotoUrl:
+                          type: string
+                          nullable: true
+
+  /public/gyms/{slugOrId}:
+    get:
+      summary: Get published gym detail by slug or id (public)
+      tags: [Public]
+      parameters:
+        - in: path
+          name: slugOrId
+          required: true
+          schema:
+            type: string
+          description: Gym slug or numeric id
+      responses:
+        '200':
+          description: Gym detail
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  gym:
+                    type: object
+                    properties:
+                      id:
+                        type: integer
+                      slug:
+                        type: string
+                      name:
+                        type: string
+                      address:
+                        type: string
+                      phone:
+                        type: string
+                        nullable: true
+                      memberCountDisplay:
+                        type: string
+                        example: "200+"
+                      openingHours:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/OpeningHour'
+                      photos:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            id:
+                              type: integer
+                            url:
+                              type: string
+                            isCover:
+                              type: boolean
+                      team:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            id:
+                              type: integer
+                            fullName:
+                              type: string
+                            role:
+                              type: string
+                            photoUrl:
+                              type: string
+        '404':
+          description: Gym not found or not published
+
+  /public/gyms/{gymId}/photos/{photoId}/image:
+    get:
+      summary: Get public gym gallery photo binary
+      tags: [Public]
+      parameters:
+        - in: path
+          name: gymId
+          required: true
+          schema:
+            type: integer
+        - in: path
+          name: photoId
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Image binary
+          content:
+            image/*:
+              schema:
+                type: string
+                format: binary
+        '404':
+          description: Not found or gym not published
+
+  /public/gyms/{gymId}/team/{userId}/image:
+    get:
+      summary: Get public team member profile image
+      tags: [Public]
+      parameters:
+        - in: path
+          name: gymId
+          required: true
+          schema:
+            type: integer
+        - in: path
+          name: userId
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Profile image binary
+          content:
+            image/*:
+              schema:
+                type: string
+                format: binary
+        '404':
+          description: Not found or gym not published

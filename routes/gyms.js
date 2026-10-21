@@ -144,6 +144,15 @@ const requireAdmin = async (req, res, next) => {
  *       500:
  *         description: Server error
  */
+function generateSlug(name, id) {
+  const base = name
+    .toLowerCase()
+    .normalize('NFD').replace(/[̀-ͯ]/g, '')
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+  return `${base}-${id}`;
+}
+
 router.post('/', auth, requireOwner, apiLimiter, async (req, res) => {
   logger.info(`🏢 Création salle de sport - Owner: ${req.user?.email}, Données:`, {
     name: req.body.name,
@@ -166,15 +175,22 @@ router.post('/', auth, requireOwner, apiLimiter, async (req, res) => {
         displayId: generateGymId(),
         name,
         address,
-        phone
+        phone,
       }
     });
 
-    logger.info(`✅ Gym créé en base: ${gym.name} (ID: ${gym.id})`);
+    // Generate slug from name + id after creation
+    const slug = generateSlug(name, gym.id);
+    const gymWithSlug = await prisma.gym.update({
+      where: { id: gym.id },
+      data: { slug }
+    });
+
+    logger.info(`✅ Gym créé en base: ${gymWithSlug.name} (ID: ${gymWithSlug.id}, slug: ${slug})`);
 
     const responseData = {
       message: 'Salle de sport créée avec succès',
-      gym
+      gym: gymWithSlug
     };
 
     logger.debug(`📤 Réponse création gym:`, responseData);
@@ -470,7 +486,7 @@ router.put('/:id', auth, apiLimiter, async (req, res) => {
 
   try {
     const id = Number(req.params.id);
-    const { name, address, phone } = req.body;
+    const { name, address, phone, isPublished, slug } = req.body;
 
     const requester = await prisma.user.findUnique({ where: { id: req.user.sub } });
     if (!requester) {
@@ -497,6 +513,8 @@ router.put('/:id', auth, apiLimiter, async (req, res) => {
     if (name !== undefined) updateData.name = name;
     if (address !== undefined) updateData.address = address;
     if (phone !== undefined) updateData.phone = phone;
+    if (isPublished !== undefined) updateData.isPublished = Boolean(isPublished);
+    if (slug !== undefined) updateData.slug = slug;
 
     logger.debug(`🔄 Mise à jour gym ${id} avec:`, updateData);
 
@@ -1273,6 +1291,180 @@ router.delete('/:id/image', auth, apiLimiter, async (req, res) => {
 
   } catch (e) {
     logger.error('💥 Erreur suppression image salle:', e);
+    handleError(res, e, 500);
+  }
+});
+
+// ── Gallery photo routes ──────────────────────────────────────────────────────
+
+async function canManageGym(requester, gymId) {
+  if (requester.role === 'owner') return true;
+  if (requester.role === 'admin') return requester.gymId === gymId;
+  return false;
+}
+
+// POST /gyms/:id/photos
+router.post('/:id/photos', auth, apiLimiter, async (req, res) => {
+  try {
+    const gymId = Number(req.params.id);
+    const { imageData } = req.body;
+
+    if (!imageData) return res.status(400).json({ error: 'imageData requis' });
+
+    const requester = await prisma.user.findUnique({ where: { id: req.user.sub } });
+    if (!requester || !await canManageGym(requester, gymId)) {
+      return res.status(403).json({ error: 'Permissions insuffisantes' });
+    }
+
+    const gym = await prisma.gym.findUnique({ where: { id: gymId } });
+    if (!gym) return notFound(res, 'Gym', gymId);
+
+    const maxPos = await prisma.gymPhoto.aggregate({
+      where: { gymId },
+      _max: { position: true }
+    });
+    const position = (maxPos._max.position ?? -1) + 1;
+
+    const photo = await prisma.gymPhoto.create({
+      data: { gymId, imageData, position }
+    });
+
+    res.status(201).json({ photo: { id: photo.id, position: photo.position, isCover: photo.isCover } });
+  } catch (e) {
+    logger.error('💥 Erreur création photo gym:', e);
+    handleError(res, e);
+  }
+});
+
+// GET /gyms/:id/photos
+router.get('/:id/photos', auth, async (req, res) => {
+  try {
+    const gymId = Number(req.params.id);
+
+    const requester = await prisma.user.findUnique({ where: { id: req.user.sub } });
+    if (!requester || !await canManageGym(requester, gymId)) {
+      return res.status(403).json({ error: 'Permissions insuffisantes' });
+    }
+
+    const gym = await prisma.gym.findUnique({ where: { id: gymId } });
+    if (!gym) return notFound(res, 'Gym', gymId);
+
+    const photos = await prisma.gymPhoto.findMany({
+      where: { gymId },
+      orderBy: { position: 'asc' },
+      select: { id: true, position: true, isCover: true }
+    });
+
+    res.json({ photos });
+  } catch (e) {
+    handleError(res, e, 500);
+  }
+});
+
+// GET /gyms/:id/photos/:photoId/image
+router.get('/:id/photos/:photoId/image', auth, async (req, res) => {
+  try {
+    const gymId = Number(req.params.id);
+    const photoId = Number(req.params.photoId);
+
+    const requester = await prisma.user.findUnique({ where: { id: req.user.sub } });
+    if (!requester || !await canManageGym(requester, gymId)) {
+      return res.status(403).json({ error: 'Permissions insuffisantes' });
+    }
+
+    const photo = await prisma.gymPhoto.findFirst({
+      where: { id: photoId, gymId }
+    });
+    if (!photo) return res.status(404).json({ error: 'Photo not found' });
+
+    const base64 = photo.imageData.includes(',') ? photo.imageData.split(',')[1] : photo.imageData;
+    const buf = Buffer.from(base64, 'base64');
+
+    let mimeType = 'image/jpeg';
+    if (buf.length > 4) {
+      if (buf[0] === 0x89 && buf[1] === 0x50) mimeType = 'image/png';
+      else if (buf[0] === 0x47 && buf[1] === 0x49) mimeType = 'image/gif';
+    }
+
+    res.setHeader('Content-Type', mimeType);
+    res.setHeader('Content-Length', buf.length);
+    res.setHeader('Cache-Control', 'private, max-age=3600');
+    res.send(buf);
+  } catch (e) {
+    handleError(res, e, 500);
+  }
+});
+
+// DELETE /gyms/:id/photos/:photoId
+router.delete('/:id/photos/:photoId', auth, apiLimiter, async (req, res) => {
+  try {
+    const gymId = Number(req.params.id);
+    const photoId = Number(req.params.photoId);
+
+    const requester = await prisma.user.findUnique({ where: { id: req.user.sub } });
+    if (!requester || !await canManageGym(requester, gymId)) {
+      return res.status(403).json({ error: 'Permissions insuffisantes' });
+    }
+
+    const photo = await prisma.gymPhoto.findFirst({ where: { id: photoId, gymId } });
+    if (!photo) return res.status(404).json({ error: 'Photo not found' });
+
+    await prisma.gymPhoto.delete({ where: { id: photoId } });
+    res.json({ message: 'Photo supprimée avec succès' });
+  } catch (e) {
+    handleError(res, e, 500);
+  }
+});
+
+// PUT /gyms/:id/photos/reorder
+router.put('/:id/photos/reorder', auth, apiLimiter, async (req, res) => {
+  try {
+    const gymId = Number(req.params.id);
+    const { order } = req.body;
+
+    if (!Array.isArray(order)) return res.status(400).json({ error: 'order doit être un tableau d\'ids' });
+
+    const requester = await prisma.user.findUnique({ where: { id: req.user.sub } });
+    if (!requester || !await canManageGym(requester, gymId)) {
+      return res.status(403).json({ error: 'Permissions insuffisantes' });
+    }
+
+    await prisma.$transaction(
+      order.map((photoId, index) =>
+        prisma.gymPhoto.updateMany({
+          where: { id: photoId, gymId },
+          data: { position: index }
+        })
+      )
+    );
+
+    res.json({ message: 'Ordre mis à jour' });
+  } catch (e) {
+    handleError(res, e, 500);
+  }
+});
+
+// PUT /gyms/:id/photos/:photoId/cover
+router.put('/:id/photos/:photoId/cover', auth, apiLimiter, async (req, res) => {
+  try {
+    const gymId = Number(req.params.id);
+    const photoId = Number(req.params.photoId);
+
+    const requester = await prisma.user.findUnique({ where: { id: req.user.sub } });
+    if (!requester || !await canManageGym(requester, gymId)) {
+      return res.status(403).json({ error: 'Permissions insuffisantes' });
+    }
+
+    const photo = await prisma.gymPhoto.findFirst({ where: { id: photoId, gymId } });
+    if (!photo) return res.status(404).json({ error: 'Photo not found' });
+
+    await prisma.$transaction([
+      prisma.gymPhoto.updateMany({ where: { gymId }, data: { isCover: false } }),
+      prisma.gymPhoto.update({ where: { id: photoId }, data: { isCover: true } })
+    ]);
+
+    res.json({ message: 'Photo de couverture mise à jour' });
+  } catch (e) {
     handleError(res, e, 500);
   }
 });

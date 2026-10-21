@@ -38,13 +38,31 @@ model Gym {
   updatedAt    DateTime       @updatedAt
   image        Bytes?
   displayId    String         @unique
+  isPublished  Boolean        @default(false)
+  slug         String?        @unique
   OpeningHour  OpeningHour[]
   User         User[]
   Banner       Banner[]
   GymCheckIn   GymCheckIn[]
   StoreProduct StoreProduct[]
+  GymPhoto     GymPhoto[]
 
   @@index([name])
+  @@index([isPublished])
+  @@index([slug])
+}
+
+model GymPhoto {
+  id        Int      @id @default(autoincrement())
+  gymId     Int
+  gym       Gym      @relation(fields: [gymId], references: [id], onDelete: Cascade)
+  imageData String   @db.Text
+  position  Int      @default(0)
+  isCover   Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  @@index([gymId])
+  @@index([gymId, position])
 }
 
 model Member {
