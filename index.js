@@ -61,6 +61,7 @@ const allowedOrigins = process.env.CORS_ORIGINS
   : ['http://localhost:3000', 'http://localhost:8080', 'http://127.0.0.1:8088', 'http://localhost:8088'];
 
 const teamOustadOrigin = /^https?:\/\/([a-z0-9-]+\.)?team-oustad\.com$/;
+const cfPagesOrigin = /^https:\/\/[a-z0-9-]+\.team-fitness-kiosk\.pages\.dev$/;
 
 app.use(cors({
   origin: (origin, callback) => {
@@ -68,6 +69,7 @@ app.use(cors({
     if (!origin) return callback(null, true);
     if (allowedOrigins.includes(origin)) return callback(null, true);
     if (teamOustadOrigin.test(origin)) return callback(null, true);
+    if (cfPagesOrigin.test(origin)) return callback(null, true);
     callback(new Error(`CORS: origin ${origin} not allowed`));
   },
   credentials: true,
