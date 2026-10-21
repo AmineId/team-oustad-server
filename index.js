@@ -61,7 +61,7 @@ const allowedOrigins = process.env.CORS_ORIGINS
   : ['http://localhost:3000', 'http://localhost:8080', 'http://127.0.0.1:8088', 'http://localhost:8088'];
 
 const teamOustadOrigin = /^https?:\/\/([a-z0-9-]+\.)?team-oustad\.com$/;
-const cfPagesOrigin = /^https:\/\/[a-z0-9-]+\.team-fitness-kiosk\.pages\.dev$/;
+const cfPagesOrigin = /^https:\/\/[a-z0-9-]+\.team-fitness-[a-z0-9-]+\.pages\.dev$/;
 
 app.use(cors({
   origin: (origin, callback) => {
