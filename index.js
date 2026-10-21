@@ -60,11 +60,14 @@ const allowedOrigins = process.env.CORS_ORIGINS
   ? process.env.CORS_ORIGINS.split(',').map(o => o.trim())
   : ['http://localhost:3000', 'http://localhost:8080', 'http://127.0.0.1:8088', 'http://localhost:8088'];
 
+const teamOustadOrigin = /^https?:\/\/([a-z0-9-]+\.)?team-oustad\.com$/;
+
 app.use(cors({
   origin: (origin, callback) => {
     // Allow requests with no origin (mobile apps, curl, Postman)
     if (!origin) return callback(null, true);
     if (allowedOrigins.includes(origin)) return callback(null, true);
+    if (teamOustadOrigin.test(origin)) return callback(null, true);
     callback(new Error(`CORS: origin ${origin} not allowed`));
   },
   credentials: true,
