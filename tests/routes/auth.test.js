@@ -5,6 +5,7 @@ const {
   cleanDatabase,
   disconnectDatabase,
   createTestGym,
+  createTestOwner,
   createTestAdmin,
   createTestMember,
   authHeader,
@@ -434,6 +435,30 @@ describe('Authentication Routes', () => {
 
       expect(response.status).toBe(403);
       expect(response.body.error).toContain('gym');
+    });
+
+    it('should allow owner to scan a member from any gym', async () => {
+      const otherGym = await createTestGym({ name: 'Owner Gym' });
+      const owner = await createTestOwner(otherGym.id);
+
+      const response = await request(app)
+        .post('/auth/scan-qr')
+        .set('Authorization', authHeader(owner))
+        .send({ qrCode: testMember.uniqueCode });
+
+      // Passe les contrôles de rôle et de salle ; bloqué seulement faute d'abonnement
+      expect(response.status).toBe(403);
+      expect(response.body.reason).toBe('no_active_subscription');
+    });
+
+    it('should return 400 when qrCode is missing', async () => {
+      const response = await request(app)
+        .post('/auth/scan-qr')
+        .set('Authorization', authHeader(testAdmin))
+        .send({});
+
+      expect(response.status).toBe(400);
+      expect(response.body.error).toContain('qrCode');
     });
   });
 

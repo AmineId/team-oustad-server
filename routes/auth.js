@@ -237,7 +237,7 @@ router.post('/login', authLimiter, async (req, res) => {
  * /auth/scan-qr:
  *   post:
  *     summary: Scanner un QR code d'accès
- *     description: Permet à un admin de scanner le QR code d'un membre pour valider l'accès à la salle
+ *     description: Permet à un admin (sa salle) ou un owner (toutes les salles) de scanner le QR code d'un membre pour valider l'accès à la salle
  *     tags: [QR Code]
  *     security:
  *       - bearerAuth: []
@@ -310,16 +310,22 @@ router.post('/scan-qr', auth, async (req, res) => {
   console.log(`📱 Scan QR - User ID: ${req.user?.sub}, Email: ${req.user?.email}, QR Code: ${qrCode}`);
 
   try {
-    // Vérifier que l'utilisateur est un admin
-    if (req.user.type !== 'admin') {
-      console.log(`❌ Accès refusé: utilisateur ${req.user.email} n'est pas admin (type: ${req.user.type})`);
-      return res.status(403).json({ error: 'Only admins can scan QR codes' });
+    // Vérifier que l'utilisateur est un admin ou un owner
+    if (!['admin', 'owner'].includes(req.user.type)) {
+      console.log(`❌ Accès refusé: utilisateur ${req.user.email} n'est pas admin/owner (type: ${req.user.type})`);
+      return res.status(403).json({ error: 'Only admins or owners can scan QR codes' });
+    }
+
+    // Sans qrCode, Prisma ignore le filtre et findFirst renverrait n'importe quel utilisateur
+    if (typeof qrCode !== 'string' || !qrCode.trim()) {
+      console.log(`❌ QR code manquant ou invalide`);
+      return res.status(400).json({ error: 'qrCode is required' });
     }
 
     // Récupérer l'admin avec sa gymId
     const adminUser = await prisma.user.findUnique({
       where: { id: req.user.sub },
-      select: { id: true, gymId: true, firstName: true, lastName: true }
+      select: { id: true, gymId: true, firstName: true, lastName: true, role: true }
     });
 
     if (!adminUser) {
@@ -360,8 +366,8 @@ router.post('/scan-qr', auth, async (req, res) => {
       return res.status(400).json({ error: 'QR code is not for a member' });
     }
 
-    // Vérifier que le membre appartient à la même salle que l'admin
-    if (member.gymId !== adminUser.gymId) {
+    // Vérifier que le membre appartient à la même salle que l'admin (un owner accède à toutes les salles)
+    if (adminUser.role !== 'owner' && member.gymId !== adminUser.gymId) {
       console.log(`❌ Membre ${member.firstName} ${member.lastName} n'appartient pas à la salle de l'admin (membre: ${member.gymId}, admin: ${adminUser.gymId})`);
       return res.status(403).json({ error: 'Member does not belong to your gym' });
     }
