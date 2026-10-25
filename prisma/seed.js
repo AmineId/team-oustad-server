@@ -13,6 +13,7 @@ const {
   generateBannerId,
   generateBannerVariantId
 } = require('../utils/idGenerator');
+const { HOME_KEY, gymKey, validatePage } = require('../utils/showcasePages');
 
 /**
  * SEED DATABASE - Données de test cohérentes
@@ -58,6 +59,8 @@ async function main() {
   await prisma.bannerVariant.deleteMany();
   await prisma.banner.deleteMany();
   await prisma.openingHour.deleteMany();
+  // La page d'accueil vitrine n'est rattachée à aucune salle (pas de cascade)
+  await prisma.showcasePage.deleteMany();
   await prisma.gym.deleteMany();
   console.log('✅ Données supprimées\n');
 
@@ -1853,6 +1856,119 @@ async function main() {
   });
 
   console.log(`✅ Banner promotion créé: ${bannerPromo2.title} (gym1, parrainage)\n`);
+
+  // ==================== SITE VITRINE (CMS) ====================
+  console.log('🖥️  Création des pages du site vitrine...');
+
+  await prisma.gym.update({
+    where: { id: gym1.id },
+    data: {
+      description: 'Au cœur de Downtown, une salle de 1 200 m² pensée pour la musculation et le cross-training. Matériel renouvelé chaque année, coachs diplômés présents tous les jours.'
+    }
+  });
+  await prisma.gym.update({
+    where: { id: gym2.id },
+    data: {
+      description: 'Un espace premium à Uptown : cardio panoramique, studio de cours collectifs et zone récupération avec sauna.'
+    }
+  });
+
+  // validatePage garantit que le seed respecte le même format que PUT /showcase/*
+  const homePage = validatePage({
+    hero: { eyebrow: 'VITRINE TEAM OUSTAD', tagline: 'Choisis ta salle. Dépasse tes limites.' },
+    sections: [
+      { id: 'marquee', type: 'marquee', visible: true, data: { words: ['MUSCULATION', 'CARDIO', 'CROSS-TRAINING', 'COURS COLLECTIFS', 'COACHING'] } },
+      { id: 'gyms', type: 'gyms', visible: true },
+      {
+        id: 'categories', type: 'categories', visible: true,
+        data: {
+          items: [
+            { label: 'Musculation', icon: 'fitness' },
+            { label: 'Cardio', icon: 'run' },
+            { label: 'Cours collectifs', icon: 'groups' },
+            { label: 'Nutrition', icon: 'food' },
+            { label: 'Récupération', icon: 'zen' }
+          ]
+        }
+      },
+      {
+        id: 'feature-coaching', type: 'feature', visible: true,
+        data: {
+          eyebrow: 'COACHING',
+          title: 'Un programme qui te ressemble',
+          body: 'Nos coachs construisent ton planning et le suivent séance après séance dans l\'app.',
+          points: ['Bilan de forme offert', 'Planning personnalisé', 'Suivi de progression'],
+          icon: 'target',
+          tag: 'Inclus'
+        }
+      },
+      { id: 'promos', type: 'promos', visible: true },
+      {
+        id: 'testimonials', type: 'testimonials', visible: true,
+        data: {
+          eyebrow: 'ILS EN PARLENT',
+          title: 'Nos membres',
+          items: [
+            { name: 'Bob W.', meta: 'Membre depuis 2 ans', quote: 'Ambiance au top et coachs toujours dispo.' },
+            { name: 'Alice S.', meta: 'Abonnement illimité', quote: 'Le planning dans l\'app change tout, je ne rate plus une séance.' }
+          ]
+        }
+      },
+      {
+        id: 'news', type: 'markdown', visible: false,
+        data: { title: 'Nouveau', body: '**Ouverture** d\'une troisième salle au printemps.' }
+      },
+      {
+        id: 'cta', type: 'cta', visible: true,
+        data: { eyebrow: 'PRÊT ?', text: 'Ta première séance est offerte.', buttonLabel: 'Réserver', url: 'https://app.team-oustad.com/' }
+      }
+    ]
+  }, { allowHero: true });
+
+  const gym1Page = validatePage({
+    sections: [
+      { id: 'about', type: 'gymAbout', visible: true },
+      {
+        id: 'equipment', type: 'feature', visible: true,
+        data: {
+          eyebrow: 'ÉQUIPEMENT',
+          title: 'Plateau musculation complet',
+          body: 'Racks, haltères jusqu\'à 60 kg et zone fonctionnelle.',
+          points: ['6 racks à squat', 'Zone cross-training', 'Vestiaires avec casiers'],
+          icon: 'bolt'
+        }
+      },
+      { id: 'promos', type: 'gymPromos', visible: true },
+      { id: 'hours', type: 'gymHours', visible: true },
+      { id: 'team', type: 'gymTeam', visible: true },
+      { id: 'subscriptions', type: 'gymSubscriptions', visible: true },
+      { id: 'info', type: 'gymInfo', visible: true }
+    ]
+  }, { allowHero: false });
+
+  const gym2Page = validatePage({
+    sections: [
+      { id: 'about', type: 'gymAbout', visible: true },
+      {
+        id: 'classes', type: 'markdown', visible: true,
+        data: { title: 'Cours collectifs', body: 'Yoga, HIIT et spinning **tous les soirs** à partir de 18h.' }
+      },
+      { id: 'hours', type: 'gymHours', visible: true },
+      { id: 'subscriptions', type: 'gymSubscriptions', visible: true },
+      { id: 'info', type: 'gymInfo', visible: true },
+      { id: 'team', type: 'gymTeam', visible: false },
+      { id: 'promos', type: 'gymPromos', visible: true }
+    ]
+  }, { allowHero: false });
+
+  await prisma.showcasePage.createMany({
+    data: [
+      { key: HOME_KEY, content: homePage, updatedBy: ownerUser.id },
+      { key: gymKey(gym1.id), gymId: gym1.id, content: gym1Page, updatedBy: ownerUser.id },
+      { key: gymKey(gym2.id), gymId: gym2.id, content: gym2Page, updatedBy: ownerUser.id }
+    ]
+  });
+  console.log(`✅ Pages vitrine créées: accueil (${homePage.sections.length} sections), ${gym1.name}, ${gym2.name}\n`);
 
   // Créer des tokens de réinitialisation de mot de passe pour tests
   console.log('🔑 Création des tokens de test...');
