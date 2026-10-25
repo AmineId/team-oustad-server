@@ -2,7 +2,20 @@ openapi: 3.0.0
 info:
   title: Team Fitness API
   version: 1.0.0
-  description: API pour la gestion des salles de sport Team Fitness
+  description: |
+    API pour la gestion des salles de sport Team Fitness
+
+    ## Rôles V2
+    Rôles : `owner` (toutes les salles), `manager` (une salle, ex-`admin`), `member`.
+    - `admin` reste accepté **en entrée** comme alias de `manager` (body `role`, anciens JWT),
+      mais le serveur renvoie toujours `manager`.
+    - Le manager reçoit un **403** sur la vitrine et les promos : `/showcase/*`, écriture `/banners`,
+      champs vitrine de `PUT /gyms/{id}` (`isPublished`, `slug`, `description` → `showcase_forbidden`),
+      `/gyms/{id}/photos*`, `/gyms/{id}/showcase`, `PUT|DELETE /gyms/{id}/image`, et les horaires
+      d'ouverture (`POST /gyms/{id}/opening-hours`).
+    - Store (`/store/*` staff) : le manager est limité à sa salle (403 sinon) ; l'owner gère toutes les salles.
+    - Kiosk : `POST /auth/login` avec `client: "kiosk"`, réservé aux owners et managers
+      (403 `kiosk_forbidden_role`). La session kiosk est distincte de la session app.
   contact:
     name: Team Fitness Support
     email: support@teamfitness.com
@@ -45,8 +58,17 @@ components:
           example: "Doe"
         role:
           type: string
-          enum: [member, admin, owner]
+          enum: [member, manager, owner]
+          description: "`admin` est accepté en entrée comme alias de `manager`, jamais renvoyé"
           example: "member"
+        type:
+          type: string
+          enum: [member, manager, owner]
+          description: "Identique à `role` (compatibilité)"
+        client:
+          type: string
+          enum: [app, kiosk]
+          description: "Renvoyé au login : client pour lequel le token a été émis"
         displayId:
           type: string
           example: "MEMBER-a8f3d9e2b1c4f567"
@@ -352,6 +374,29 @@ components:
           example: true
         user:
           $ref: '#/components/schemas/User'
+
+    CreatedManager:
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 2
+        email:
+          type: string
+          format: email
+          example: "manager@example.com"
+        firstName:
+          type: string
+          example: "Jane"
+        lastName:
+          type: string
+          example: "Manager"
+        role:
+          type: string
+          example: manager
+        gymId:
+          type: integer
+          example: 1
 
     Error:
       type: object
@@ -1562,6 +1607,14 @@ paths:
                 password:
                   type: string
                   example: "password123"
+                client:
+                  type: string
+                  enum: [app, kiosk]
+                  default: app
+                  description: |
+                    `kiosk` pour la borne : réservé aux owners et managers. La session kiosk
+                    a son propre emplacement : elle ne déconnecte pas l'app, et inversement
+                    (une nouvelle connexion du même client invalide l'ancien token de ce client).
       responses:
         '200':
           description: Login successful
@@ -1575,6 +1628,25 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+        '401':
+          description: Identifiants invalides
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: "Connexion kiosk refusée pour ce rôle (coach, member)"
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: kiosk_forbidden_role
+                  message:
+                    type: string
+                    example: "Le kiosk est réservé aux owners et managers"
         '500':
           description: Server error
           content:
@@ -1609,13 +1681,24 @@ paths:
                     example: "John Doe"
                   role:
                     type: string
-                    enum: [owner, admin, member]
+                    enum: [owner, manager, member]
                     example: "member"
+                  type:
+                    type: string
+                    enum: [owner, manager, member]
+                    description: "Identique à `role`"
                   displayId:
                     type: string
                     example: "MEMBER-a8f3d9e2b1c4f567"
+                  gymId:
+                    type: integer
                   gym:
                     $ref: '#/components/schemas/Gym'
+                  gyms:
+                    type: array
+                    description: "Owner uniquement : toutes les salles avec `stats` (`members`, `managers`, `admins` (déprécié), `owners`)"
+                    items:
+                      type: object
                   activeSubscription:
                     $ref: '#/components/schemas/Subscription'
                   recentPayments:
@@ -1628,6 +1711,10 @@ paths:
                     properties:
                       canManageAdmins:
                         type: boolean
+                        description: "Déprécié : utiliser canManageManagers"
+                      canManageManagers:
+                        type: boolean
+                        description: "Rôles V2 : alias de canManageAdmins (même valeur)"
                       canManageGyms:
                         type: boolean
                       canViewReports:
@@ -2089,8 +2176,8 @@ paths:
                   example: "Doe"
                 role:
                   type: string
-                  enum: [admin, member]
-                  description: User role (admin can create members, owner can create admins/members)
+                  enum: [manager, member]
+                  description: User role (manager can create members, owner can create managers/members). `admin` accepté comme alias de `manager`.
                   example: "member"
                 gymId:
                   type: integer
@@ -2277,7 +2364,7 @@ paths:
                     example: "John Doe"
                   role:
                     type: string
-                    enum: [owner, admin, member]
+                    enum: [owner, manager, member]
                     example: "member"
                   displayId:
                     type: string
@@ -2296,6 +2383,10 @@ paths:
                     properties:
                       canManageAdmins:
                         type: boolean
+                        description: "Déprécié : utiliser canManageManagers"
+                      canManageManagers:
+                        type: boolean
+                        description: "Rôles V2 : alias de canManageAdmins (même valeur)"
                       canManageGyms:
                         type: boolean
                       canViewReports:
@@ -2815,10 +2906,12 @@ paths:
               schema:
                 $ref: '#/components/schemas/Error'
 
-  /users/create-admin:
+  /users/create-manager:
     post:
-      summary: Create a new admin (Owner only)
-      description: Create a new admin user. Only owners can create admins.
+      summary: Create a new manager (Owner only)
+      description: |
+        Crée un manager (ex-admin) rattaché à une salle. Owner avec `canManageAdmins` uniquement.
+        `POST /users/create-admin` reste disponible comme alias pendant la transition (même réponse).
       tags: [Users, Owners]
       security:
         - bearerAuth: []
@@ -2867,23 +2960,14 @@ paths:
                 properties:
                   message:
                     type: string
-                    example: "Admin créé avec succès"
+                    example: "Manager créé avec succès"
+                  setupEmailSent:
+                    type: boolean
+                  manager:
+                    $ref: '#/components/schemas/CreatedManager'
                   admin:
-                    type: object
-                    properties:
-                      id:
-                        type: integer
-                        example: 2
-                      email:
-                        type: string
-                        format: email
-                        example: "admin@example.com"
-                      firstName:
-                        type: string
-                        example: "Jane"
-                      lastName:
-                        type: string
-                        example: "Admin"
+                    $ref: '#/components/schemas/CreatedManager'
+                    description: "Déprécié : identique à `manager`"
         '400':
           description: Invalid input or email already exists
           content:
@@ -2899,6 +2983,18 @@ paths:
               schema:
                 $ref: '#/components/schemas/Error'
 
+
+  /users/create-admin:
+    post:
+      deprecated: true
+      summary: "Alias de /users/create-manager (transition Rôles V2)"
+      description: Identique à `POST /users/create-manager`.
+      tags: [Users, Owners]
+      security:
+        - bearerAuth: []
+      responses:
+        '201':
+          description: Manager créé (voir /users/create-manager)
   /users/gyms/all:
     get:
       summary: List all gyms (Owner only)
@@ -2985,9 +3081,12 @@ paths:
                         type: integer
                         description: Total number of users
                         example: 150
+                      totalManagers:
+                        type: integer
+                        description: Total number of manager users
                       totalAdmins:
                         type: integer
-                        description: Total number of admin users
+                        description: "Déprécié : identique à totalManagers"
                         example: 10
                       totalMembers:
                         type: integer
@@ -3397,7 +3496,7 @@ paths:
 
     put:
       summary: Update gym
-      description: Update gym information. Owners can update any gym, admins can only update their gym.
+      description: Update gym information. Owners can update any gym, managers only their gym and never the showcase fields (`isPublished`, `slug`, `description` → 403 `showcase_forbidden`).
       tags: [Gyms]
       security:
         - bearerAuth: []
@@ -3494,7 +3593,7 @@ paths:
   /gyms/{id}/opening-hours:
     post:
       summary: Set opening hours for gym
-      description: Create or update opening hours for each day of the week. Owners can set hours for any gym, admins only for their gym.
+      description: Create or update opening hours for each day of the week. Owner uniquement (Rôles V2 : 403 pour le manager).
       tags: [Gyms, Opening Hours]
       security:
         - bearerAuth: []
@@ -3584,7 +3683,7 @@ paths:
   /gyms/{id}/image:
     put:
       summary: Upload gym image
-      description: Upload or update a gym's image (base64). Owners can update any gym, admins can only update their own gym.
+      description: Upload or update a gym's image (base64). Owner uniquement (Rôles V2 : 403 pour le manager).
       tags: [Gyms, Images]
       security:
         - bearerAuth: []
@@ -3670,7 +3769,7 @@ paths:
           description: Server error
     delete:
       summary: Delete gym image
-      description: Delete a gym's image. Owners can delete any gym image, admins can only delete their own gym's image.
+      description: Delete a gym's image. Owner uniquement (Rôles V2 : 403 pour le manager).
       tags: [Gyms, Images]
       security:
         - bearerAuth: []
@@ -6158,7 +6257,7 @@ paths:
     
     post:
       summary: Créer une nouvelle bannière
-      description: Créer une nouvelle bannière avec support multimédia et A/B testing (Admin/Owner uniquement)
+      description: Créer une nouvelle bannière avec support multimédia et A/B testing (Owner uniquement — 403 pour le manager)
       tags:
         - Banners
       security:
@@ -6306,7 +6405,7 @@ paths:
 
     put:
       summary: Mettre à jour une bannière
-      description: Mettre à jour les informations d'une bannière (Admin/Owner uniquement)
+      description: Mettre à jour les informations d'une bannière (Owner uniquement — 403 pour le manager)
       tags:
         - Banners
       security:
@@ -6397,7 +6496,7 @@ paths:
 
     delete:
       summary: Supprimer une bannière
-      description: Supprimer une bannière et ses variantes (Admin/Owner uniquement)
+      description: Supprimer une bannière et ses variantes (Owner uniquement — 403 pour le manager)
       tags:
         - Banners
       security:
@@ -6451,7 +6550,7 @@ paths:
     
     post:
       summary: Créer une variante A/B
-      description: Créer une nouvelle variante pour A/B testing (Admin/Owner uniquement)
+      description: Créer une nouvelle variante pour A/B testing (Owner uniquement — 403 pour le manager)
       tags:
         - Banners
       security:
@@ -6525,7 +6624,7 @@ paths:
   /banners/{id}/variants/{variantId}:
     put:
       summary: Mettre à jour une variante
-      description: Modifier une variante A/B existante (Admin/Owner uniquement)
+      description: Modifier une variante A/B existante (Owner uniquement — 403 pour le manager)
       tags:
         - Banners
       security:
@@ -6592,7 +6691,7 @@ paths:
     
     delete:
       summary: Supprimer une variante
-      description: Supprimer une variante A/B (Admin/Owner uniquement)
+      description: Supprimer une variante A/B (Owner uniquement — 403 pour le manager)
       tags:
         - Banners
       security:
@@ -6700,7 +6799,7 @@ paths:
   /banners/{id}/stats:
     get:
       summary: Récupérer les statistiques d'une bannière
-      description: Récupère les statistiques globales et par variante (Admin/Owner uniquement)
+      description: Récupère les statistiques globales et par variante (Manager/Owner)
       tags:
         - Banners
       security:
@@ -6775,7 +6874,7 @@ paths:
   /banners/stats/summary:
     get:
       summary: Résumé des statistiques de toutes les bannières
-      description: Vue d'ensemble des performances (Admin/Owner uniquement)
+      description: Vue d'ensemble des performances (Manager/Owner)
       tags:
         - Banners
       security:
@@ -7218,7 +7317,7 @@ paths:
     post:
       summary: Créer un produit
       description: |
-        Ajouter un nouveau produit (admin/owner uniquement).
+        Ajouter un nouveau produit (manager de la salle du produit ou owner ; 403 si autre salle).
         Les images sont converties en base64 et stockées directement dans la base de données.
       tags:
         - Store
@@ -7314,7 +7413,7 @@ paths:
     put:
       summary: Modifier un produit
       description: |
-        Met à jour un produit existant (admin/owner uniquement).
+        Met à jour un produit existant (manager de la salle du produit ou owner ; 403 si autre salle).
         Les nouvelles images sont converties en base64 et ajoutées aux existantes.
       tags:
         - Store
@@ -7378,7 +7477,7 @@ paths:
     delete:
       summary: Supprimer un produit
       description: |
-        Supprime un produit (admin/owner uniquement).
+        Supprime un produit (manager de la salle du produit ou owner ; 403 si autre salle).
         Les images stockées en base64 sont automatiquement supprimées avec le produit.
       tags:
         - Store
@@ -7415,7 +7514,7 @@ paths:
   /store/reservations:
     get:
       summary: Toutes les réservations
-      description: Liste toutes les réservations (admin/owner uniquement)
+      description: Liste les réservations : manager = sa salle ; owner = toutes, ou `?gymId=`
       tags:
         - Store
       security:
@@ -7569,7 +7668,7 @@ paths:
   /store/reservations/{id}/complete:
     patch:
       summary: Finaliser une réservation
-      description: Marque une réservation comme retirée (admin/owner uniquement)
+      description: Marque une réservation comme retirée (manager de la salle ou owner)
       tags:
         - Store
       security:
@@ -7605,7 +7704,7 @@ paths:
   /store/stats:
     get:
       summary: Statistiques du store
-      description: Récupère les statistiques globales (admin/owner uniquement)
+      description: Statistiques du store : manager = sa salle ; owner = `?gymId=` ou sa salle
       tags:
         - Store
       security:
@@ -8101,7 +8200,7 @@ paths:
           type: integer
     get:
       summary: Contenu CMS de la fiche vitrine d'une salle
-      description: Owner avec canManageGyms (toutes salles) ou admin de la salle.
+      description: Owner avec canManageGyms uniquement (Rôles V2 : 403 pour le manager).
       tags: [Showcase]
       security:
         - bearerAuth: []
@@ -8118,7 +8217,7 @@ paths:
           description: Salle introuvable
     put:
       summary: Remplacer la fiche vitrine d'une salle
-      description: Owner avec canManageGyms (toutes salles) ou admin de la salle. `hero` refusé.
+      description: Owner avec canManageGyms uniquement (Rôles V2 : 403 pour le manager). `hero` refusé.
       tags: [Showcase]
       security:
         - bearerAuth: []

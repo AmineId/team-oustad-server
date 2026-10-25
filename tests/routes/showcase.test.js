@@ -60,27 +60,27 @@ describe('Showcase CMS routes', () => {
     it('renvoie {} tant que rien n\'est enregistré', async () => {
       const res = await request(app)
         .get(`/gyms/${gym.id}/showcase`)
-        .set('Authorization', authHeader(admin));
+        .set('Authorization', authHeader(owner));
       expect(res.status).toBe(200);
       expect(res.body).toEqual({});
     });
 
-    it('l\'admin de la salle enregistre puis relit la page', async () => {
+    it('l\'owner enregistre puis relit la page', async () => {
       const put = await request(app)
         .put(`/gyms/${gym.id}/showcase`)
-        .set('Authorization', authHeader(admin))
+        .set('Authorization', authHeader(owner))
         .send(samplePage);
       expect(put.status).toBe(200);
 
       const get = await request(app)
         .get(`/gyms/${gym.id}/showcase`)
-        .set('Authorization', authHeader(admin));
+        .set('Authorization', authHeader(owner));
       expect(get.body.sections.map((s) => s.id)).toEqual(['gymInfo', 's1', 's2']);
     });
 
-    it('refuse l\'admin d\'une autre salle et les membres', async () => {
+    it('refuse le manager (même de sa salle), le manager d\'une autre salle et les membres', async () => {
       const otherAdmin = await createTestAdmin(otherGym.id);
-      for (const user of [otherAdmin, member]) {
+      for (const user of [admin, otherAdmin, member]) {
         const res = await request(app)
           .put(`/gyms/${gym.id}/showcase`)
           .set('Authorization', authHeader(user))
@@ -163,10 +163,35 @@ describe('Showcase CMS routes', () => {
     it('PUT /gyms/:id enregistre la description', async () => {
       const res = await request(app)
         .put(`/gyms/${gym.id}`)
-        .set('Authorization', authHeader(admin))
+        .set('Authorization', authHeader(owner))
         .send({ description: 'Nouvelle description' });
       expect(res.status).toBe(200);
       expect(res.body.gym.description).toBe('Nouvelle description');
+    });
+
+    it('PUT /gyms/:id refuse les champs vitrine au manager mais accepte le reste', async () => {
+      for (const body of [{ description: 'x' }, { isPublished: true }, { slug: 'ma-salle' }]) {
+        const res = await request(app)
+          .put(`/gyms/${gym.id}`)
+          .set('Authorization', authHeader(admin))
+          .send(body);
+        expect(res.status).toBe(403);
+        expect(res.body.error).toBe('showcase_forbidden');
+      }
+
+      const ok = await request(app)
+        .put(`/gyms/${gym.id}`)
+        .set('Authorization', authHeader(admin))
+        .send({ phone: '0600000000' });
+      expect(ok.status).toBe(200);
+    });
+
+    it('refuse la galerie photos au manager', async () => {
+      const res = await request(app)
+        .post(`/gyms/${gym.id}/photos`)
+        .set('Authorization', authHeader(admin))
+        .send({ imageData: 'data:image/png;base64,iVBORw0KGgo=' });
+      expect(res.status).toBe(403);
     });
   });
 });

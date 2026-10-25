@@ -12,13 +12,15 @@ const DEFAULT_OWNER_PERMISSIONS = Object.freeze({
 });
 
 function toOwnerPermissions(ownerRow) {
-  if (!ownerRow) return { ...DEFAULT_OWNER_PERMISSIONS };
-  return {
+  const permissions = ownerRow ? {
     canManageAdmins: ownerRow.canManageAdmins,
     canManageGyms: ownerRow.canManageGyms,
     canViewReports: ownerRow.canViewReports,
     maxGymsAllowed: ownerRow.maxGymsAllowed
-  };
+  } : { ...DEFAULT_OWNER_PERMISSIONS };
+  // Rôles V2 : alias exposé pendant la transition (même colonne en base)
+  permissions.canManageManagers = permissions.canManageAdmins;
+  return permissions;
 }
 
 async function getOwnerPermissions(userId) {
@@ -28,10 +30,11 @@ async function getOwnerPermissions(userId) {
 
 /**
  * true si `user` (ligne User) est un owner disposant de `permission`.
- * Toujours false pour un admin ou un membre.
+ * Toujours false pour un manager, un coach ou un membre.
  */
 async function ownerHasPermission(user, permission) {
   if (!user || user.role !== 'owner') return false;
+  if (permission === 'canManageManagers') permission = 'canManageAdmins';
   const permissions = await getOwnerPermissions(user.id);
   return permissions[permission] === true;
 }

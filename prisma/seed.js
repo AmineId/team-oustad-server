@@ -50,7 +50,7 @@ async function main() {
   // Members depend on users
   await prisma.member.deleteMany();
   // Admin/Owner also depend on users
-  await prisma.admin.deleteMany();
+  await prisma.manager.deleteMany();
   await prisma.owner.deleteMany();
   // Password reset tokens must be removed before users
   await prisma.passwordResetToken.deleteMany();
@@ -93,13 +93,13 @@ async function main() {
             notificationsEnabled: true
           },
           {
-            displayId: generateUserIdByRole('admin'),
+            displayId: generateUserIdByRole('manager'),
             uniqueCode: crypto.randomUUID().substring(0, 8).toUpperCase(),
             email: 'admin@team-oustad.com',
             password: hashed,
             firstName: 'Mike',
             lastName: 'Anderson',
-            role: 'admin',
+            role: 'manager',
             notificationsEnabled: true
           },
           {
@@ -148,13 +148,13 @@ async function main() {
       User: {
         create: [
           {
-            displayId: generateUserIdByRole('admin'),
+            displayId: generateUserIdByRole('manager'),
             uniqueCode: crypto.randomUUID().substring(0, 8).toUpperCase(),
             email: 'admin2@team-oustad.com',
             password: hashed,
             firstName: 'Lisa',
             lastName: 'Martinez',
-            role: 'admin',
+            role: 'manager',
             notificationsEnabled: true
           },
           {
@@ -240,13 +240,13 @@ async function main() {
   
   // GYM 1 Users
   const ownerUser = gym1.User.find(u => u.role === 'owner');
-  const adminUser = gym1.User.find(u => u.role === 'admin');
+  const adminUser = gym1.User.find(u => u.role === 'manager');
   const bobUser = gym1.User.find(u => u.email === 'bob@example.com');
   const charlieUser = gym1.User.find(u => u.email === 'charlie@example.com');
   const aliceUser = gym1.User.find(u => u.email === 'alice@example.com');
 
   // GYM 2 Users
-  const admin2User = gym2.User.find(u => u.role === 'admin');
+  const admin2User = gym2.User.find(u => u.role === 'manager');
   const davidUser = gym2.User.find(u => u.email === 'david@example.com');
   const emmaUser = gym2.User.find(u => u.email === 'emma@example.com');
 
@@ -262,16 +262,16 @@ async function main() {
   });
   console.log(`✅ Owner: ${ownerUser.firstName} ${ownerUser.lastName}`);
 
-  // Admin profiles
-  await prisma.admin.create({
+  // Manager profiles
+  await prisma.manager.create({
     data: { userId: adminUser.id }
   });
-  console.log(`✅ Admin: ${adminUser.firstName} ${adminUser.lastName}`);
+  console.log(`✅ Manager: ${adminUser.firstName} ${adminUser.lastName}`);
 
-  await prisma.admin.create({
+  await prisma.manager.create({
     data: { userId: admin2User.id }
   });
-  console.log(`✅ Admin: ${admin2User.firstName} ${admin2User.lastName}`);
+  console.log(`✅ Manager: ${admin2User.firstName} ${admin2User.lastName}`);
 
   // Member profiles
   const bobMember = await prisma.member.create({
@@ -1987,7 +1987,7 @@ async function main() {
   
   const totalUsers = await prisma.user.count();
   const totalMembers = await prisma.member.count();
-  const totalAdmins = await prisma.admin.count();
+  const totalAdmins = await prisma.manager.count();
   const totalOwners = await prisma.owner.count();
   const totalGyms = await prisma.gym.count();
   const totalSubscriptions = await prisma.subscription.count();
@@ -2002,7 +2002,7 @@ async function main() {
   console.log('👥 Utilisateurs:');
   console.log(`   - Total: ${totalUsers}`);
   console.log(`   - Owners: ${totalOwners}`);
-  console.log(`   - Admins: ${totalAdmins}`);
+  console.log(`   - Managers: ${totalAdmins}`);
   console.log(`   - Members: ${totalMembers}\n`);
   
   console.log('🏋️ Salles de sport:');
@@ -2055,10 +2055,10 @@ async function main() {
   console.log('   Owner:');
   console.log('     - Email: owner@team-oustad.com');
   console.log('     - Password: owner123\n');
-  console.log('   Admin (Gym 1):');
+  console.log('   Manager (Gym 1):');
   console.log('     - Email: admin@team-oustad.com');
   console.log('     - Password: admin123\n');
-  console.log('   Admin (Gym 2):');
+  console.log('   Manager (Gym 2):');
   console.log('     - Email: admin2@team-oustad.com');
   console.log('     - Password: admin123\n');
   console.log('   Members (avec historique):');

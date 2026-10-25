@@ -6,6 +6,7 @@ const {
   disconnectDatabase,
   createTestGym,
   createTestAdmin,
+  createTestOwner,
   createTestMember,
   authHeader,
   prisma
@@ -36,7 +37,8 @@ describe('Store Routes', () => {
     await prisma.storeProduct.deleteMany({});
     await prisma.passwordResetToken.deleteMany({});
     await prisma.member.deleteMany({});
-    await prisma.admin.deleteMany({});
+    await prisma.manager.deleteMany({});
+    await prisma.owner.deleteMany({});
     await prisma.user.deleteMany({});
     
     // Create fresh test users
@@ -441,6 +443,77 @@ describe('Store Routes', () => {
         .set('Authorization', authHeader(testAdmin));
       expect(res.status).toBe(200);
       expect(res.body.stats).toBeDefined();
+    });
+  });
+  describe('Rôles V2 : store limité à la salle du manager', () => {
+    let otherGym;
+    let otherProduct;
+
+    beforeEach(async () => {
+      otherGym = await createTestGym({ name: `Other ${Date.now()}` });
+      otherProduct = await prisma.storeProduct.create({
+        data: {
+          displayId: `PROD-OTHER-${Date.now()}`,
+          name: 'Produit autre salle',
+          price: 10,
+          stock: 5,
+          availableStock: 5,
+          gymId: otherGym.id,
+          createdBy: testAdmin.id
+        }
+      });
+    });
+
+    it('refuse la création pour une autre salle (403)', async () => {
+      const res = await request(app)
+        .post('/store/products')
+        .set('Authorization', authHeader(testAdmin))
+        .send({ name: 'X', price: 10, stock: 1, gymId: otherGym.id });
+      expect(res.status).toBe(403);
+    });
+
+    it('crée dans sa salle par défaut', async () => {
+      const res = await request(app)
+        .post('/store/products')
+        .set('Authorization', authHeader(testAdmin))
+        .send({ name: 'Y', price: 10, stock: 1 });
+      expect(res.status).toBe(201);
+      expect(res.body.product.gymId).toBe(testGym.id);
+    });
+
+    it('refuse la modification et la suppression d\'un produit d\'une autre salle (403)', async () => {
+      const put = await request(app)
+        .put(`/store/products/${otherProduct.displayId}`)
+        .set('Authorization', authHeader(testAdmin))
+        .send({ price: 1 });
+      expect(put.status).toBe(403);
+
+      const del = await request(app)
+        .delete(`/store/products/${otherProduct.displayId}`)
+        .set('Authorization', authHeader(testAdmin));
+      expect(del.status).toBe(403);
+    });
+
+    it('refuse les stats d\'une autre salle au manager, les accorde à l\'owner', async () => {
+      const mgr = await request(app)
+        .get(`/store/stats?gymId=${otherGym.id}`)
+        .set('Authorization', authHeader(testAdmin));
+      expect(mgr.status).toBe(403);
+
+      const owner = await createTestOwner(testGym.id);
+      const own = await request(app)
+        .get(`/store/stats?gymId=${otherGym.id}`)
+        .set('Authorization', authHeader(owner));
+      expect(own.status).toBe(200);
+    });
+
+    it('l\'owner crée un produit pour n\'importe quelle salle', async () => {
+      const owner = await createTestOwner(testGym.id);
+      const res = await request(app)
+        .post('/store/products')
+        .set('Authorization', authHeader(owner))
+        .send({ name: 'Z', price: 10, stock: 1, gymId: otherGym.id });
+      expect(res.status).toBe(201);
     });
   });
 });

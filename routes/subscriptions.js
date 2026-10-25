@@ -40,7 +40,7 @@ router.post('/', auth, async (req, res) => {
       return res.status(403).json({ error: 'Accès refusé' });
     }
     
-    if (requester.role === 'admin') {
+    if (requester.role === 'manager') {
       // Vérifier que le membre est dans la même salle
       const member = await prisma.user.findUnique({
         where: { id: memberId }
@@ -155,7 +155,7 @@ router.get('/:id', auth, async (req, res) => {
       return res.status(403).json({ error: 'Accès refusé' });
     }
     
-    if (requester.role === 'admin' && status.subscription.member.user.gymId !== requester.gymId) {
+    if (requester.role === 'manager' && status.subscription.member.user.gymId !== requester.gymId) {
       return res.status(403).json({ error: 'Accès refusé' });
     }
     
@@ -191,7 +191,7 @@ router.get('/member/:memberId', auth, async (req, res) => {
       return res.status(403).json({ error: 'Accès refusé' });
     }
     
-    if (requester.role === 'admin') {
+    if (requester.role === 'manager') {
       const member = await prisma.user.findUnique({
         where: { id: memberId }
       });
@@ -254,7 +254,7 @@ router.post('/payments/:paymentId/acknowledge', auth, async (req, res) => {
       return res.status(403).json({ error: 'Accès refusé' });
     }
 
-    if (requester.role === 'admin' && payment.Member.User.gymId !== requester.gymId) {
+    if (requester.role === 'manager' && payment.Member.User.gymId !== requester.gymId) {
       return res.status(403).json({ error: 'Accès refusé' });
     }
 
@@ -323,7 +323,7 @@ router.post('/payments/:paymentId/complete', auth, async (req, res) => {
       return res.status(403).json({ error: 'Accès refusé' });
     }
 
-    if (requester.role === 'admin' && payment.Member.User.gymId !== requester.gymId) {
+    if (requester.role === 'manager' && payment.Member.User.gymId !== requester.gymId) {
       return res.status(403).json({ error: 'Accès refusé' });
     }
     
@@ -379,7 +379,7 @@ router.get('/payments/upcoming', auth, async (req, res) => {
     };
     
     // Si admin, filtrer par salle
-    if (requester.role === 'admin') {
+    if (requester.role === 'manager') {
       whereClause.Member = {
         User: {
           gymId: requester.gymId

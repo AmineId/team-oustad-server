@@ -40,7 +40,7 @@ describe('Plannings Routes', () => {
     await prisma.planning.deleteMany({});
     await prisma.passwordResetToken.deleteMany({});
     await prisma.member.deleteMany({});
-    await prisma.admin.deleteMany({});
+    await prisma.manager.deleteMany({});
     await prisma.user.deleteMany({});
     
     // Create fresh test users

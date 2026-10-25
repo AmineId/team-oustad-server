@@ -176,7 +176,7 @@ const TOOLS = [
   // ===== SALLES DE SPORT (GYMS) =====
   {
     name: 'gyms_list',
-    description: 'Lister les salles de sport accessibles (owners voient tout, admins/members voient leur salle)',
+    description: 'Lister les salles de sport accessibles (owners voient tout, managers/members voient leur salle)',
     inputSchema: {
       type: 'object',
       properties: {},
@@ -262,14 +262,14 @@ const TOOLS = [
   // ===== UTILISATEURS =====
   {
     name: 'users_list',
-    description: 'Lister les utilisateurs (admins voient leur salle, owners voient tout)',
+    description: 'Lister les utilisateurs (managers voient leur salle, owners voient tout)',
     inputSchema: {
       type: 'object',
       properties: {
         role: {
           type: 'string',
-          description: 'Filtrer par rôle (admin, member, owner)',
-          enum: ['admin', 'member', 'owner'],
+          description: 'Filtrer par rôle (manager, member, owner)',
+          enum: ['manager', 'member', 'owner'],
         },
         gymId: {
           type: 'number',
@@ -294,7 +294,7 @@ const TOOLS = [
   },
   {
     name: 'users_create',
-    description: 'Créer un nouvel utilisateur (membre, admin ou owner)',
+    description: 'Créer un nouvel utilisateur (membre, manager ou owner)',
     inputSchema: {
       type: 'object',
       properties: {
@@ -308,12 +308,12 @@ const TOOLS = [
         },
         role: {
           type: 'string',
-          description: 'Rôle (admin, member, owner)',
-          enum: ['admin', 'member', 'owner'],
+          description: 'Rôle (manager, member, owner ; admin accepté comme alias de manager)',
+          enum: ['manager', 'member', 'owner'],
         },
         gymId: {
           type: 'number',
-          description: 'ID de la salle (obligatoire pour admin et member)',
+          description: 'ID de la salle (obligatoire pour manager et member)',
         },
       },
       required: ['email', 'fullName', 'role'],

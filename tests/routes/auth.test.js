@@ -40,7 +40,8 @@ describe('Authentication Routes', () => {
     await prisma.subscription.deleteMany({});
     await prisma.subscriptionType.deleteMany({});
     await prisma.member.deleteMany({});
-    await prisma.admin.deleteMany({});
+    await prisma.manager.deleteMany({});
+    await prisma.owner.deleteMany({});
     await prisma.user.deleteMany({});
     
     // Create fresh test users
@@ -67,7 +68,7 @@ describe('Authentication Routes', () => {
       expect(response.status).toBe(200);
       expect(response.body.token).toBeDefined();
       expect(response.body.user).toBeDefined();
-      expect(response.body.user.role).toBe('admin');
+      expect(response.body.user.role).toBe('manager');
       expect(response.body.user.email).toBe('testadmin@test.com');
     });
 
@@ -163,7 +164,7 @@ describe('Authentication Routes', () => {
       expect(response.status).toBe(200);
       expect(response.body.id).toBe(testAdmin.id);
       expect(response.body.email).toBe(testAdmin.email);
-      expect(response.body.type).toBe('admin');
+      expect(response.body.type).toBe('manager');
       expect(response.body.gym).toBeDefined();
     });
 
@@ -410,7 +411,7 @@ describe('Authentication Routes', () => {
         .send({ qrCode: testMember.displayId });
 
       expect(response.status).toBe(403);
-      expect(response.body.error).toContain('admin');
+      expect(response.body.error).toContain('manager');
     });
 
     it('should return 404 for non-existent QR code', async () => {
@@ -613,6 +614,66 @@ describe('Authentication Routes', () => {
         .send({ userId: testMember.id });
 
       expect(response.status).toBe(200);
+    });
+  });
+  describe('Rôles V2 : login kiosk', () => {
+    const login = (body) => request(app).post('/auth/login').send(body);
+    const me = (token) => request(app).get('/auth/me').set('Authorization', `Bearer ${token}`);
+
+    it('accepte le manager et renvoie role=manager et client=kiosk', async () => {
+      const res = await login({ email: 'testadmin@test.com', password: 'admin123', client: 'kiosk' });
+      expect(res.status).toBe(200);
+      expect(res.body.user.role).toBe('manager');
+      expect(res.body.user.type).toBe('manager');
+      expect(res.body.user.client).toBe('kiosk');
+    });
+
+    it('accepte l\'owner', async () => {
+      await createTestOwner(testGym.id, { email: 'kioskowner@test.com', password: 'owner123' });
+      const res = await login({ email: 'kioskowner@test.com', password: 'owner123', client: 'kiosk' });
+      expect(res.status).toBe(200);
+      expect(res.body.user.role).toBe('owner');
+    });
+
+    it('refuse le membre avec 403 kiosk_forbidden_role, sans toucher à sa session', async () => {
+      const app1 = await login({ email: 'testmember@test.com', password: 'member123' });
+      const res = await login({ email: 'testmember@test.com', password: 'member123', client: 'kiosk' });
+      expect(res.status).toBe(403);
+      expect(res.body.error).toBe('kiosk_forbidden_role');
+      expect(res.body.token).toBeUndefined();
+      expect((await me(app1.body.token)).status).toBe(200);
+    });
+
+    it('refuse un mauvais mot de passe avant le contrôle de rôle (401)', async () => {
+      const res = await login({ email: 'testmember@test.com', password: 'wrong', client: 'kiosk' });
+      expect(res.status).toBe(401);
+    });
+
+    it('garde des sessions séparées : la connexion kiosk ne déconnecte pas l\'app', async () => {
+      const appLogin = await login({ email: 'testadmin@test.com', password: 'admin123' });
+      const kioskLogin = await login({ email: 'testadmin@test.com', password: 'admin123', client: 'kiosk' });
+      expect((await me(appLogin.body.token)).status).toBe(200);
+      expect((await me(kioskLogin.body.token)).status).toBe(200);
+
+      // Nouvelle connexion app : l'ancien token app expire, le kiosk reste connecté
+      const appLogin2 = await login({ email: 'testadmin@test.com', password: 'admin123' });
+      expect((await me(appLogin.body.token)).status).toBe(401);
+      expect((await me(appLogin2.body.token)).status).toBe(200);
+      expect((await me(kioskLogin.body.token)).status).toBe(200);
+
+      // Nouvelle connexion kiosk : l'ancien token kiosk expire
+      await login({ email: 'testadmin@test.com', password: 'admin123', client: 'kiosk' });
+      expect((await me(kioskLogin.body.token)).status).toBe(401);
+      expect((await me(appLogin2.body.token)).status).toBe(200);
+    });
+
+    it('/auth/me renvoie role=manager pour un ancien token type=admin', async () => {
+      const { generateToken } = require('../helpers/testHelpers');
+      const legacy = generateToken({ ...testAdmin, role: 'admin' });
+      const res = await me(legacy);
+      expect(res.status).toBe(200);
+      expect(res.body.role).toBe('manager');
+      expect(res.body.type).toBe('manager');
     });
   });
 });

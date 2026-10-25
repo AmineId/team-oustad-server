@@ -6,6 +6,7 @@ const {
   disconnectDatabase,
   createTestGym,
   createTestAdmin,
+  createTestOwner,
   createTestMember,
   authHeader,
   prisma
@@ -19,6 +20,7 @@ app.use('/banners', bannersRoutes);
 describe('Banners Routes', () => {
   let testGym;
   let testAdmin;
+  let testOwner;
   let testMember;
 
   beforeAll(async () => {
@@ -36,10 +38,12 @@ describe('Banners Routes', () => {
     await prisma.banner.deleteMany({});
     await prisma.passwordResetToken.deleteMany({});
     await prisma.member.deleteMany({});
-    await prisma.admin.deleteMany({});
+    await prisma.manager.deleteMany({});
+    await prisma.owner.deleteMany({});
     await prisma.user.deleteMany({});
     
     // Create fresh test users
+    testOwner = await createTestOwner(testGym.id);
     testAdmin = await createTestAdmin(testGym.id, {
       email: 'admin@test.com',
       password: 'admin123'
@@ -52,10 +56,10 @@ describe('Banners Routes', () => {
   });
 
   describe('POST /banners', () => {
-    it('should create a banner as admin', async () => {
+    it('should create a banner as owner', async () => {
       const response = await request(app)
         .post('/banners')
-        .set('Authorization', authHeader(testAdmin))
+        .set('Authorization', authHeader(testOwner))
         .send({
           title: 'Summer Promotion',
           message: 'Get 20% off on all memberships',
@@ -84,7 +88,7 @@ describe('Banners Routes', () => {
     it('should return 400 with missing required fields', async () => {
       const response = await request(app)
         .post('/banners')
-        .set('Authorization', authHeader(testAdmin))
+        .set('Authorization', authHeader(testOwner))
         .send({
           title: 'Test Banner'
           // Missing message and type
@@ -208,10 +212,10 @@ describe('Banners Routes', () => {
       });
     });
 
-    it('should update a banner as admin', async () => {
+    it('should update a banner as owner', async () => {
       const response = await request(app)
         .put(`/banners/${testBanner.id}`)
-        .set('Authorization', authHeader(testAdmin))
+        .set('Authorization', authHeader(testOwner))
         .send({
           title: 'Updated Title',
           description: 'Updated message'
@@ -253,10 +257,10 @@ describe('Banners Routes', () => {
       });
     });
 
-    it('should delete a banner as admin', async () => {
+    it('should delete a banner as owner', async () => {
       const response = await request(app)
         .delete(`/banners/${testBanner.id}`)
-        .set('Authorization', authHeader(testAdmin));
+        .set('Authorization', authHeader(testOwner));
 
       expect(response.status).toBe(200);
 
@@ -457,7 +461,7 @@ describe('Banners Routes', () => {
     it('should create a variant', async () => {
       const response = await request(app)
         .post(`/banners/${variantBanner.id}/variants`)
-        .set('Authorization', authHeader(testAdmin))
+        .set('Authorization', authHeader(testOwner))
         .send({ variantName: 'A', title: 'Variant A', weight: 50 });
       expect(response.status).toBe(201);
       expect(response.body.variantName).toBe('A');
@@ -484,7 +488,7 @@ describe('Banners Routes', () => {
       });
       const response = await request(app)
         .put(`/banners/${variantBanner.id}/variants/${variant.id}`)
-        .set('Authorization', authHeader(testAdmin))
+        .set('Authorization', authHeader(testOwner))
         .send({ title: 'Updated Variant B' });
       expect(response.status).toBe(200);
     });
@@ -502,7 +506,68 @@ describe('Banners Routes', () => {
       });
       const response = await request(app)
         .delete(`/banners/${variantBanner.id}/variants/${variant.id}`)
+        .set('Authorization', authHeader(testOwner));
+      expect(response.status).toBe(200);
+    });
+  });
+  describe('Rôles V2 : banners réservés à l\'owner en écriture', () => {
+    let banner;
+
+    beforeEach(async () => {
+      banner = await prisma.banner.create({
+        data: {
+          displayId: `BANNER-${Date.now()}-mgr`,
+          title: 'Manager Banner',
+          type: 'promotion',
+          startDate: new Date(),
+          endDate: new Date(Date.now() + 24 * 60 * 60 * 1000),
+          gymId: testGym.id
+        }
+      });
+    });
+
+    it('refuse la création au manager (403)', async () => {
+      const response = await request(app)
+        .post('/banners')
+        .set('Authorization', authHeader(testAdmin))
+        .send({ title: 'Promo', type: 'promotion' });
+      expect(response.status).toBe(403);
+    });
+
+    it('refuse la modification et la suppression au manager (403)', async () => {
+      const put = await request(app)
+        .put(`/banners/${banner.id}`)
+        .set('Authorization', authHeader(testAdmin))
+        .send({ title: 'Changed' });
+      expect(put.status).toBe(403);
+
+      const del = await request(app)
+        .delete(`/banners/${banner.id}`)
         .set('Authorization', authHeader(testAdmin));
+      expect(del.status).toBe(403);
+    });
+
+    it('refuse la création de variante au manager (403)', async () => {
+      const response = await request(app)
+        .post(`/banners/${banner.id}/variants`)
+        .set('Authorization', authHeader(testAdmin))
+        .send({ variantName: 'A', title: 'A' });
+      expect(response.status).toBe(403);
+    });
+
+    it('laisse le manager lire les stats', async () => {
+      const response = await request(app)
+        .get('/banners/stats/summary')
+        .set('Authorization', authHeader(testAdmin));
+      expect(response.status).toBe(200);
+    });
+
+    it('normalise un ancien token type=admin en manager', async () => {
+      const { generateToken } = require('../helpers/testHelpers');
+      const legacy = generateToken({ ...testAdmin, role: 'admin' });
+      const response = await request(app)
+        .get('/banners/stats/summary')
+        .set('Authorization', `Bearer ${legacy}`);
       expect(response.status).toBe(200);
     });
   });

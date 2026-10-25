@@ -36,7 +36,8 @@ describe('Subscription Types Routes', () => {
     await prisma.subscriptionType.deleteMany({});
     await prisma.passwordResetToken.deleteMany({});
     await prisma.member.deleteMany({});
-    await prisma.admin.deleteMany({});
+    await prisma.manager.deleteMany({});
+    await prisma.owner.deleteMany({});
     await prisma.user.deleteMany({});
     
     // Create fresh test users

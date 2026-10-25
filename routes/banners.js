@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const authenticateToken = require('../middleware/auth');
-const { requireAdminOrOwner } = require('../middleware/bannerAuth');
+const { requireManagerOrOwner, requireBannerOwner } = require('../middleware/bannerAuth');
 const bannerService = require('../services/bannerService');
 
 // ==================== PUBLIC ENDPOINTS ====================
@@ -38,7 +38,7 @@ router.get('/', async (req, res) => {
  * GET /banners/stats/summary
  * Résumé des statistiques de toutes les bannières
  */
-router.get('/stats/summary', authenticateToken, requireAdminOrOwner, async (req, res) => {
+router.get('/stats/summary', authenticateToken, requireManagerOrOwner, async (req, res) => {
   try {
     const { gymId, startDate, endDate } = req.query;
 
@@ -150,7 +150,7 @@ router.post('/:id/track/click', async (req, res) => {
  * POST /banners
  * Créer une nouvelle bannière (Admin/Owner uniquement)
  */
-router.post('/', authenticateToken, requireAdminOrOwner, async (req, res) => {
+router.post('/', authenticateToken, requireBannerOwner, async (req, res) => {
   try {
     const bannerData = req.body;
     
@@ -175,7 +175,7 @@ router.post('/', authenticateToken, requireAdminOrOwner, async (req, res) => {
  * PUT /banners/:id
  * Mettre à jour une bannière (Admin/Owner uniquement)
  */
-router.put('/:id', authenticateToken, requireAdminOrOwner, async (req, res) => {
+router.put('/:id', authenticateToken, requireBannerOwner, async (req, res) => {
   try {
     const { id } = req.params;
     const updateData = req.body;
@@ -200,7 +200,7 @@ router.put('/:id', authenticateToken, requireAdminOrOwner, async (req, res) => {
  * DELETE /banners/:id
  * Supprimer une bannière (Admin/Owner uniquement)
  */
-router.delete('/:id', authenticateToken, requireAdminOrOwner, async (req, res) => {
+router.delete('/:id', authenticateToken, requireBannerOwner, async (req, res) => {
   try {
     const { id } = req.params;
 
@@ -226,7 +226,7 @@ router.delete('/:id', authenticateToken, requireAdminOrOwner, async (req, res) =
  * GET /banners/:id/variants
  * Récupérer les variantes d'une bannière
  */
-router.get('/:id/variants', authenticateToken, requireAdminOrOwner, async (req, res) => {
+router.get('/:id/variants', authenticateToken, requireManagerOrOwner, async (req, res) => {
   try {
     const { id } = req.params;
 
@@ -246,7 +246,7 @@ router.get('/:id/variants', authenticateToken, requireAdminOrOwner, async (req, 
  * POST /banners/:id/variants
  * Créer une variante A/B
  */
-router.post('/:id/variants', authenticateToken, requireAdminOrOwner, async (req, res) => {
+router.post('/:id/variants', authenticateToken, requireBannerOwner, async (req, res) => {
   try {
     const { id } = req.params;
     const variantData = req.body;
@@ -267,7 +267,7 @@ router.post('/:id/variants', authenticateToken, requireAdminOrOwner, async (req,
  * PUT /banners/:id/variants/:variantId
  * Mettre à jour une variante
  */
-router.put('/:id/variants/:variantId', authenticateToken, requireAdminOrOwner, async (req, res) => {
+router.put('/:id/variants/:variantId', authenticateToken, requireBannerOwner, async (req, res) => {
   try {
     const { id, variantId } = req.params;
     const updateData = req.body;
@@ -296,7 +296,7 @@ router.put('/:id/variants/:variantId', authenticateToken, requireAdminOrOwner, a
  * DELETE /banners/:id/variants/:variantId
  * Supprimer une variante
  */
-router.delete('/:id/variants/:variantId', authenticateToken, requireAdminOrOwner, async (req, res) => {
+router.delete('/:id/variants/:variantId', authenticateToken, requireBannerOwner, async (req, res) => {
   try {
     const { id, variantId } = req.params;
 
@@ -325,7 +325,7 @@ router.delete('/:id/variants/:variantId', authenticateToken, requireAdminOrOwner
  * GET /banners/:id/stats
  * Récupérer les statistiques d'une bannière
  */
-router.get('/:id/stats', authenticateToken, requireAdminOrOwner, async (req, res) => {
+router.get('/:id/stats', authenticateToken, requireManagerOrOwner, async (req, res) => {
   try {
     const { id } = req.params;
     const { startDate, endDate } = req.query;

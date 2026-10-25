@@ -144,13 +144,14 @@ function generateCheckInId() {
 
 /**
  * Génère un ID utilisateur basé sur le rôle
- * @param {string} role - 'member', 'admin', 'owner'
+ * @param {string} role - 'member', 'manager' (alias 'admin'), 'owner'
  * @returns {string} ID formaté selon le rôle
  */
 function generateUserIdByRole(role) {
   switch (role.toLowerCase()) {
     case 'member':
       return generateMemberId();
+    case 'manager':
     case 'admin':
       return generateAdminId();
     case 'owner':
