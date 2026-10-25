@@ -9,30 +9,28 @@
     "dev:full": "npm run db:up && npm run dev",
     "start:preprod": "dotenv run -f .env.preprod -- node index.js",
     "start:prod": "dotenv run -f .env.prod -- node index.js",
-
     "db:up": "docker compose -f config/docker-compose.yml up -d --wait",
     "db:down": "docker compose -f config/docker-compose.yml down",
     "db:seed": "node prisma/seed.js",
     "db:test:up": "docker compose -f config/docker-compose.test.yml up -d --wait",
     "db:test:down": "docker compose -f config/docker-compose.test.yml down",
-
     "migrate": "prisma migrate dev",
     "migrate:preprod": "dotenv run -f .env.preprod -- prisma migrate deploy",
     "migrate:prod": "dotenv run -f .env.prod -- prisma migrate deploy",
     "studio": "prisma studio",
-
     "preprod:full": "npm run db:preprod:up && npm run migrate:preprod && npm run start:preprod",
     "preprod:setup": "npm run db:preprod:up && npm run migrate:preprod && dotenv run -f .env.preprod -- node prisma/seed.js",
     "prod:deploy": "npm run migrate:prod && npm start",
     "db:preprod:up": "docker compose -f config/docker-compose-multi-env.yml up -d --wait postgres-preprod",
     "db:preprod:down": "docker compose -f config/docker-compose-multi-env.yml stop postgres-preprod",
-
     "test": "cross-env NODE_ENV=test jest --runInBand",
     "test:coverage": "cross-env NODE_ENV=test jest --coverage --runInBand",
     "test:ci": "cross-env NODE_ENV=test jest --ci --coverage --runInBand",
-
     "tunnel": "./bin/start-tunnel.sh",
-    "pm2:restart:preprod": "npx prisma generate && pm2 restart teamfitness-preprod"
+    "dev:tunnel": "npm run db:up && concurrently -n \"server,tunnel\" -c \"cyan,yellow\" \"npm run dev\" \"cloudflared tunnel run pprod\"",
+    "pm2:restart:preprod": "npx prisma generate && pm2 restart teamfitness-preprod",
+    "preprod:deploy": "npm run migrate:preprod && npx prisma generate && dotenv run -f .env.preprod -- node prisma/seed.js && pm2 restart teamfitness-preprod",
+    "preprod:deploy:noseed": "npm run migrate:preprod && npx prisma generate && pm2 restart teamfitness-preprod"
   },
   "keywords": [],
   "author": "",
@@ -69,6 +67,7 @@
     "@emnapi/core": "^1.11.3",
     "@emnapi/runtime": "^1.11.3",
     "@jest/globals": "^30.5.2",
+    "concurrently": "^10.0.6",
     "cross-env": "^10.1.0",
     "dotenv-cli": "^11.0.0",
     "jest": "^30.5.2",

@@ -9,7 +9,9 @@ const {
   generatePaymentId,
   generatePlanningId,
   generateExerciseId,
-  generateSubscriptionTypeId
+  generateSubscriptionTypeId,
+  generateBannerId,
+  generateBannerVariantId
 } = require('../utils/idGenerator');
 
 /**
@@ -52,6 +54,9 @@ async function main() {
   // Password reset tokens must be removed before users
   await prisma.passwordResetToken.deleteMany();
   await prisma.user.deleteMany();
+  await prisma.bannerStats.deleteMany();
+  await prisma.bannerVariant.deleteMany();
+  await prisma.banner.deleteMany();
   await prisma.openingHour.deleteMany();
   await prisma.gym.deleteMany();
   console.log('✅ Données supprimées\n');
@@ -1701,6 +1706,154 @@ async function main() {
   console.log(`✅ Planning créé pour ${charlieUser.firstName} ${charlieUser.lastName}: ${charliePlanning.title}\n`);
 
 
+  // Créer des banners event et promotion
+  console.log('🎯 Création des banners...');
+
+  const bannerNow = new Date();
+
+  // Banner 1 — EVENT: Tournoi mensuel (actif maintenant)
+  const bannerEvent1 = await prisma.banner.create({
+    data: {
+      displayId: generateBannerId(),
+      gymId: gym1.id,
+      type: 'event',
+      title: 'Tournoi Mensuel de Fitness',
+      titleEn: 'Monthly Fitness Tournament',
+      titleAr: 'البطولة الشهرية للياقة البدنية',
+      description: 'Participez à notre tournoi mensuel et remportez des prix incroyables ! Inscrivez-vous avant le 30 octobre.',
+      descriptionEn: 'Join our monthly tournament and win amazing prizes! Register before October 30th.',
+      descriptionAr: 'شارك في بطولتنا الشهرية واربح جوائز رائعة! سجّل قبل 30 أكتوبر.',
+      imageUrl: 'https://images.unsplash.com/photo-1517836357463-d25dfeac3438?w=800',
+      mediaType: 'image',
+      backgroundColor: '#1A1A2E',
+      textColor: '#E94560',
+      startDate: new Date(bannerNow.getFullYear(), bannerNow.getMonth(), 1),
+      endDate: new Date(bannerNow.getFullYear(), bannerNow.getMonth() + 1, 0),
+      actionType: 'showDetails',
+      actionData: 'Inscriptions ouvertes — présentation obligatoire à l\'accueil.',
+      priority: 10,
+      isActive: true,
+      isScheduled: true,
+      maxViewsPerUser: 5,
+    }
+  });
+
+  // Variant A — version avec challenge
+  await prisma.bannerVariant.create({
+    data: {
+      displayId: generateBannerVariantId(),
+      bannerId: bannerEvent1.id,
+      variantName: 'A',
+      title: '🏆 Tournoi Mensuel',
+      description: 'Testez vos limites. Gagnez des récompenses.',
+      backgroundColor: '#1A1A2E',
+      textColor: '#E94560',
+      weight: 50,
+      isActive: true,
+    }
+  });
+
+  // Variant B — version axée communauté
+  await prisma.bannerVariant.create({
+    data: {
+      displayId: generateBannerVariantId(),
+      bannerId: bannerEvent1.id,
+      variantName: 'B',
+      title: '💪 Rejoins le Tournoi !',
+      description: 'Sois dans le top 3 et remporte ton mois gratuit.',
+      backgroundColor: '#0F3460',
+      textColor: '#FFFFFF',
+      weight: 50,
+      isActive: true,
+    }
+  });
+
+  console.log(`✅ Banner event créé: ${bannerEvent1.title} (2 variants A/B)`);
+
+  // Banner 2 — EVENT: Cours collectifs spéciaux (gym2, commence dans 2 semaines)
+  const bannerEvent2 = await prisma.banner.create({
+    data: {
+      displayId: generateBannerId(),
+      gymId: gym2.id,
+      type: 'event',
+      title: 'Semaine Spéciale Yoga & Pilates',
+      titleEn: 'Special Yoga & Pilates Week',
+      titleAr: 'أسبوع اليوغا والبيلاتس الخاص',
+      description: 'Du 4 au 8 novembre, profitez de cours collectifs gratuits animés par nos coachs certifiés.',
+      descriptionEn: 'From Nov 4–8, enjoy free group classes led by our certified coaches.',
+      imageUrl: 'https://images.unsplash.com/photo-1599901860904-17e6ed7083a0?w=800',
+      mediaType: 'image',
+      backgroundColor: '#2D6A4F',
+      textColor: '#D8F3DC',
+      startDate: new Date(bannerNow.getFullYear(), bannerNow.getMonth(), bannerNow.getDate() + 14),
+      endDate: new Date(bannerNow.getFullYear(), bannerNow.getMonth(), bannerNow.getDate() + 21),
+      actionType: 'externalUrl',
+      actionData: 'https://app.team-oustad.com/events/yoga-week',
+      priority: 8,
+      isActive: false, // Pas encore actif — sera activé par le cron
+      isScheduled: true,
+    }
+  });
+
+  console.log(`✅ Banner event créé: ${bannerEvent2.title} (planifié, actif dans 2 semaines)`);
+
+  // Banner 3 — PROMOTION: Offre de bienvenue (toutes les salles)
+  const bannerPromo1 = await prisma.banner.create({
+    data: {
+      displayId: generateBannerId(),
+      type: 'promotion',
+      title: '-20% sur votre 1er mois',
+      titleEn: '20% off your 1st month',
+      titleAr: 'خصم 20% على شهرك الأول',
+      description: 'Inscrivez-vous ce mois-ci et bénéficiez de 20% de réduction sur votre premier abonnement. Offre valable jusqu\'au 31 octobre.',
+      descriptionEn: 'Sign up this month and get 20% off your first subscription. Valid until Oct 31.',
+      imageUrl: 'https://images.unsplash.com/photo-1571019613454-1cb2f99b2d8b?w=800',
+      mediaType: 'image',
+      backgroundColor: '#FF6B35',
+      textColor: '#FFFFFF',
+      startDate: new Date(bannerNow.getFullYear(), bannerNow.getMonth(), 1),
+      endDate: new Date(bannerNow.getFullYear(), bannerNow.getMonth(), 31),
+      actionType: 'navigate',
+      actionData: '/subscriptions/new',
+      actionParams: { discount: 20, code: 'WELCOME20' },
+      priority: 15,
+      isActive: true,
+      isScheduled: true,
+      maxViewsPerUser: 3,
+      subscriptionTypes: [], // Tous les types d'abonnement
+    }
+  });
+
+  console.log(`✅ Banner promotion créé: ${bannerPromo1.title} (global, toutes les salles)`);
+
+  // Banner 4 — PROMOTION: Parrainage (gym1, ciblé abonnés actifs)
+  const bannerPromo2 = await prisma.banner.create({
+    data: {
+      displayId: generateBannerId(),
+      gymId: gym1.id,
+      type: 'promotion',
+      title: 'Parrainez un ami, gagnez 1 mois offert',
+      titleEn: 'Refer a friend, get 1 month free',
+      titleAr: 'قدّم صديقاً واحصل على شهر مجاني',
+      description: 'Partagez votre code unique avec un ami. Dès qu\'il s\'inscrit, vous recevez tous les deux 1 mois gratuit !',
+      descriptionEn: 'Share your unique code with a friend. Once they sign up, you both get 1 free month!',
+      imageUrl: 'https://images.unsplash.com/photo-1521791136064-7986c2920216?w=800',
+      mediaType: 'image',
+      backgroundColor: '#6A0572',
+      textColor: '#F8EDFF',
+      startDate: new Date(bannerNow.getFullYear(), bannerNow.getMonth(), 1),
+      endDate: new Date(bannerNow.getFullYear(), bannerNow.getMonth() + 2, 0),
+      actionType: 'showDetails',
+      actionData: 'Retrouvez votre code de parrainage dans votre profil. Chaque parrainage réussi = 1 mois offert pour vous et votre filleul.',
+      priority: 12,
+      isActive: true,
+      isScheduled: true,
+      maxViewsPerUser: 10,
+    }
+  });
+
+  console.log(`✅ Banner promotion créé: ${bannerPromo2.title} (gym1, parrainage)\n`);
+
   // Créer des tokens de réinitialisation de mot de passe pour tests
   console.log('🔑 Création des tokens de test...');
   await prisma.passwordResetToken.create({
@@ -1767,6 +1920,15 @@ async function main() {
   console.log(`     └─ Échoués: ${failedPayments}`);
   console.log(`     └─ Remboursés: ${refundedPayments}\n`);
   
+  const totalBanners = await prisma.banner.count();
+  const activeBanners = await prisma.banner.count({ where: { isActive: true } });
+  const totalVariants = await prisma.bannerVariant.count();
+  console.log('🎯 Banners:');
+  console.log(`   - Total: ${totalBanners}`);
+  console.log(`   - Actifs: ${activeBanners}`);
+  console.log(`   - Planifiés (inactifs): ${totalBanners - activeBanners}`);
+  console.log(`   - Variants A/B: ${totalVariants}\n`);
+
   console.log('💪 Exercices et Plannings:');
   console.log(`   - Exercices disponibles: ${totalExercises}`);
   console.log(`   - Plannings créés: ${totalPlannings}`);
