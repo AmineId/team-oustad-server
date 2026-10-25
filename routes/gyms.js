@@ -7,6 +7,8 @@ const { apiLimiter } = require('../middleware/rateLimiter');
 const router = express.Router();
 const auth = require('../middleware/auth');
 const { generateGymId } = require('../utils/idGenerator');
+const { ownerHasPermission, requireOwnerPermission } = require('../utils/ownerPermissions');
+const { gymKey, ShowcaseValidationError, validatePage, readPage, writePage } = require('../utils/showcasePages');
 
 // Utility helpers
 function handleError(res, e, status = 400) {
@@ -153,7 +155,7 @@ function generateSlug(name, id) {
   return `${base}-${id}`;
 }
 
-router.post('/', auth, requireOwner, apiLimiter, async (req, res) => {
+router.post('/', auth, requireOwnerPermission('canManageGyms'), apiLimiter, async (req, res) => {
   logger.info(`🏢 Création salle de sport - Owner: ${req.user?.email}, Données:`, {
     name: req.body.name,
     address: req.body.address,
@@ -486,7 +488,7 @@ router.put('/:id', auth, apiLimiter, async (req, res) => {
 
   try {
     const id = Number(req.params.id);
-    const { name, address, phone, isPublished, slug } = req.body;
+    const { name, address, phone, isPublished, slug, description } = req.body;
 
     const requester = await prisma.user.findUnique({ where: { id: req.user.sub } });
     if (!requester) {
@@ -497,8 +499,8 @@ router.put('/:id', auth, apiLimiter, async (req, res) => {
     // Vérifier les permissions
     let canUpdate = false;
     if (requester.role === 'owner') {
-      canUpdate = true;
-      logger.debug(`👑 Owner ${getFullName(requester)} peut modifier gym ${id}`);
+      canUpdate = await ownerHasPermission(requester, 'canManageGyms');
+      logger.debug(`👑 Owner ${getFullName(requester)} peut modifier gym ${id} : ${canUpdate}`);
     } else if (requester.role === 'admin') {
       canUpdate = requester.gymId === id;
       logger.debug(`👨‍💼 Admin ${getFullName(requester)} ${canUpdate ? 'peut modifier' : 'ne peut pas modifier'} gym ${id} (sa salle: ${requester.gymId})`);
@@ -515,6 +517,15 @@ router.put('/:id', auth, apiLimiter, async (req, res) => {
     if (phone !== undefined) updateData.phone = phone;
     if (isPublished !== undefined) updateData.isPublished = Boolean(isPublished);
     if (slug !== undefined) updateData.slug = slug;
+    if (description !== undefined) {
+      if (description !== null && typeof description !== 'string') {
+        return res.status(400).json({ error: 'description doit être une chaîne' });
+      }
+      if (description && description.length > 5000) {
+        return res.status(400).json({ error: 'description trop longue (5000 caractères max)' });
+      }
+      updateData.description = description || null;
+    }
 
     logger.debug(`🔄 Mise à jour gym ${id} avec:`, updateData);
 
@@ -582,7 +593,7 @@ router.put('/:id', auth, apiLimiter, async (req, res) => {
  *       500:
  *         description: Server error
  */
-router.delete('/:id', auth, requireOwner, apiLimiter, async (req, res) => {
+router.delete('/:id', auth, requireOwnerPermission('canManageGyms'), apiLimiter, async (req, res) => {
   logger.info(`🗑️ Suppression gym - ID: ${req.params.id}, Owner: ${req.user?.email}`);
 
   try {
@@ -738,8 +749,8 @@ router.post('/:id/opening-hours', auth, apiLimiter, async (req, res) => {
     // Vérifier les permissions
     let canUpdate = false;
     if (requester.role === 'owner') {
-      canUpdate = true;
-      logger.debug(`👑 Owner ${getFullName(requester)} peut modifier horaires gym ${id}`);
+      canUpdate = await ownerHasPermission(requester, 'canManageGyms');
+      logger.debug(`👑 Owner ${getFullName(requester)} peut modifier horaires gym ${id} : ${canUpdate}`);
     } else if (requester.role === 'admin') {
       canUpdate = requester.gymId === id;
       logger.debug(`👨‍💼 Admin ${getFullName(requester)} ${canUpdate ? 'peut modifier' : 'ne peut pas modifier'} horaires gym ${id} (sa salle: ${requester.gymId})`);
@@ -985,8 +996,8 @@ router.put('/:id/image', auth, apiLimiter, async (req, res) => {
 
     let canUpdate = false;
     if (requester.role === 'owner') {
-      canUpdate = true;
-      logger.debug(`👑 Owner ${getFullName(requester)} peut modifier image salle ${id}`);
+      canUpdate = await ownerHasPermission(requester, 'canManageGyms');
+      logger.debug(`👑 Owner ${getFullName(requester)} peut modifier image salle ${id} : ${canUpdate}`);
     } else if (requester.role === 'admin') {
       canUpdate = targetGym.id === requester.gymId;
       logger.debug(`👨‍💼 Admin ${getFullName(requester)} ${canUpdate ? 'peut modifier' : 'ne peut pas modifier'} image salle ${id} (sa salle: ${requester.gymId})`);
@@ -1264,8 +1275,8 @@ router.delete('/:id/image', auth, apiLimiter, async (req, res) => {
 
     let canDelete = false;
     if (requester.role === 'owner') {
-      canDelete = true;
-      logger.debug(`👑 Owner ${getFullName(requester)} peut supprimer image salle ${id}`);
+      canDelete = await ownerHasPermission(requester, 'canManageGyms');
+      logger.debug(`👑 Owner ${getFullName(requester)} peut supprimer image salle ${id} : ${canDelete}`);
     } else if (requester.role === 'admin') {
       canDelete = targetGym.id === requester.gymId;
       logger.debug(`👨‍💼 Admin ${getFullName(requester)} ${canDelete ? 'peut supprimer' : 'ne peut pas supprimer'} image salle ${id} (sa salle: ${requester.gymId})`);
@@ -1298,7 +1309,7 @@ router.delete('/:id/image', auth, apiLimiter, async (req, res) => {
 // ── Gallery photo routes ──────────────────────────────────────────────────────
 
 async function canManageGym(requester, gymId) {
-  if (requester.role === 'owner') return true;
+  if (requester.role === 'owner') return ownerHasPermission(requester, 'canManageGyms');
   if (requester.role === 'admin') return requester.gymId === gymId;
   return false;
 }
@@ -1465,6 +1476,45 @@ router.put('/:id/photos/:photoId/cover', auth, apiLimiter, async (req, res) => {
 
     res.json({ message: 'Photo de couverture mise à jour' });
   } catch (e) {
+    handleError(res, e, 500);
+  }
+});
+
+// ── Contenu CMS de la page vitrine ───────────────────────────────────────────
+
+// GET /gyms/:id/showcase — page { sections } de la fiche salle, {} si vide
+router.get('/:id/showcase', auth, async (req, res) => {
+  try {
+    const gymId = Number(req.params.id);
+    const requester = await prisma.user.findUnique({ where: { id: req.user.sub } });
+    if (!requester || !await canManageGym(requester, gymId)) {
+      return res.status(403).json({ error: 'Permissions insuffisantes' });
+    }
+    const gym = await prisma.gym.findUnique({ where: { id: gymId }, select: { id: true } });
+    if (!gym) return notFound(res, 'Gym', gymId);
+    res.json(await readPage(gymKey(gymId)));
+  } catch (e) {
+    logger.error('💥 Erreur GET showcase gym:', e);
+    handleError(res, e, 500);
+  }
+});
+
+// PUT /gyms/:id/showcase — remplace la page entière
+router.put('/:id/showcase', auth, apiLimiter, async (req, res) => {
+  try {
+    const gymId = Number(req.params.id);
+    const requester = await prisma.user.findUnique({ where: { id: req.user.sub } });
+    if (!requester || !await canManageGym(requester, gymId)) {
+      return res.status(403).json({ error: 'Permissions insuffisantes' });
+    }
+    const gym = await prisma.gym.findUnique({ where: { id: gymId }, select: { id: true } });
+    if (!gym) return notFound(res, 'Gym', gymId);
+    const page = validatePage(req.body, { allowHero: false });
+    await writePage(gymKey(gymId), page, { gymId, userId: requester.id });
+    res.json(page);
+  } catch (e) {
+    if (e instanceof ShowcaseValidationError) return res.status(400).json({ error: e.message });
+    logger.error('💥 Erreur PUT showcase gym:', e);
     handleError(res, e, 500);
   }
 });

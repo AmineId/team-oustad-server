@@ -3,6 +3,7 @@ const cors = require('cors');
 const prisma = require('../utils/prismaClient');
 const { getFullName } = require('../utils/nameUtils');
 const logger = require('../utils/logger');
+const { HOME_KEY, gymKey, readPage, publicView } = require('../utils/showcasePages');
 
 const router = express.Router();
 
@@ -76,6 +77,17 @@ router.get('/gyms', async (req, res) => {
   }
 });
 
+// GET /public/showcase/home — contenu CMS de la page d'accueil, {} si vide
+router.get('/showcase/home', async (req, res) => {
+  try {
+    res.setHeader('Cache-Control', PUBLIC_CACHE);
+    res.json(publicView(await readPage(HOME_KEY)));
+  } catch (e) {
+    logger.error('💥 Erreur GET /public/showcase/home:', e);
+    res.status(500).json({ error: e.message });
+  }
+});
+
 // GET /public/gyms/:slugOrId
 router.get('/gyms/:slugOrId', async (req, res) => {
   try {
@@ -114,7 +126,10 @@ router.get('/gyms/:slugOrId', async (req, res) => {
       name: gym.name,
       address: gym.address,
       phone: gym.phone,
+      description: gym.description,
       memberCountDisplay: memberCountDisplay(gym._count.User),
+      // Page CMS (sections) — {} tant que rien n'a été saisi
+      showcase: publicView(await readPage(gymKey(gym.id))),
       openingHours: gym.OpeningHour.map(h => ({
         dayOfWeek: h.dayOfWeek,
         openTime: h.openTime,

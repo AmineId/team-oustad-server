@@ -40,12 +40,14 @@ model Gym {
   displayId    String         @unique
   isPublished  Boolean        @default(false)
   slug         String?        @unique
+  description  String?        @db.Text
   OpeningHour  OpeningHour[]
   User         User[]
   Banner       Banner[]
   GymCheckIn   GymCheckIn[]
   StoreProduct StoreProduct[]
   GymPhoto     GymPhoto[]
+  ShowcasePage ShowcasePage?
 
   @@index([name])
   @@index([isPublished])
@@ -63,6 +65,18 @@ model GymPhoto {
 
   @@index([gymId])
   @@index([gymId, position])
+}
+
+/// Page du site vitrine éditable depuis l'app (CMS) : `key` = "home" pour
+/// la page d'accueil, "gym:<id>" pour la fiche d'une salle. `content` est la
+/// page telle qu'envoyée par l'app : { hero?, sections: [...] }.
+model ShowcasePage {
+  key       String   @id
+  gymId     Int?     @unique
+  gym       Gym?     @relation(fields: [gymId], references: [id], onDelete: Cascade)
+  content   Json
+  updatedAt DateTime @updatedAt
+  updatedBy Int?
 }
 
 model Member {

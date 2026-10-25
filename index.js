@@ -112,6 +112,7 @@ const checkInRoutes = require('./routes/checkIn');
 const storeRoutes = require('./routes/store');
 const whatsappRoutes = require('./routes/whatsapp');
 const publicRoutes = require('./routes/public');
+const showcaseRoutes = require('./routes/showcase');
 
 // Use routes
 console.log('🔗 Configuration des routes API...');
@@ -128,6 +129,7 @@ app.use('/check-in', checkInRoutes);
 app.use('/store', storeRoutes);
 app.use('/whatsapp', whatsappRoutes);
 app.use('/public', publicRoutes);
+app.use('/showcase', showcaseRoutes);
 console.log('✅ Routes configurées: /gyms, /users, /auth, /plannings, /subscriptions, /subscription-types, /android, /members, /banners, /check-in, /store, /whatsapp, /public');
 
 // Redirection Beta Download vers Google Play Internal Testing

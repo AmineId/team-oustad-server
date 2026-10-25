@@ -86,6 +86,11 @@ components:
           type: string
           nullable: true
           example: "downtown-fitness-1"
+        description:
+          type: string
+          nullable: true
+          maxLength: 5000
+          description: Texte de présentation (markdown) affiché sur la fiche vitrine
         openingHours:
           type: array
           items:
@@ -102,6 +107,52 @@ components:
         - id
         - name
         - address
+
+    ShowcaseSection:
+      type: object
+      required: [id, type]
+      properties:
+        id:
+          type: string
+          maxLength: 40
+          example: "s1k9x"
+        type:
+          type: string
+          maxLength: 40
+          description: |
+            Contenu : markdown, feature, testimonials, marquee, categories, cta.
+            Intégrées (sans data) : gyms, promos (accueil) ; gymAbout, gymPromos,
+            gymInfo, gymHours, gymTeam, gymSubscriptions (salle). Le serveur
+            stocke tout type ; l'app ignore ceux qu'elle ne connaît pas.
+          example: "markdown"
+        visible:
+          type: boolean
+          default: true
+        data:
+          type: object
+          additionalProperties: true
+          description: Champs propres au type (chaînes ≤ 5000, tableaux ≤ 20). `url` en http(s) uniquement.
+          example: { title: "Tarifs", body: "**30 €** / mois" }
+
+    ShowcasePage:
+      type: object
+      description: Page CMS du site vitrine ; `{}` tant que rien n'a été enregistré.
+      properties:
+        hero:
+          type: object
+          description: Page d'accueil uniquement
+          properties:
+            eyebrow:
+              type: string
+              maxLength: 200
+            tagline:
+              type: string
+              maxLength: 200
+        sections:
+          type: array
+          maxItems: 40
+          items:
+            $ref: '#/components/schemas/ShowcaseSection'
 
     GymPhoto:
       type: object
@@ -8003,6 +8054,103 @@ paths:
                           type: string
                           nullable: true
 
+  /showcase/home:
+    get:
+      summary: Contenu CMS de la page d'accueil vitrine (owner)
+      tags: [Showcase]
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Page enregistrée, ou {} si vide
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ShowcasePage'
+        '403':
+          description: Réservé aux owners
+    put:
+      summary: Remplacer la page d'accueil vitrine (owner)
+      tags: [Showcase]
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ShowcasePage'
+      responses:
+        '200':
+          description: Page enregistrée (normalisée)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ShowcasePage'
+        '400':
+          description: Page invalide (tailles, ids en double, lien non http(s)…)
+        '403':
+          description: Réservé aux owners
+
+  /gyms/{id}/showcase:
+    parameters:
+      - in: path
+        name: id
+        required: true
+        schema:
+          type: integer
+    get:
+      summary: Contenu CMS de la fiche vitrine d'une salle
+      description: Owner avec canManageGyms (toutes salles) ou admin de la salle.
+      tags: [Showcase]
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Page enregistrée, ou {} si vide
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ShowcasePage'
+        '403':
+          description: Permissions insuffisantes
+        '404':
+          description: Salle introuvable
+    put:
+      summary: Remplacer la fiche vitrine d'une salle
+      description: Owner avec canManageGyms (toutes salles) ou admin de la salle. `hero` refusé.
+      tags: [Showcase]
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ShowcasePage'
+      responses:
+        '200':
+          description: Page enregistrée (normalisée)
+        '400':
+          description: Page invalide
+        '403':
+          description: Permissions insuffisantes
+        '404':
+          description: Salle introuvable
+
+  /public/showcase/home:
+    get:
+      summary: Contenu CMS public de la page d'accueil vitrine
+      description: Sans authentification, sections masquées exclues, Cache-Control max-age=300.
+      tags: [Public]
+      responses:
+        '200':
+          description: Page, ou {} si vide
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ShowcasePage'
+
   /public/gyms/{slugOrId}:
     get:
       summary: Get published gym detail by slug or id (public)
@@ -8039,6 +8187,11 @@ paths:
                       memberCountDisplay:
                         type: string
                         example: "200+"
+                      description:
+                        type: string
+                        nullable: true
+                      showcase:
+                        $ref: '#/components/schemas/ShowcasePage'
                       openingHours:
                         type: array
                         items:
