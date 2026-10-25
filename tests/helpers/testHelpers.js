@@ -23,6 +23,8 @@ async function cleanDatabase() {
   await prisma.planningExercise.deleteMany({});
   await prisma.planningDay.deleteMany({});
   await prisma.planning.deleteMany({});
+  await prisma.programAssignment.deleteMany({});
+  await prisma.program.deleteMany({});
   await prisma.exercise.deleteMany({});
   await prisma.memberMeasurement.deleteMany({});
   await prisma.memberGoal.deleteMany({});
@@ -266,17 +268,47 @@ async function createTestPayment(memberId, subscriptionId, data = {}) {
  * Create a test planning
  */
 async function createTestPlanning(coachId, memberId, data = {}) {
-  return await prisma.planning.create({
+  // Rôles V2 : un « planning » est une affectation de programme
+  const program = await createTestProgram(coachId, { title: data.title || 'Test Planning' });
+  return createTestAssignment(program.id, memberId, coachId, data);
+}
+
+/**
+ * Create a test program (Rôles V2). `days` : [{ dayOfWeek, exercises: [{ exerciseId, sets, reps }] }]
+ */
+async function createTestProgram(creatorId, data = {}) {
+  return prisma.program.create({
     data: {
-      displayId: data.displayId || `PLN${uid()}`,
-      coachId: coachId,
-      memberId: memberId,
-      title: data.title || 'Test Planning',
-      description: data.description || 'Test planning description',
-      startDate: data.startDate || new Date(),
-      endDate: data.endDate || new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
-      status: data.status || 'active',
-      ...data
+      displayId: data.displayId || `PROGRAM-${uid()}`,
+      title: data.title || 'Test Program',
+      description: data.description || 'Test program description',
+      level: data.level || null,
+      durationWeeks: data.durationWeeks || null,
+      createdBy: creatorId,
+      ProgramDay: {
+        create: (data.days || []).map(day => ({
+          dayOfWeek: day.dayOfWeek,
+          ProgramExercise: { create: (day.exercises || []).map((e, i) => ({ order: i, ...e })) }
+        }))
+      }
+    },
+    include: { ProgramDay: { include: { ProgramExercise: true } } }
+  });
+}
+
+/**
+ * Create a test program assignment (Rôles V2)
+ */
+async function createTestAssignment(programId, memberId, assignedBy, data = {}) {
+  return prisma.programAssignment.create({
+    data: {
+      displayId: data.displayId || `ASSIGN-${uid()}`,
+      programId,
+      memberId,
+      assignedBy,
+      startDate: data.startDate || new Date(Date.now() - 24 * 60 * 60 * 1000),
+      endDate: data.endDate === undefined ? new Date(Date.now() + 7 * 24 * 60 * 60 * 1000) : data.endDate,
+      status: data.status || 'active'
     }
   });
 }
@@ -334,6 +366,8 @@ module.exports = {
   createTestSubscription,
   createTestPayment,
   createTestPlanning,
+  createTestProgram,
+  createTestAssignment,
   createTestExercise,
   generateToken,
   authHeader

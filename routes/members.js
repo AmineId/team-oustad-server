@@ -6,6 +6,7 @@ const { apiLimiter } = require('../middleware/rateLimiter');
 const router = express.Router();
 const auth = require('../middleware/auth');
 const coachService = require('../services/coachService');
+const programService = require('../services/programService');
 const { generateUserIdByRole } = require('../utils/idGenerator');
 const { getFullName } = require('../utils/nameUtils');
 
@@ -855,6 +856,25 @@ router.get('/:id/measurements', auth, canAccessMemberProfile, async (req, res) =
   } catch (e) {
     logger.error('💥 Erreur récupération mesures:', e);
     handleError(res, e, 500);
+  }
+});
+
+// Rôles V2 : programmes affectés à un membre (le plus récent d'abord).
+// Lecture : le membre lui-même, manager de sa salle, son coach, owner.
+router.get('/:id/programs', auth, async (req, res) => {
+  try {
+    const memberUser = await programService.getMemberUserOrThrow(Number(req.params.id));
+    const requester = await prisma.user.findUnique({ where: { id: req.user.sub } });
+    if (!requester || !programService.canReadMemberPrograms(requester, memberUser)) {
+      return res.status(403).json({ error: 'Accès refusé aux programmes de ce membre' });
+    }
+    res.json(await programService.listMemberAssignments(memberUser.id, { status: req.query.status }));
+  } catch (error) {
+    if (error instanceof programService.ProgramError) {
+      return res.status(error.status).json({ error: error.code, message: error.message });
+    }
+    logger.error('💥 Erreur programmes du membre:', error);
+    res.status(500).json({ error: 'Erreur lors de la récupération des programmes' });
   }
 });
 
