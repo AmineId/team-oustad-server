@@ -1,4 +1,5 @@
 const express = require('express');
+const { getOwnerPermissions } = require('../utils/ownerPermissions');
 const router = express.Router();
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
@@ -189,12 +190,7 @@ router.post('/login', authLimiter, async (req, res) => {
           role: 'owner',
           gymId: user.gymId,
           gym: user.Gym,
-          permissions: {
-            canManageAdmins: user.owner?.canManageAdmins || false,
-            canManageGyms: user.owner?.canManageGyms || false,
-            canViewReports: user.owner?.canViewReports || false,
-            maxGymsAllowed: user.owner?.maxGymsAllowed || 0,
-          },
+          permissions: await getOwnerPermissions(user.id),
           type: 'owner'
         }
       };
@@ -588,12 +584,7 @@ router.get('/me', auth, async (req, res) => {
         role: user.role,
         gymId: user.gymId,
         gyms: gymsWithStats,
-        permissions: {
-          canManageAdmins: user.owner?.canManageAdmins || false,
-          canManageGyms: user.owner?.canManageGyms || false,
-          canViewReports: user.owner?.canViewReports || false,
-          maxGymsAllowed: user.owner?.maxGymsAllowed || 0,
-        },
+        permissions: await getOwnerPermissions(user.id),
         type: 'owner'
       };
       console.log(`📤 Réponse /me owner:`, {

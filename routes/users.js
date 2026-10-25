@@ -6,6 +6,7 @@ const { sendPasswordResetNotification } = require('../services/notificationServi
 const { splitFullName, getFullName } = require('../utils/nameUtils');
 const { generateUserId } = require('../utils/idGenerator');
 const prisma = require('../utils/prismaClient');
+const { ownerHasPermission, requireOwnerPermission } = require('../utils/ownerPermissions');
 
 const router = express.Router();
 const auth = require('../middleware/auth');
@@ -348,8 +349,9 @@ router.post('/', auth, async (req, res) => {
     let canCreate = false;
 
     if (requester.role === 'owner') {
-      // Owner peut créer admins et members
-      canCreate = ['admin', 'member'].includes(role);
+      // Owner peut créer des members, et des admins s'il a canManageAdmins
+      canCreate = role === 'member' ||
+        (role === 'admin' && await ownerHasPermission(requester, 'canManageAdmins'));
     } else if (requester.role === 'admin') {
       // Admin peut créer seulement des members dans sa salle
       canCreate = role === 'member' && gymId === requester.gymId;
@@ -865,11 +867,15 @@ router.put('/:id', auth, async (req, res) => {
     // Vérifier les permissions
     let canUpdate = false;
 
+    const isSelf = id === req.user.sub;
     if (requester.role === 'owner') {
-      canUpdate = true; // Owner peut modifier tout le monde
+      // Owner : tout le monde ; un autre admin/owner exige canManageAdmins
+      canUpdate = isSelf || targetUser.role === 'member' ||
+        await ownerHasPermission(requester, 'canManageAdmins');
     } else if (requester.role === 'admin') {
-      // Admin peut modifier seulement les membres de sa salle
-      canUpdate = targetUser.gymId === requester.gymId;
+      // Admin : lui-même et les membres de sa salle (jamais un admin/owner)
+      canUpdate = isSelf ||
+        (targetUser.role === 'member' && targetUser.gymId === requester.gymId);
     } else if (requester.role === 'member') {
       // Member peut modifier seulement son propre profil
       canUpdate = id === req.user.sub;
@@ -877,6 +883,14 @@ router.put('/:id', auth, async (req, res) => {
 
     if (!canUpdate) {
       return res.status(403).json({ error: 'Vous n\'avez pas les permissions pour modifier cet utilisateur' });
+    }
+
+    // Les permissions d'un owner ne se modifient qu'avec canManageAdmins, et
+    // jamais les siennes (pas d'auto-élévation).
+    if (targetUser.role === 'owner' && permissions) {
+      if (isSelf || !(await ownerHasPermission(requester, 'canManageAdmins'))) {
+        return res.status(403).json({ error: 'Vous ne pouvez pas modifier ces permissions' });
+      }
     }
 
     const updateData = {};
@@ -995,7 +1009,9 @@ router.delete('/:id', auth, async (req, res) => {
     let canDelete = false;
 
     if (requester.role === 'owner') {
-      canDelete = true; // Owner peut supprimer tout le monde
+      // Owner : membres ; admins/owners avec canManageAdmins ; jamais lui-même
+      canDelete = id !== req.user.sub && (targetUser.role === 'member' ||
+        await ownerHasPermission(requester, 'canManageAdmins'));
     } else if (requester.role === 'admin') {
       // Admin peut supprimer seulement les membres de sa salle
       canDelete = targetUser.gymId === requester.gymId && targetUser.role === 'member';
@@ -1143,7 +1159,9 @@ router.put('/:id/profile-image', auth, async (req, res) => {
       canUpdate = true;
       console.log(`👑 Owner ${getFullName(requester)} peut modifier photo profil user ${id}`);
     } else if (requester.role === 'admin') {
-      canUpdate = targetUser.gymId === requester.gymId;
+      // Lui-même et les membres de sa salle, pas les autres admins/owners
+      canUpdate = id === req.user.sub ||
+        (targetUser.role === 'member' && targetUser.gymId === requester.gymId);
       console.log(`👨‍💼 Admin ${getFullName(requester)} ${canUpdate ? 'peut modifier' : 'ne peut pas modifier'} photo profil user ${id}`);
     } else if (requester.role === 'member') {
       canUpdate = id === req.user.sub;
@@ -1425,7 +1443,8 @@ router.delete('/:id/profile-image', auth, async (req, res) => {
       canDelete = true;
       console.log(`👑 Owner ${getFullName(requester)} peut supprimer photo profil user ${id}`);
     } else if (requester.role === 'admin') {
-      canDelete = targetUser.gymId === requester.gymId;
+      canDelete = id === req.user.sub ||
+        (targetUser.role === 'member' && targetUser.gymId === requester.gymId);
       console.log(`👨‍💼 Admin ${getFullName(requester)} ${canDelete ? 'peut supprimer' : 'ne peut pas supprimer'} photo profil user ${id}`);
     } else if (requester.role === 'member') {
       canDelete = id === req.user.sub;
@@ -1545,7 +1564,7 @@ router.delete('/:id/profile-image', auth, async (req, res) => {
  *                 error:
  *                   type: string
  */
-router.get('/stats', auth, requireOwner, async (req, res) => {
+router.get('/stats', auth, requireOwnerPermission('canViewReports'), async (req, res) => {
   try {
     const [
       totalGyms,
@@ -1832,7 +1851,7 @@ router.post('/:id/change-password', auth, async (req, res) => {
   }
 });
 
-router.post('/create-owner', auth, requireOwner, async (req, res) => {
+router.post('/create-owner', auth, requireOwnerPermission('canManageAdmins'), async (req, res) => {
   const { email, password, firstName, lastName, gymId, permissions } = req.body;
 
   if (!email || !password || !firstName || !lastName || !gymId) {
@@ -2022,7 +2041,7 @@ router.post('/create-owner', auth, requireOwner, async (req, res) => {
  *                   type: string
  *                   example: "Erreur lors de la création de l'admin"
  */
-router.post('/create-admin', auth, requireOwner, async (req, res) => {
+router.post('/create-admin', auth, requireOwnerPermission('canManageAdmins'), async (req, res) => {
   console.log('📝 CREATE-ADMIN - Body reçu:', JSON.stringify(req.body, null, 2));
   
   const { email, password, firstName, lastName, gymId, address, sendSetupEmail = true } = req.body;
