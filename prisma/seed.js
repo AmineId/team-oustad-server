@@ -51,6 +51,8 @@ async function main() {
   await prisma.member.deleteMany();
   // Admin/Owner also depend on users
   await prisma.manager.deleteMany();
+  await prisma.coachGym.deleteMany();
+  await prisma.coach.deleteMany();
   await prisma.owner.deleteMany();
   // Password reset tokens must be removed before users
   await prisma.passwordResetToken.deleteMany();
@@ -273,6 +275,26 @@ async function main() {
   });
   console.log(`✅ Manager: ${admin2User.firstName} ${admin2User.lastName}`);
 
+  // Coach (Rôles V2) : rattaché aux deux salles, salle principale = Gym 1
+  const coachUser = await prisma.user.create({
+    data: {
+      displayId: generateUserIdByRole('coach'),
+      uniqueCode: crypto.randomUUID().substring(0, 8).toUpperCase(),
+      email: 'coach@team-oustad.com',
+      password: await bcrypt.hash('coach123', 10),
+      firstName: 'Yassine',
+      lastName: 'Benali',
+      phoneNumber: '+212600000099',
+      role: 'coach',
+      gymId: gym1.id,
+      notificationsEnabled: true,
+      Coach: {
+        create: { CoachGym: { create: [{ gymId: gym1.id }, { gymId: gym2.id }] } }
+      }
+    }
+  });
+  console.log(`✅ Coach: ${coachUser.firstName} ${coachUser.lastName} (Gym 1 + Gym 2)`);
+
   // Member profiles
   const bobMember = await prisma.member.create({
     data: {
@@ -297,6 +319,13 @@ async function main() {
     }
   });
   console.log(`✅ Member: ${aliceUser.firstName} ${aliceUser.lastName}`);
+
+  // Bob et Charlie sont suivis par le coach
+  await prisma.member.updateMany({
+    where: { userId: { in: [bobUser.id, charlieUser.id] } },
+    data: { coachId: coachUser.id }
+  });
+  console.log(`✅ Coach ${coachUser.firstName} affecté à ${bobUser.firstName} et ${charlieUser.firstName}`);
 
   const davidMember = await prisma.member.create({
     data: {
@@ -2058,6 +2087,9 @@ async function main() {
   console.log('   Manager (Gym 1):');
   console.log('     - Email: admin@team-oustad.com');
   console.log('     - Password: admin123\n');
+  console.log('   Coach (Gym 1 + Gym 2):');
+  console.log('     - Email: coach@team-oustad.com');
+  console.log('     - Password: coach123\n');
   console.log('   Manager (Gym 2):');
   console.log('     - Email: admin2@team-oustad.com');
   console.log('     - Password: admin123\n');

@@ -7,6 +7,7 @@ const { apiLimiter } = require('../middleware/rateLimiter');
 const router = express.Router();
 const auth = require('../middleware/auth');
 const { generateGymId } = require('../utils/idGenerator');
+const { canAccessGym, getCoachGymIds } = require('../utils/staffScope');
 const { ownerHasPermission, requireOwnerPermission } = require('../utils/ownerPermissions');
 const { gymKey, ShowcaseValidationError, validatePage, readPage, writePage } = require('../utils/showcasePages');
 
@@ -253,6 +254,9 @@ router.get('/', auth, async (req, res) => {
       // Member voit seulement sa salle
       whereClause.id = requester.gymId;
       logger.debug(`👤 Membre ${getFullName(requester)} voit seulement sa salle: ${requester.gymId}`);
+    } else if (requester.role === 'coach') {
+      // Coach voit ses salles (CoachGym)
+      whereClause.id = { in: await getCoachGymIds(requester.id) };
     } else {
       logger.debug(`👑 Owner ${getFullName(requester)} voit toutes les salles`);
     }
@@ -381,6 +385,8 @@ router.get('/:id', auth, async (req, res) => {
     } else if (requester.role === 'manager' || requester.role === 'member') {
       hasAccess = requester.gymId === id;
       logger.debug(`${requester.role === 'manager' ? '👨‍💼' : '👤'} ${requester.role} ${getFullName(requester)} ${hasAccess ? 'accède' : 'refuse accès'} à gym ${id} (sa salle: ${requester.gymId})`);
+    } else if (requester.role === 'coach') {
+      hasAccess = await canAccessGym(requester, id);
     }
 
     if (!hasAccess) {
@@ -874,6 +880,8 @@ router.get('/:id/opening-hours', auth, async (req, res) => {
     } else if (requester.role === 'manager' || requester.role === 'member') {
       hasAccess = requester.gymId === id;
       logger.debug(`${requester.role === 'manager' ? '👨‍💼' : '👤'} ${requester.role} ${getFullName(requester)} ${hasAccess ? 'accède' : 'refuse accès'} aux horaires gym ${id} (sa salle: ${requester.gymId})`);
+    } else if (requester.role === 'coach') {
+      hasAccess = await canAccessGym(requester, id);
     }
 
     if (!hasAccess) {
@@ -1135,6 +1143,8 @@ router.get('/:id/image', auth, async (req, res) => {
     } else if (requester.role === 'manager' || requester.role === 'member') {
       hasAccess = targetGym.id === requester.gymId;
       logger.debug(`${requester.role === 'manager' ? '👨‍💼' : '👤'} ${requester.role} ${getFullName(requester)} ${hasAccess ? 'accède' : 'refuse accès'} à image salle ${id} (sa salle: ${requester.gymId})`);
+    } else if (requester.role === 'coach') {
+      hasAccess = await canAccessGym(requester, id);
     }
 
     if (!hasAccess) {

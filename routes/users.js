@@ -8,6 +8,9 @@ const { generateUserId } = require('../utils/idGenerator');
 const prisma = require('../utils/prismaClient');
 const { ownerHasPermission, requireOwnerPermission } = require('../utils/ownerPermissions');
 const { normalizeRole } = require('../utils/roles');
+const coachService = require('../services/coachService');
+const { CoachError } = coachService;
+const { COACH_REF_SELECT, getCoachGyms, toCoachRef } = require('../utils/staffScope');
 
 const router = express.Router();
 const auth = require('../middleware/auth');
@@ -639,7 +642,7 @@ router.get('/:id/qr', auth, async (req, res) => {
       // Admin can only access QR codes of users in their gym (gymId is on the User model, not Admin)
       hasAccess = user.gymId === requester.gymId;
       console.log(`👨‍💼 Admin ${getFullName(requester)} - Accès: ${hasAccess} (requester.gymId: ${requester?.gymId}, user.gymId: ${user.gymId})`);
-    } else if (requester.role === 'member') {
+    } else if (requester.role === 'member' || requester.role === 'coach') {
       // Member can only access their own QR code
       hasAccess = req.user.sub === id;
       console.log(`👤 Membre ${getFullName(requester)} - Accès: ${hasAccess} (own QR: ${req.user.sub === id})`);
@@ -879,7 +882,7 @@ router.put('/:id', auth, async (req, res) => {
       // Admin : lui-même et les membres de sa salle (jamais un admin/owner)
       canUpdate = isSelf ||
         (targetUser.role === 'member' && targetUser.gymId === requester.gymId);
-    } else if (requester.role === 'member') {
+    } else if (requester.role === 'member' || requester.role === 'coach') {
       // Member peut modifier seulement son propre profil
       canUpdate = id === req.user.sub;
     }
@@ -1037,6 +1040,7 @@ router.delete('/:id', auth, async (req, res) => {
     } else if (targetUser.role === 'owner') {
       await prisma.owner.deleteMany({ where: { userId: id } });
     }
+    // Coach : Coach/CoachGym suivent en cascade, Member.coachId repasse à null
 
     // Supprimer l'utilisateur
     await prisma.user.delete({ where: { id } });
@@ -1166,7 +1170,7 @@ router.put('/:id/profile-image', auth, async (req, res) => {
       canUpdate = id === req.user.sub ||
         (targetUser.role === 'member' && targetUser.gymId === requester.gymId);
       console.log(`👨‍💼 Admin ${getFullName(requester)} ${canUpdate ? 'peut modifier' : 'ne peut pas modifier'} photo profil user ${id}`);
-    } else if (requester.role === 'member') {
+    } else if (requester.role === 'member' || requester.role === 'coach') {
       canUpdate = id === req.user.sub;
       console.log(`👤 Membre ${getFullName(requester)} ${canUpdate ? 'peut modifier' : 'ne peut pas modifier'} sa propre photo profil`);
     }
@@ -1296,7 +1300,7 @@ router.get('/:id/profile-image', auth, async (req, res) => {
     } else if (requester.role === 'manager') {
       hasAccess = targetUser.gymId === requester.gymId;
       console.log(`👨‍💼 Admin ${getFullName(requester)} ${hasAccess ? 'accède' : 'refuse accès'} à photo profil user ${id}`);
-    } else if (requester.role === 'member') {
+    } else if (requester.role === 'member' || requester.role === 'coach') {
       hasAccess = id === req.user.sub;
       console.log(`👤 Membre ${getFullName(requester)} ${hasAccess ? 'accède' : 'refuse accès'} à sa propre photo profil`);
     }
@@ -1449,7 +1453,7 @@ router.delete('/:id/profile-image', auth, async (req, res) => {
       canDelete = id === req.user.sub ||
         (targetUser.role === 'member' && targetUser.gymId === requester.gymId);
       console.log(`👨‍💼 Admin ${getFullName(requester)} ${canDelete ? 'peut supprimer' : 'ne peut pas supprimer'} photo profil user ${id}`);
-    } else if (requester.role === 'member') {
+    } else if (requester.role === 'member' || requester.role === 'coach') {
       canDelete = id === req.user.sub;
       console.log(`👤 Membre ${getFullName(requester)} ${canDelete ? 'peut supprimer' : 'ne peut pas supprimer'} sa propre photo profil`);
     }
@@ -1617,6 +1621,7 @@ router.get('/:id', auth, async (req, res) => {
         Gym: { select: { id: true, name: true } },
         Member: {
           include: {
+            Coach: { select: COACH_REF_SELECT },
             Subscription: {
               where: { status: 'active' }
             },
@@ -1643,7 +1648,7 @@ router.get('/:id', auth, async (req, res) => {
       hasAccess = true;
     } else if (requester.role === 'manager') {
       hasAccess = user.gymId === requester.gymId;
-    } else if (requester.role === 'member') {
+    } else if (requester.role === 'member' || requester.role === 'coach') {
       hasAccess = req.user.sub === id;
     }
 
@@ -1665,6 +1670,13 @@ router.get('/:id', auth, async (req, res) => {
     if (user.role === 'member' && user.Member) {
       response.activeSubscription = user.Member.Subscription.find(sub => sub.status === 'active') || null;
       response.recentPayments = user.Member.Payment || [];
+      response.coachId = user.Member.coachId ?? null;
+      response.coach = toCoachRef(user.Member.Coach);
+    }
+
+    if (user.role === 'coach') {
+      response.gymId = user.gymId;
+      response.gyms = await getCoachGyms(user.id);
     }
 
     if (user.role === 'owner' && user.Owner) {
@@ -2197,6 +2209,49 @@ router.post('/create-manager', auth, requireOwnerPermission('canManageAdmins'), 
 // Alias de transition Rôles V2 (anciens clients)
 router.post('/create-admin', auth, requireOwnerPermission('canManageAdmins'), createManagerHandler);
 
+// ==================== COACHS (Rôles V2) ====================
+
+function sendCoachError(res, error, fallbackMessage) {
+  if (error instanceof CoachError) {
+    return res.status(error.status).json({ error: error.code, message: error.message });
+  }
+  console.error(fallbackMessage, error);
+  return res.status(500).json({ error: fallbackMessage });
+}
+
+// Créer un coach rattaché à une ou plusieurs salles (owner uniquement)
+router.post('/create-coach', auth, requireOwnerPermission('canManageAdmins'), async (req, res) => {
+  try {
+    const { email, password, firstName, lastName, phoneNumber, gymIds, sendSetupEmail = true } = req.body;
+    const result = await coachService.createCoach({
+      email: sanitizeEmail(email),
+      password,
+      firstName,
+      lastName,
+      phoneNumber,
+      gymIds,
+      sendSetupEmail
+    });
+    res.status(201).json({
+      message: result.setupEmailSent
+        ? 'Coach créé avec succès. Un email d\'activation a été envoyé.'
+        : 'Coach créé avec succès',
+      ...result
+    });
+  } catch (error) {
+    sendCoachError(res, error, 'Erreur lors de la création du coach');
+  }
+});
+
+// Remplacer les salles d'un coach (owner uniquement)
+router.patch('/:id/gyms', auth, requireOwnerPermission('canManageAdmins'), async (req, res) => {
+  try {
+    res.json(await coachService.setCoachGyms(Number(req.params.id), req.body.gymIds));
+  } catch (error) {
+    sendCoachError(res, error, 'Erreur lors de la mise à jour des salles du coach');
+  }
+});
+
 // Lister tous les gyms (pour les owners)
 /**
  * @swagger
@@ -2393,6 +2448,7 @@ router.get('/gym/:gymId/members', auth, async (req, res) => {
       include: {
         Member: {
           include: {
+            Coach: { select: COACH_REF_SELECT },
             Subscription: {
               where: { status: 'active' },
               include: {
@@ -2424,6 +2480,8 @@ router.get('/gym/:gymId/members', auth, async (req, res) => {
         displayId: user.displayId,
         uniqueCode: user.uniqueCode,
         createdAt: user.createdAt,
+        coachId: user.Member?.coachId ?? null,
+        coach: toCoachRef(user.Member?.Coach),
         activeSubscription: activeSubscription ? {
           id: activeSubscription.id,
           type: activeSubscription.type,

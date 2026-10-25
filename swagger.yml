@@ -6,7 +6,8 @@ info:
     API pour la gestion des salles de sport Team Fitness
 
     ## Rôles V2
-    Rôles : `owner` (toutes les salles), `manager` (une salle, ex-`admin`), `member`.
+    Rôles : `owner` (toutes les salles), `manager` (une salle, ex-`admin`), `coach` (une ou plusieurs
+    salles via CoachGym, créé par l'owner), `member`.
     - `admin` reste accepté **en entrée** comme alias de `manager` (body `role`, anciens JWT),
       mais le serveur renvoie toujours `manager`.
     - Le manager reçoit un **403** sur la vitrine et les promos : `/showcase/*`, écriture `/banners`,
@@ -14,6 +15,10 @@ info:
       `/gyms/{id}/photos*`, `/gyms/{id}/showcase`, `PUT|DELETE /gyms/{id}/image`, et les horaires
       d'ouverture (`POST /gyms/{id}/opening-hours`).
     - Store (`/store/*` staff) : le manager est limité à sa salle (403 sinon) ; l'owner gère toutes les salles.
+    - Coach : **refusé par défaut** (403 `coach_forbidden`) sauf sur les routes qui lui sont ouvertes :
+      son profil (`/auth/me`, `/users/me`, `/users/{sonId}`…), `/coaches/me/*`, lecture de ses salles
+      (`GET /gyms`, `/gyms/{id}`, horaires, image). Pour un coach, se baser sur `gyms` et non sur `gymId`
+      (salle principale).
     - Kiosk : `POST /auth/login` avec `client: "kiosk"`, réservé aux owners et managers
       (403 `kiosk_forbidden_role`). La session kiosk est distincte de la session app.
   contact:
@@ -58,17 +63,22 @@ components:
           example: "Doe"
         role:
           type: string
-          enum: [member, manager, owner]
+          enum: [member, coach, manager, owner]
           description: "`admin` est accepté en entrée comme alias de `manager`, jamais renvoyé"
           example: "member"
         type:
           type: string
-          enum: [member, manager, owner]
+          enum: [member, coach, manager, owner]
           description: "Identique à `role` (compatibilité)"
         client:
           type: string
           enum: [app, kiosk]
           description: "Renvoyé au login : client pour lequel le token a été émis"
+        gyms:
+          type: array
+          description: "Coach uniquement : ses salles (CoachGym)"
+          items:
+            $ref: '#/components/schemas/GymRef'
         displayId:
           type: string
           example: "MEMBER-a8f3d9e2b1c4f567"
@@ -374,6 +384,123 @@ components:
           example: true
         user:
           $ref: '#/components/schemas/User'
+
+    GymRef:
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 1
+        displayId:
+          type: string
+          example: "GYM-a1b2c3"
+        name:
+          type: string
+          example: "Salle A"
+
+    CoachRef:
+      type: object
+      nullable: true
+      properties:
+        id:
+          type: integer
+          example: 7
+        firstName:
+          type: string
+          example: "Yassine"
+        lastName:
+          type: string
+          example: "Benali"
+
+    Coach:
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 7
+        displayId:
+          type: string
+        email:
+          type: string
+          format: email
+        firstName:
+          type: string
+        lastName:
+          type: string
+        phoneNumber:
+          type: string
+          nullable: true
+        role:
+          type: string
+          example: coach
+        gymId:
+          type: integer
+          description: "Salle principale (ne pas s'en servir : utiliser gyms)"
+        gyms:
+          type: array
+          items:
+            $ref: '#/components/schemas/GymRef'
+        membersCount:
+          type: integer
+          description: "GET /coaches uniquement : nombre de membres affectés"
+
+    CoachedMember:
+      type: object
+      properties:
+        id:
+          type: integer
+        displayId:
+          type: string
+        email:
+          type: string
+        firstName:
+          type: string
+        lastName:
+          type: string
+        phoneNumber:
+          type: string
+          nullable: true
+        gymId:
+          type: integer
+        gym:
+          $ref: '#/components/schemas/GymRef'
+        fitnessLevel:
+          type: string
+          nullable: true
+        coachId:
+          type: integer
+          nullable: true
+        coach:
+          $ref: '#/components/schemas/CoachRef'
+        activeSubscription:
+          type: object
+          nullable: true
+          properties:
+            id:
+              type: integer
+            status:
+              type: string
+            startDate:
+              type: string
+              format: date-time
+            endDate:
+              type: string
+              format: date-time
+              nullable: true
+            sessionQuota:
+              type: integer
+              nullable: true
+            sessionsUsed:
+              type: integer
+
+    CoachError:
+      type: object
+      properties:
+        error:
+          type: string
+          description: "Code stable : missing_fields, gym_ids_required, invalid_gym_ids, gym_not_found, email_taken, phone_taken, coach_not_found, member_not_found, coach_not_in_gym"
+        message:
+          type: string
 
     CreatedManager:
       type: object
@@ -1681,11 +1808,11 @@ paths:
                     example: "John Doe"
                   role:
                     type: string
-                    enum: [owner, manager, member]
+                    enum: [owner, manager, coach, member]
                     example: "member"
                   type:
                     type: string
-                    enum: [owner, manager, member]
+                    enum: [owner, manager, coach, member]
                     description: "Identique à `role`"
                   displayId:
                     type: string
@@ -1696,7 +1823,7 @@ paths:
                     $ref: '#/components/schemas/Gym'
                   gyms:
                     type: array
-                    description: "Owner uniquement : toutes les salles avec `stats` (`members`, `managers`, `admins` (déprécié), `owners`)"
+                    description: "Owner : toutes les salles avec `stats` (`members`, `managers`, `coaches`, `admins` (déprécié), `owners`). Coach : ses salles `[{id, displayId, name}]`."
                     items:
                       type: object
                   activeSubscription:
@@ -2364,7 +2491,7 @@ paths:
                     example: "John Doe"
                   role:
                     type: string
-                    enum: [owner, manager, member]
+                    enum: [owner, manager, coach, member]
                     example: "member"
                   displayId:
                     type: string
@@ -3212,7 +3339,7 @@ paths:
   /users/gym/{gymId}/members:
     get:
       summary: Get all members of a specific gym
-      description: Get a list of all members in a specific gym with their subscription status and recent payments. Owners can access any gym, admins can only access their own gym.
+      description: Get a list of all members in a specific gym with their subscription status and recent payments. Owners can access any gym, managers only their own gym. Chaque membre expose `coachId` (int|null) et `coach` ({id, firstName, lastName}|null) — Rôles V2.
       tags: [Users, Gyms]
       security:
         - bearerAuth: []
@@ -8373,3 +8500,214 @@ paths:
                 format: binary
         '404':
           description: Not found or gym not published
+
+  /users/create-coach:
+    post:
+      summary: Créer un coach (Owner uniquement)
+      description: |
+        Rôles V2. Owner avec `canManageAdmins`. Le coach est rattaché à `gymIds` (CoachGym) ; sa salle
+        principale (`gymId`) est la première de la liste. Sans `password`, un email d'activation est envoyé
+        comme pour les managers.
+      tags: [Users, Coaches]
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, firstName, lastName, gymIds]
+              properties:
+                email:
+                  type: string
+                  format: email
+                firstName:
+                  type: string
+                lastName:
+                  type: string
+                phoneNumber:
+                  type: string
+                password:
+                  type: string
+                  description: Optionnel
+                gymIds:
+                  type: array
+                  items:
+                    type: integer
+                  example: [1, 2]
+                sendSetupEmail:
+                  type: boolean
+                  default: true
+      responses:
+        '201':
+          description: Coach créé
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                  coach:
+                    $ref: '#/components/schemas/Coach'
+                  setupEmailSent:
+                    type: boolean
+        '400':
+          description: Champs manquants, gymIds invalides, email ou téléphone déjà utilisé
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CoachError'
+        '403':
+          description: Pas owner (ou sans canManageAdmins)
+        '404':
+          description: Salle introuvable (`gym_not_found`)
+
+  /users/{id}/gyms:
+    patch:
+      summary: Remplacer les salles d'un coach (Owner uniquement)
+      description: |
+        Remplace les rattachements CoachGym. Les membres des salles retirées qui étaient affectés à ce coach
+        repassent à `coachId = null` (`unassignedMembers`). Si la salle principale est retirée, elle bascule
+        sur la première salle de `gymIds`.
+      tags: [Users, Coaches]
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [gymIds]
+              properties:
+                gymIds:
+                  type: array
+                  items:
+                    type: integer
+      responses:
+        '200':
+          description: Salles mises à jour
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    type: integer
+                  gymIds:
+                    type: array
+                    items:
+                      type: integer
+                  gyms:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/GymRef'
+                  unassignedMembers:
+                    type: integer
+        '400':
+          description: gymIds invalide
+        '403':
+          description: Pas owner
+        '404':
+          description: Coach ou salle introuvable
+
+  /coaches:
+    get:
+      summary: Lister les coachs (Owner / Manager)
+      description: "Owner : tous les coachs, ou ceux d'une salle avec `gymId`. Manager : coachs de sa salle (403 si `gymId` d'une autre salle)."
+      tags: [Coaches]
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: query
+          name: gymId
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Tableau brut de coachs
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Coach'
+        '403':
+          description: Autre rôle, ou manager sur une autre salle
+
+  /coaches/me/members:
+    get:
+      summary: Membres affectés au coach connecté (Coach)
+      tags: [Coaches]
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Tableau brut de membres (toutes les salles du coach)
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/CoachedMember'
+        '403':
+          description: Pas coach
+
+  /members/{id}/coach:
+    patch:
+      summary: Affecter ou retirer le coach principal d'un membre (Owner / Manager)
+      description: "`id` = userId du membre. Manager : membres de sa salle uniquement. Le coach doit être rattaché à la salle du membre."
+      tags: [Members, Coaches]
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [coachId]
+              properties:
+                coachId:
+                  type: integer
+                  nullable: true
+                  description: "null pour retirer le coach"
+      responses:
+        '200':
+          description: Affectation enregistrée
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  memberId:
+                    type: integer
+                  coachId:
+                    type: integer
+                    nullable: true
+                  coach:
+                    $ref: '#/components/schemas/CoachRef'
+        '400':
+          description: "coachId invalide, ou `coach_not_in_gym`"
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CoachError'
+        '403':
+          description: Autre rôle, ou manager sur un membre d'une autre salle
+        '404':
+          description: Membre ou coach introuvable
