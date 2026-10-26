@@ -343,6 +343,60 @@ class CheckInService {
   }
 
   /**
+   * Rôles V2 : check-ins du jour (présents ou sortis) des salles `gymIds`
+   * (toutes si undefined). `isMyMember` = membre suivi par `viewerId` ;
+   * `nextSessionToday` = prochaine séance du jour où le membre est inscrit.
+   */
+  async getTodayCheckIns({ gymIds, viewerId }) {
+    const todayStart = new Date();
+    todayStart.setHours(0, 0, 0, 0);
+    const tomorrowStart = new Date(todayStart.getTime() + 24 * 60 * 60 * 1000);
+
+    const checkIns = await prisma.gymCheckIn.findMany({
+      where: {
+        checkInTime: { gte: todayStart, lt: tomorrowStart },
+        ...(gymIds && { gymId: { in: gymIds } })
+      },
+      include: {
+        Gym: { select: { id: true, displayId: true, name: true } },
+        Member: {
+          include: {
+            User: { select: { id: true, displayId: true, firstName: true, lastName: true } },
+            TrainingSessionMember: {
+              where: {
+                status: { in: ['booked', 'checked_in'] },
+                Session: { status: { not: 'cancelled' }, startAt: { lt: tomorrowStart }, endAt: { gt: new Date() } }
+              },
+              include: { Session: { select: { id: true, startAt: true, endAt: true, coachId: true, title: true } } }
+            }
+          }
+        }
+      },
+      orderBy: { checkInTime: 'desc' }
+    });
+
+    return checkIns.map(c => {
+      const next = c.Member.TrainingSessionMember
+        .map(sm => sm.Session)
+        .sort((a, b) => a.startAt - b.startAt)[0] || null;
+      return {
+        id: c.id,
+        displayId: c.displayId,
+        memberId: c.memberId,
+        member: c.Member.User,
+        gymId: c.gymId,
+        gym: c.Gym,
+        checkInTime: c.checkInTime,
+        checkOutTime: c.checkOutTime,
+        isManual: c.isManual,
+        coachId: c.Member.coachId,
+        isMyMember: c.Member.coachId === viewerId,
+        nextSessionToday: next
+      };
+    });
+  }
+
+  /**
    * Récupérer les membres présents dans la salle (pas encore checkout)
    */
   async getPresentMembers(gymId) {
