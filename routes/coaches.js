@@ -3,11 +3,13 @@ const router = express.Router();
 const auth = require('../middleware/auth');
 const prisma = require('../utils/prismaClient');
 const coachService = require('../services/coachService');
+const sessionService = require('../services/sessionService');
 
 /**
  * Rôles V2 : coachs.
  * - GET /coaches?gymId=      owner (toutes salles) / manager (sa salle)
  * - GET /coaches/me/members  coach : ses membres affectés
+ * - GET /coaches/me/sessions coach : ses séances (toutes salles)
  */
 
 router.get('/', auth, async (req, res) => {
@@ -47,6 +49,22 @@ router.get('/me/members', auth, async (req, res) => {
   } catch (error) {
     console.error('Erreur membres du coach:', error);
     res.status(500).json({ error: 'Erreur lors de la récupération des membres' });
+  }
+});
+
+router.get('/me/sessions', auth, async (req, res) => {
+  try {
+    const requester = await prisma.user.findUnique({ where: { id: req.user.sub } });
+    if (!requester || requester.role !== 'coach') {
+      return res.status(403).json({ error: 'Accès réservé aux coachs' });
+    }
+    res.json(await sessionService.listCoachSessions(requester.id, req.query));
+  } catch (error) {
+    if (error instanceof sessionService.SessionError) {
+      return res.status(error.status).json({ error: error.code, message: error.message });
+    }
+    console.error('Erreur séances du coach:', error);
+    res.status(500).json({ error: 'Erreur lors de la récupération des séances' });
   }
 });
 

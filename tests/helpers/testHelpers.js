@@ -18,6 +18,8 @@ async function cleanDatabase() {
   await prisma.quotaNotification.deleteMany({});
   await prisma.storeReservation.deleteMany({});
   await prisma.storeProduct.deleteMany({});
+  await prisma.trainingSessionMember.deleteMany({});
+  await prisma.trainingSession.deleteMany({});
   await prisma.gymCheckIn.deleteMany({});
   await prisma.payment.deleteMany({});
   await prisma.planningExercise.deleteMany({});
