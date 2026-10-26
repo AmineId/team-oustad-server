@@ -24,6 +24,9 @@ info:
       Les routes `/plannings` en lecture (`/member/{id}`, `/next-day/{id}`, `GET /plannings`) gardent leur
       forme et sont alimentées par les affectations (`planning.id` = id de l'affectation) ; les écritures
       `/plannings` renvoient **410** `plannings_deprecated`.
+    - Séances (`/sessions`) : plage de travail d'un coach avec un ou plusieurs membres, gérée par l'owner
+      ou le manager de la salle (chevauchement coach → 409, récurrence hebdomadaire ≤ 26, horaires
+      d'ouverture en heure du Maroc). Le coach lit et pointe ses séances.
     - Kiosk : `POST /auth/login` avec `client: "kiosk"`, réservé aux owners et managers
       (403 `kiosk_forbidden_role`). La session kiosk est distincte de la session app.
   contact:
@@ -676,6 +679,121 @@ components:
               reason:
                 type: string
                 enum: [member_not_found, other_gym, not_your_member, forbidden]
+
+    SessionMember:
+      type: object
+      properties:
+        memberId:
+          type: integer
+        member:
+          type: object
+          properties:
+            id:
+              type: integer
+            displayId:
+              type: string
+            firstName:
+              type: string
+            lastName:
+              type: string
+            phoneNumber:
+              type: string
+              nullable: true
+        status:
+          type: string
+          enum: [booked, checked_in, absent, cancelled]
+        checkedInAt:
+          type: string
+          format: date-time
+          nullable: true
+        bookedAt:
+          type: string
+          format: date-time
+
+    Session:
+      type: object
+      properties:
+        id:
+          type: integer
+        displayId:
+          type: string
+        gymId:
+          type: integer
+        gym:
+          $ref: '#/components/schemas/GymRef'
+        coachId:
+          type: integer
+        coach:
+          $ref: '#/components/schemas/CoachRef'
+        startAt:
+          type: string
+          format: date-time
+        endAt:
+          type: string
+          format: date-time
+        capacity:
+          type: integer
+        title:
+          type: string
+          nullable: true
+        type:
+          type: string
+          nullable: true
+        notes:
+          type: string
+          nullable: true
+        seriesId:
+          type: string
+          nullable: true
+        status:
+          type: string
+          enum: [scheduled, done, cancelled]
+          description: "`done` posé automatiquement après la fin (inscrits non pointés → `absent`)"
+        members:
+          type: array
+          items:
+            $ref: '#/components/schemas/SessionMember'
+        bookedCount:
+          type: integer
+          description: "Inscrits non annulés"
+        remaining:
+          type: integer
+        createdBy:
+          $ref: '#/components/schemas/CoachRef'
+        createdAt:
+          type: string
+          format: date-time
+        isMemberCoach:
+          type: boolean
+          description: "GET /sessions/available avec memberId uniquement"
+
+    SessionError:
+      type: object
+      properties:
+        error:
+          type: string
+          description: "missing_fields, invalid_date, invalid_time_range, invalid_capacity, invalid_repeat, too_many_occurrences, invalid_scope, range_too_large, coach_not_found, coach_not_in_gym, outside_opening_hours, gym_closed, session_overlap, capacity_below_booked, session_not_found, session_not_open, member_ids_required, booking_rejected, session_full, member_not_in_session, member_id_required, no_active_subscription, quota_exhausted, subscription_expired, gym_id_required, member_not_found, forbidden"
+        message:
+          type: string
+        conflicts:
+          type: array
+          description: "session_overlap uniquement"
+          items:
+            $ref: '#/components/schemas/Session'
+        rejected:
+          type: array
+          description: "booking_rejected uniquement"
+          items:
+            type: object
+            properties:
+              memberId:
+                type: integer
+              reason:
+                type: string
+                enum: [member_not_found, member_other_gym, no_active_subscription, member_overlap, already_booked]
+        remaining:
+          type: integer
+          description: "session_full uniquement"
 
     CoachError:
       type: object
@@ -9261,3 +9379,460 @@ paths:
           description: Hors portée
         '404':
           description: Membre introuvable
+
+  /sessions:
+    get:
+      summary: Lister les séances (Owner / Manager)
+      description: "Owner : toutes ; manager : sa salle (403 si gymId d'une autre salle). Triées par startAt."
+      tags: [Sessions]
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: query
+          name: gymId
+          schema:
+            type: integer
+        - in: query
+          name: coachId
+          schema:
+            type: integer
+        - in: query
+          name: status
+          schema:
+            type: string
+            enum: [scheduled, done, cancelled]
+        - in: query
+          name: from
+          schema:
+            type: string
+            format: date-time
+          description: "Défaut : aujourd'hui 00:00"
+        - in: query
+          name: to
+          schema:
+            type: string
+            format: date-time
+          description: "Défaut : from + 7 jours ; plage ≤ 62 jours"
+      responses:
+        '200':
+          description: Tableau brut
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Session'
+        '400':
+          description: Plage invalide
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SessionError'
+    post:
+      summary: Créer une séance ou une série hebdomadaire (Owner / Manager de la salle)
+      description: |
+        Le coach doit être rattaché à la salle. Refus si une séance non annulée du coach chevauche (toutes salles).
+        Avec `repeat`, une occurrence par semaine (même heure locale) jusqu'à `until` inclus, 26 au plus, en tout ou rien.
+        Si des horaires d'ouverture sont définis pour le jour, la séance doit y tenir (heure du Maroc).
+        Le coach reçoit un FCM `data: { type: "session", sessionId, action: "assigned" }`.
+      tags: [Sessions]
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [gymId, coachId, startAt, endAt]
+              properties:
+                gymId:
+                  type: integer
+                coachId:
+                  type: integer
+                startAt:
+                  type: string
+                  format: date-time
+                endAt:
+                  type: string
+                  format: date-time
+                capacity:
+                  type: integer
+                  minimum: 1
+                  default: 1
+                title:
+                  type: string
+                type:
+                  type: string
+                notes:
+                  type: string
+                repeat:
+                  type: object
+                  properties:
+                    weekly:
+                      type: boolean
+                      enum: [true]
+                    until:
+                      type: string
+                      format: date-time
+      responses:
+        '201':
+          description: Séance(s) créée(s) — toujours un tableau
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  sessions:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Session'
+        '400':
+          description: Validation, coach_not_in_gym, outside_opening_hours, gym_closed, too_many_occurrences
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SessionError'
+        '403':
+          description: Salle hors portée
+        '409':
+          description: "session_overlap avec `conflicts`"
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SessionError'
+
+  /sessions/available:
+    get:
+      summary: Rechercher des créneaux disponibles (Owner / Manager)
+      description: |
+        Séances `scheduled` à venir avec des places. Avec `memberId` : exclut celles où il est inscrit ou qui
+        chevauchent ses séances, et met d'abord celles de son coach (`isMemberCoach`), puis tri par date.
+      tags: [Sessions]
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: query
+          name: gymId
+          schema:
+            type: integer
+          description: "Obligatoire pour l'owner, forcé pour le manager"
+        - in: query
+          name: memberId
+          schema:
+            type: integer
+        - in: query
+          name: coachId
+          schema:
+            type: integer
+        - in: query
+          name: from
+          schema:
+            type: string
+            format: date-time
+          description: "Défaut : aujourd'hui 00:00"
+        - in: query
+          name: to
+          schema:
+            type: string
+            format: date-time
+          description: "Défaut : from + 7 jours ; plage ≤ 62 jours"
+      responses:
+        '200':
+          description: Tableau brut
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Session'
+        '400':
+          description: gym_id_required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SessionError'
+
+  /sessions/{id}:
+    get:
+      summary: Détail d'une séance (Owner / Manager de la salle / Coach de la séance)
+      tags: [Sessions]
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Séance
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Session'
+        '403':
+          description: Hors portée
+        '404':
+          description: Introuvable
+    patch:
+      summary: Modifier une séance ou sa série (Owner / Manager)
+      description: "Avec scope ≠ this, le décalage de startAt/endAt s'applique à chaque occurrence. Coach et membres notifiés."
+      tags: [Sessions]
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+        - in: query
+          name: scope
+          schema:
+            type: string
+            enum: [this, following, series]
+            default: this
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                startAt:
+                  type: string
+                  format: date-time
+                endAt:
+                  type: string
+                  format: date-time
+                coachId:
+                  type: integer
+                capacity:
+                  type: integer
+                title:
+                  type: string
+                type:
+                  type: string
+                notes:
+                  type: string
+      responses:
+        '200':
+          description: Séances modifiées
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  sessions:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Session'
+        '400':
+          description: Validation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SessionError'
+        '409':
+          description: session_overlap, capacity_below_booked, session_not_open
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SessionError'
+    delete:
+      summary: Annuler une séance ou sa série (Owner / Manager)
+      description: "Statut `cancelled` (historique conservé). Coach et membres inscrits notifiés."
+      tags: [Sessions]
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+        - in: query
+          name: scope
+          schema:
+            type: string
+            enum: [this, following, series]
+            default: this
+      responses:
+        '200':
+          description: Séances annulées
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  sessions:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Session'
+
+  /sessions/{id}/members:
+    post:
+      summary: Inscrire des membres (Owner / Manager)
+      description: "Tout ou rien. Membres de la salle avec un abonnement actif, sans séance qui chevauche."
+      tags: [Sessions]
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [memberIds]
+              properties:
+                memberIds:
+                  type: array
+                  items:
+                    type: integer
+      responses:
+        '200':
+          description: Séance mise à jour
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Session'
+        '409':
+          description: session_full (`remaining`), session_not_open
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SessionError'
+        '422':
+          description: booking_rejected avec `rejected`
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SessionError'
+
+  /sessions/{id}/members/{memberId}:
+    delete:
+      summary: Désinscrire un membre (Owner / Manager)
+      tags: [Sessions]
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+        - in: path
+          name: memberId
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Séance mise à jour (statut du membre `cancelled`)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Session'
+        '404':
+          description: member_not_in_session
+
+  /sessions/{id}/check-in:
+    post:
+      summary: Pointer un membre à la séance (Coach de la séance / Manager / Owner)
+      description: |
+        Crée aussi l'entrée salle du jour (décompte du quota) si le membre n'a pas encore scanné aujourd'hui ;
+        sinon `created: false` et rien n'est décompté. Re-pointer est idempotent.
+      tags: [Sessions]
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [memberId]
+              properties:
+                memberId:
+                  type: integer
+      responses:
+        '200':
+          description: Membre pointé
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  member:
+                    $ref: '#/components/schemas/SessionMember'
+                  gymCheckIn:
+                    type: object
+                    properties:
+                      id:
+                        type: integer
+                      created:
+                        type: boolean
+                      sessionsRemaining:
+                        type: integer
+                        nullable: true
+        '403':
+          description: Ni coach de la séance, ni staff de la salle
+        '404':
+          description: member_not_in_session
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SessionError'
+        '409':
+          description: session_not_open, no_active_subscription, quota_exhausted, subscription_expired (rien n'est pointé)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SessionError'
+
+  /coaches/me/sessions:
+    get:
+      summary: Séances du coach connecté (Coach)
+      tags: [Coaches, Sessions]
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: query
+          name: status
+          schema:
+            type: string
+        - in: query
+          name: from
+          schema:
+            type: string
+            format: date-time
+          description: "Défaut : aujourd'hui 00:00"
+        - in: query
+          name: to
+          schema:
+            type: string
+            format: date-time
+          description: "Défaut : from + 7 jours ; plage ≤ 62 jours"
+      responses:
+        '200':
+          description: Tableau brut (toutes les salles du coach)
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Session'

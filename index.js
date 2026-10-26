@@ -116,6 +116,7 @@ const showcaseRoutes = require('./routes/showcase');
 const coachesRoutes = require('./routes/coaches');
 const programsRoutes = require('./routes/programs');
 const programAssignmentsRoutes = require('./routes/programAssignments');
+const sessionsRoutes = require('./routes/sessions');
 
 // Use routes
 console.log('🔗 Configuration des routes API...');
@@ -136,7 +137,8 @@ app.use('/showcase', showcaseRoutes);
 app.use('/coaches', coachesRoutes);
 app.use('/programs', programsRoutes);
 app.use('/program-assignments', programAssignmentsRoutes);
-console.log('✅ Routes configurées: /gyms, /users, /auth, /plannings, /subscriptions, /subscription-types, /android, /members, /banners, /check-in, /store, /whatsapp, /public, /showcase, /coaches, /programs, /program-assignments');
+app.use('/sessions', sessionsRoutes);
+console.log('✅ Routes configurées: /gyms, /users, /auth, /plannings, /subscriptions, /subscription-types, /android, /members, /banners, /check-in, /store, /whatsapp, /public, /showcase, /coaches, /programs, /program-assignments, /sessions');
 
 // Redirection Beta Download vers Google Play Internal Testing
 app.get('/beta/download', (req, res) => {
@@ -281,6 +283,21 @@ cron.schedule('0 10 * * *', async () => {
   }
 });
 console.log('✅ Job de vérification des quotas: tous les jours à 10h00');
+
+// Rôles V2 : rappels de séance (~1 h avant) et clôture des séances passées (toutes les 15 min)
+const { sendSessionReminders, closePastSessions } = require('./jobs/sessionReminder');
+cron.schedule('*/15 * * * *', async () => {
+  try {
+    const reminders = await sendSessionReminders();
+    const closed = await closePastSessions();
+    if (reminders.sessions || closed.closed) {
+      console.log(`✅ Séances : ${reminders.sent} rappel(s), ${closed.closed} clôturée(s), ${closed.absent} absent(s)`);
+    }
+  } catch (error) {
+    console.error('❌ Erreur job séances:', error);
+  }
+});
+console.log('✅ Job des séances (rappels + clôture): toutes les 15 minutes');
 
 app.listen(PORT, HOST, () => {
   const localUrl = `http://localhost:${PORT}`;

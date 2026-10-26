@@ -16,6 +16,10 @@ const COACH_ROUTES = [
   ['DELETE', /^\/users\/fcm-token$/],
   // Coach : ses membres
   ['GET', /^\/coaches\/me\/members$/],
+  ['GET', /^\/coaches\/me\/sessions$/],
+  // Séances : lecture et pointage de ses séances (portée vérifiée dans le service)
+  ['GET', /^\/sessions\/\d+$/],
+  ['POST', /^\/sessions\/\d+\/check-in$/],
   // Programmes : lecture, affectation à ses membres, plannings de ses membres
   ['GET', /^\/programs$/],
   ['GET', /^\/programs\/\d+$/],

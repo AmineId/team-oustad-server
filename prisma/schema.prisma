@@ -70,6 +70,7 @@ model Gym {
   GymPhoto     GymPhoto[]
   ShowcasePage ShowcasePage?
   CoachGym     CoachGym[]
+  TrainingSession TrainingSession[]
 
   @@index([name])
   @@index([isPublished])
@@ -120,6 +121,7 @@ model Member {
   Payment                     Payment[]
   Planning                    Planning[]
   ProgramAssignment           ProgramAssignment[]
+  TrainingSessionMember       TrainingSessionMember[]
   Subscription                Subscription[]
   GymCheckIn                  GymCheckIn[]
   StoreReservation            StoreReservation[]
@@ -322,6 +324,53 @@ model ProgramAssignment {
   @@index([programId, status])
 }
 
+/// Rôles V2 : séance = plage de travail d'un coach dans une salle, avec un
+/// ou plusieurs membres. Nommée TrainingSession pour ne pas confondre avec
+/// la session d'auth (currentSessionId) ni le quota d'abonnement (sessionsUsed).
+model TrainingSession {
+  id             Int                     @id @default(autoincrement())
+  displayId      String                  @unique
+  gymId          Int
+  coachId        Int
+  startAt        DateTime
+  endAt          DateTime
+  capacity       Int                     @default(1)
+  title          String?
+  type           String?
+  notes          String?
+  /// Série hebdomadaire (même valeur pour toutes les occurrences)
+  seriesId       String?
+  status         String                  @default("scheduled") // scheduled, done, cancelled
+  createdBy      Int?
+  reminderSentAt DateTime?
+  createdAt      DateTime                @default(now())
+  updatedAt      DateTime                @updatedAt
+  Gym            Gym                     @relation(fields: [gymId], references: [id], onDelete: Cascade)
+  Coach          User                    @relation("SessionCoach", fields: [coachId], references: [id], onDelete: Cascade)
+  Creator        User?                   @relation("SessionCreator", fields: [createdBy], references: [id], onDelete: SetNull)
+  Members        TrainingSessionMember[]
+
+  @@index([gymId, startAt])
+  @@index([coachId, startAt])
+  @@index([seriesId])
+  @@index([status, startAt])
+}
+
+model TrainingSessionMember {
+  sessionId    Int
+  memberId     Int
+  status       String          @default("booked") // booked, checked_in, absent, cancelled
+  bookedAt     DateTime        @default(now())
+  checkedInAt  DateTime?
+  checkedInBy  Int?
+  gymCheckInId Int?
+  Session      TrainingSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  Member       Member          @relation(fields: [memberId], references: [userId], onDelete: Cascade)
+
+  @@id([sessionId, memberId])
+  @@index([memberId])
+}
+
 model PlanningDay {
   id               Int                @id @default(autoincrement())
   planningId       Int
@@ -428,6 +477,8 @@ model User {
   Planning             Planning[]
   CreatedPrograms      Program[]            @relation("ProgramCreator")
   AssignedPrograms     ProgramAssignment[]  @relation("ProgramAssigner")
+  CoachedSessions      TrainingSession[]    @relation("SessionCoach")
+  CreatedSessions      TrainingSession[]    @relation("SessionCreator")
   StoreProduct         StoreProduct[]
   Gym                  Gym                  @relation(fields: [gymId], references: [id])
 
