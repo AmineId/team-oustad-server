@@ -41,6 +41,9 @@ async function main() {
   await prisma.planningExercise.deleteMany();
   await prisma.planningDay.deleteMany();
   await prisma.planning.deleteMany();
+  // Programmes (Rôles V2) : affectations -> programmes (jours/exercices en cascade)
+  await prisma.programAssignment.deleteMany();
+  await prisma.program.deleteMany();
   await prisma.exercise.deleteMany();
   // Payment and subscription depend on member
   await prisma.payment.deleteMany();
@@ -1737,6 +1740,49 @@ async function main() {
   });
   console.log(`✅ Planning créé pour ${charlieUser.firstName} ${charlieUser.lastName}: ${charliePlanning.title}\n`);
 
+  // Rôles V2 : les plannings ci-dessus sont convertis comme le fait la migration
+  // (1 Planning -> 1 Program créé par l'owner + 1 ProgramAssignment), puis supprimés.
+  console.log('🔁 Conversion des plannings en programmes...');
+  const legacyPlannings = await prisma.planning.findMany({
+    include: { PlanningDay: { include: { PlanningExercise: true } } }
+  });
+  // Bob et Charlie sont suivis par le coach : c'est lui qui leur a affecté le programme
+  const assignerFor = (memberId) =>
+    [bobUser.id, charlieUser.id].includes(memberId) ? coachUser.id : ownerUser.id;
+  for (const planning of legacyPlannings) {
+    await prisma.program.create({
+      data: {
+        displayId: `PROGRAM-${crypto.randomBytes(8).toString('hex')}`,
+        title: planning.title,
+        description: planning.description,
+        level: planning.memberId === charlieUser.id ? 'beginner' : 'intermediate',
+        durationWeeks: 12,
+        createdBy: ownerUser.id,
+        ProgramDay: {
+          create: planning.PlanningDay.map(day => ({
+            dayOfWeek: day.dayOfWeek,
+            ProgramExercise: {
+              create: day.PlanningExercise.map(({ exerciseId, sets, reps, duration, weight, restTime, notes, order }) =>
+                ({ exerciseId, sets, reps, duration, weight, restTime, notes, order }))
+            }
+          }))
+        },
+        ProgramAssignment: {
+          create: {
+            displayId: `ASSIGN-${crypto.randomBytes(8).toString('hex')}`,
+            memberId: planning.memberId,
+            assignedBy: assignerFor(planning.memberId),
+            startDate: planning.startDate,
+            endDate: planning.endDate,
+            status: planning.status
+          }
+        }
+      }
+    });
+  }
+  await prisma.planning.deleteMany();
+  console.log(`✅ ${legacyPlannings.length} programme(s) créé(s) et affecté(s)\n`);
+
 
   // Créer des banners event et promotion
   console.log('🎯 Création des banners...');
@@ -2022,9 +2068,9 @@ async function main() {
   const totalSubscriptions = await prisma.subscription.count();
   const totalPayments = await prisma.payment.count();
   const totalExercises = await prisma.exercise.count();
-  const totalPlannings = await prisma.planning.count();
-  const totalPlanningDays = await prisma.planningDay.count();
-  const totalPlanningExercises = await prisma.planningExercise.count();
+  const totalPlannings = await prisma.program.count();
+  const totalPlanningDays = await prisma.programDay.count();
+  const totalPlanningExercises = await prisma.programExercise.count();
   const totalSubscriptionTypes = await prisma.subscriptionType.count();
   const activeSubscriptionTypes = await prisma.subscriptionType.count({ where: { isActive: true } });
   
@@ -2076,7 +2122,7 @@ async function main() {
 
   console.log('💪 Exercices et Plannings:');
   console.log(`   - Exercices disponibles: ${totalExercises}`);
-  console.log(`   - Plannings créés: ${totalPlannings}`);
+  console.log(`   - Programmes créés: ${totalPlannings}`);
   console.log(`   - Jours planifiés: ${totalPlanningDays}`);
   console.log(`   - Exercices assignés: ${totalPlanningExercises}\n`);
   

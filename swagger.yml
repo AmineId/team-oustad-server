@@ -19,6 +19,11 @@ info:
       son profil (`/auth/me`, `/users/me`, `/users/{sonId}`…), `/coaches/me/*`, lecture de ses salles
       (`GET /gyms`, `/gyms/{id}`, horaires, image). Pour un coach, se baser sur `gyms` et non sur `gymId`
       (salle principale).
+    - Programmes : l'owner crée des modèles (`/programs`), affectés aux membres
+      (`POST /programs/{id}/assignments`) par l'owner ou le coach (ses membres) ; le manager les consulte en lecture seule.
+      Les routes `/plannings` en lecture (`/member/{id}`, `/next-day/{id}`, `GET /plannings`) gardent leur
+      forme et sont alimentées par les affectations (`planning.id` = id de l'affectation) ; les écritures
+      `/plannings` renvoient **410** `plannings_deprecated`.
     - Kiosk : `POST /auth/login` avec `client: "kiosk"`, réservé aux owners et managers
       (403 `kiosk_forbidden_role`). La session kiosk est distincte de la session app.
   contact:
@@ -492,6 +497,185 @@ components:
               nullable: true
             sessionsUsed:
               type: integer
+
+    ProgramExercise:
+      type: object
+      properties:
+        id:
+          type: integer
+          description: "Id de la ligne (programExerciseId), utilisé dans PUT/DELETE"
+        exerciseId:
+          type: integer
+        exercise:
+          $ref: '#/components/schemas/Exercise'
+        sets:
+          type: integer
+          nullable: true
+        reps:
+          type: integer
+          nullable: true
+        duration:
+          type: integer
+          nullable: true
+        weight:
+          type: number
+          nullable: true
+        restTime:
+          type: integer
+          nullable: true
+          description: Secondes
+        notes:
+          type: string
+          nullable: true
+        order:
+          type: integer
+
+    ProgramExerciseInput:
+      type: object
+      required: [exerciseId]
+      properties:
+        exerciseId:
+          type: integer
+        sets:
+          type: integer
+        reps:
+          type: integer
+        duration:
+          type: integer
+        weight:
+          type: number
+        restTime:
+          type: integer
+        notes:
+          type: string
+        order:
+          type: integer
+
+    ProgramDayInput:
+      type: object
+      required: [dayOfWeek]
+      properties:
+        dayOfWeek:
+          type: integer
+          minimum: 0
+          maximum: 6
+          description: "0 = dimanche … 6 = samedi"
+        exercises:
+          type: array
+          items:
+            $ref: '#/components/schemas/ProgramExerciseInput'
+
+    Program:
+      type: object
+      properties:
+        id:
+          type: integer
+        displayId:
+          type: string
+        title:
+          type: string
+        description:
+          type: string
+          nullable: true
+        level:
+          type: string
+          nullable: true
+        durationWeeks:
+          type: integer
+          nullable: true
+        createdBy:
+          $ref: '#/components/schemas/CoachRef'
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+        days:
+          type: array
+          items:
+            type: object
+            properties:
+              dayOfWeek:
+                type: integer
+              exercises:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ProgramExercise'
+        assignmentsCount:
+          type: integer
+          description: Affectations actives
+
+    ProgramInput:
+      type: object
+      properties:
+        title:
+          type: string
+          description: Requis à la création
+        description:
+          type: string
+        level:
+          type: string
+        durationWeeks:
+          type: integer
+        days:
+          type: array
+          description: "Création : jours initiaux. PUT : remplace tous les jours si fourni."
+          items:
+            $ref: '#/components/schemas/ProgramDayInput'
+
+    ProgramAssignment:
+      type: object
+      properties:
+        id:
+          type: integer
+        displayId:
+          type: string
+        programId:
+          type: integer
+        memberId:
+          type: integer
+        assignedBy:
+          $ref: '#/components/schemas/CoachRef'
+        startDate:
+          type: string
+          format: date-time
+        endDate:
+          type: string
+          format: date-time
+          nullable: true
+          description: "null = sans fin (tant que l'affectation est active)"
+        status:
+          type: string
+          enum: [active, completed, cancelled]
+        createdAt:
+          type: string
+          format: date-time
+        program:
+          $ref: '#/components/schemas/Program'
+
+    ProgramError:
+      type: object
+      properties:
+        error:
+          type: string
+          description: "title_required, invalid_day_of_week, duplicate_day, exercise_id_required, invalid_field, invalid_days, exercise_not_found, program_not_found, program_exercise_not_found, program_in_use, member_ids_required, invalid_date, assignment_rejected, assignment_not_found, member_not_found, invalid_status"
+        message:
+          type: string
+        activeAssignments:
+          type: integer
+          description: "program_in_use uniquement"
+        rejected:
+          type: array
+          description: "assignment_rejected uniquement"
+          items:
+            type: object
+            properties:
+              memberId:
+                type: integer
+              reason:
+                type: string
+                enum: [member_not_found, other_gym, not_your_member, forbidden]
 
     CoachError:
       type: object
@@ -4087,6 +4271,8 @@ paths:
 
   /plannings:
     post:
+      deprecated: true
+      x-roles-v2: "410 plannings_deprecated : utiliser /programs et POST /programs/{id}/assignments"
       summary: Create a new workout plan
       description: Create a new workout plan for a member. Only coaches can create plans for members in their gym.
       tags: [Plannings]
@@ -4471,6 +4657,8 @@ paths:
 
   /plannings/{planningId}/days/{dayOfWeek}/exercises:
     post:
+      deprecated: true
+      x-roles-v2: "410 plannings_deprecated : utiliser /programs et POST /programs/{id}/assignments"
       summary: Add exercise to planning day
       description: Add an exercise to a specific day in a workout plan. Only the coach who created the plan can modify it.
       tags: [Plannings, Exercises]
@@ -4565,6 +4753,8 @@ paths:
 
   /plannings/{planningId}/days/{dayOfWeek}/exercises/{exerciseId}:
     delete:
+      deprecated: true
+      x-roles-v2: "410 plannings_deprecated : utiliser /programs et POST /programs/{id}/assignments"
       summary: Remove exercise from planning day
       description: Remove a specific exercise from a specific day in a workout plan. Only the coach who created the plan can modify it.
       tags: [Plannings, Exercises]
@@ -4764,6 +4954,8 @@ paths:
 
   /plannings/{planningId}:
     delete:
+      deprecated: true
+      x-roles-v2: "410 plannings_deprecated : utiliser /programs et POST /programs/{id}/assignments"
       summary: Delete a planning
       description: Delete a workout plan. Only the coach who created the plan can delete it. Cascades to all days and exercises.
       tags: [Plannings]
@@ -8711,3 +8903,361 @@ paths:
           description: Autre rôle, ou manager sur un membre d'une autre salle
         '404':
           description: Membre ou coach introuvable
+
+  /programs:
+    get:
+      summary: Lister les programmes (Owner / Manager / Coach)
+      description: Programmes communs à toutes les salles, du plus récent au plus ancien.
+      tags: [Programs]
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: query
+          name: search
+          schema:
+            type: string
+          description: Filtre sur le titre (insensible à la casse)
+      responses:
+        '200':
+          description: Tableau brut de programmes
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Program'
+        '403':
+          description: Membre
+    post:
+      summary: Créer un programme (Owner)
+      tags: [Programs]
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProgramInput'
+      responses:
+        '201':
+          description: Programme créé
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Program'
+        '400':
+          description: Body invalide
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProgramError'
+        '403':
+          description: Pas owner
+        '404':
+          description: Exercice introuvable
+
+  /programs/{id}:
+    get:
+      summary: Détail d'un programme (Owner / Manager / Coach)
+      tags: [Programs]
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Programme
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Program'
+        '404':
+          description: Programme introuvable
+    put:
+      summary: Modifier un programme (Owner)
+      description: "Les champs absents sont conservés ; `days` fourni remplace tous les jours."
+      tags: [Programs]
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProgramInput'
+      responses:
+        '200':
+          description: Programme mis à jour
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Program'
+        '400':
+          description: Body invalide
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProgramError'
+        '404':
+          description: Programme introuvable
+    delete:
+      summary: Supprimer un programme (Owner)
+      tags: [Programs]
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: "Supprimé : `{ deletedId }`"
+        '409':
+          description: "`program_in_use` : encore des affectations actives (`activeAssignments`)"
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProgramError'
+
+  /programs/{id}/days/{dayOfWeek}/exercises:
+    post:
+      summary: Ajouter un exercice à un jour du programme (Owner)
+      description: "Crée le jour s'il n'existe pas. `order` par défaut : à la fin du jour."
+      tags: [Programs]
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+        - in: path
+          name: dayOfWeek
+          required: true
+          schema:
+            type: integer
+            minimum: 0
+            maximum: 6
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProgramExerciseInput'
+      responses:
+        '201':
+          description: Exercice ajouté
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProgramExercise'
+        '400':
+          description: Body invalide
+        '404':
+          description: Programme ou exercice introuvable
+
+  /programs/{id}/days/{dayOfWeek}/exercises/{exerciseId}:
+    put:
+      summary: Modifier un exercice du programme (Owner)
+      description: "`exerciseId` = id de la ligne ProgramExercise. Les champs absents sont conservés."
+      tags: [Programs]
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+        - in: path
+          name: dayOfWeek
+          required: true
+          schema:
+            type: integer
+            minimum: 0
+            maximum: 6
+        - in: path
+          name: exerciseId
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProgramExerciseInput'
+      responses:
+        '200':
+          description: Exercice mis à jour
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProgramExercise'
+        '404':
+          description: Exercice absent de ce jour du programme
+    delete:
+      summary: Retirer un exercice du programme (Owner)
+      tags: [Programs]
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+        - in: path
+          name: dayOfWeek
+          required: true
+          schema:
+            type: integer
+            minimum: 0
+            maximum: 6
+        - in: path
+          name: exerciseId
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: "Retiré : `{ deletedId }`"
+        '404':
+          description: Exercice absent de ce jour du programme
+
+  /programs/{id}/assignments:
+    post:
+      summary: Affecter un programme à des membres (Owner / Coach)
+      description: |
+        Tout ou rien. Owner : tous les membres ; coach : ses membres affectés. Manager : 403 forbidden.
+        Un membre n'a qu'une affectation active : les précédentes passent en `completed` (`replaced`).
+        Chaque membre reçoit un FCM `data: { type: "program", assignmentId, programId }`.
+      tags: [Programs]
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [memberIds, startDate]
+              properties:
+                memberIds:
+                  type: array
+                  items:
+                    type: integer
+                startDate:
+                  type: string
+                  format: date-time
+                endDate:
+                  type: string
+                  format: date-time
+                  nullable: true
+      responses:
+        '201':
+          description: Affectations créées
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  assignments:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/ProgramAssignment'
+                  replaced:
+                    type: integer
+        '400':
+          description: memberIds ou dates invalides
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProgramError'
+        '403':
+          description: Membre
+        '404':
+          description: Programme introuvable
+        '422':
+          description: "`assignment_rejected` avec `rejected[]` — rien n'est créé"
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProgramError'
+
+  /program-assignments/{id}:
+    delete:
+      summary: Annuler une affectation (Owner / Coach)
+      description: "Passe le statut à `cancelled` (historique conservé). Mêmes droits que l'affectation."
+      tags: [Programs]
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Affectation annulée
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProgramAssignment'
+        '403':
+          description: Hors portée
+        '404':
+          description: Affectation introuvable
+
+  /members/{id}/programs:
+    get:
+      summary: Programmes affectés à un membre
+      description: "`id` = userId du membre. Lecture : le membre, le manager de sa salle, son coach, l'owner. Plus récent d'abord."
+      tags: [Programs, Members]
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+        - in: query
+          name: status
+          schema:
+            type: string
+            enum: [active, completed, cancelled]
+      responses:
+        '200':
+          description: Tableau brut d'affectations (avec `program`)
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ProgramAssignment'
+        '403':
+          description: Hors portée
+        '404':
+          description: Membre introuvable

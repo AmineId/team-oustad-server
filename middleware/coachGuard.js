@@ -16,6 +16,18 @@ const COACH_ROUTES = [
   ['DELETE', /^\/users\/fcm-token$/],
   // Coach : ses membres
   ['GET', /^\/coaches\/me\/members$/],
+  // Programmes : lecture, affectation à ses membres, plannings de ses membres
+  ['GET', /^\/programs$/],
+  ['GET', /^\/programs\/\d+$/],
+  ['POST', /^\/programs\/\d+\/assignments$/],
+  ['DELETE', /^\/program-assignments\/\d+$/],
+  ['GET', /^\/members\/\d+\/programs$/],
+  ['GET', /^\/plannings$/],
+  ['GET', /^\/plannings\/exercises$/],
+  ['GET', /^\/plannings\/exercises\/\d+$/],
+  ['GET', /^\/plannings\/member\/\d+$/],
+  ['GET', /^\/plannings\/next-day\/\d+$/],
+  ['POST', /^\/plannings\/respond-help$/],
   // Salles : lecture
   ['GET', /^\/gyms$/],
   ['GET', /^\/gyms\/\d+$/],

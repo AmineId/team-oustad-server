@@ -19,13 +19,13 @@ const dailyPlanningNotification = cron.schedule('0 6 * * *', async () => {
 
     console.log(`📅 Date: ${today.toISOString().split('T')[0]}, Jour de la semaine: ${currentDayOfWeek}`);
 
-    // Trouver tous les plannings actifs pour aujourd'hui avec retry
-    const activePlannings = await executeWithRetry(async () => {
-      return await prisma.planning.findMany({
+    // Rôles V2 : affectations de programme actives aujourd'hui (endDate null = sans fin)
+    const activeAssignments = await executeWithRetry(async () => {
+      return await prisma.programAssignment.findMany({
         where: {
           status: 'active',
           startDate: { lte: today },
-          endDate: { gte: today }
+          OR: [{ endDate: null }, { endDate: { gte: today } }]
         },
         include: {
           Member: {
@@ -41,22 +41,16 @@ const dailyPlanningNotification = cron.schedule('0 6 * * *', async () => {
               }
             }
           },
-          Coach: {
-            select: {
-              firstName: true,
-              lastName: true
-            }
-          },
-          PlanningDay: {
-            where: {
-              dayOfWeek: currentDayOfWeek
-            },
+          Program: {
             include: {
-              PlanningExercise: {
+              ProgramDay: {
+                where: { dayOfWeek: currentDayOfWeek },
                 include: {
-                  Exercise: true
-                },
-                orderBy: { order: 'asc' }
+                  ProgramExercise: {
+                    include: { Exercise: true },
+                    orderBy: { order: 'asc' }
+                  }
+                }
               }
             }
           }
@@ -64,12 +58,17 @@ const dailyPlanningNotification = cron.schedule('0 6 * * *', async () => {
       });
     });
 
-    console.log(`✅ ${activePlannings.length} planning(s) actif(s) trouvé(s)`);
+    console.log(`✅ ${activeAssignments.length} programme(s) actif(s) trouvé(s)`);
 
-    // Filtrer les plannings qui ont des exercices aujourd'hui
-    const planningsWithExercisesToday = activePlannings.filter(
-      planning => planning.PlanningDay.length > 0 && planning.PlanningDay[0].PlanningExercise.length > 0
-    );
+    // Forme « planning » attendue par la boucle d'envoi (id = affectation)
+    const planningsWithExercisesToday = activeAssignments
+      .filter(a => a.Program.ProgramDay.length > 0 && a.Program.ProgramDay[0].ProgramExercise.length > 0)
+      .map(a => ({
+        id: a.id,
+        title: a.Program.title,
+        Member: a.Member,
+        PlanningDay: [{ PlanningExercise: a.Program.ProgramDay[0].ProgramExercise }]
+      }));
 
     console.log(`✅ ${planningsWithExercisesToday.length} planning(s) avec exercices aujourd'hui`);
 

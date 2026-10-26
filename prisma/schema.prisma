@@ -44,6 +44,7 @@ model Exercise {
   updatedAt            DateTime @updatedAt
   displayId        String             @unique
   PlanningExercise PlanningExercise[]
+  ProgramExercise  ProgramExercise[]
 
   @@index([category])
   @@index([difficulty])
@@ -118,6 +119,7 @@ model Member {
   MemberMeasurement           MemberMeasurement[]
   Payment                     Payment[]
   Planning                    Planning[]
+  ProgramAssignment           ProgramAssignment[]
   Subscription                Subscription[]
   GymCheckIn                  GymCheckIn[]
   StoreReservation            StoreReservation[]
@@ -250,6 +252,76 @@ model Planning {
   @@index([startDate, endDate])
 }
 
+/// Rôles V2 : programme réutilisable créé par l'owner (jours + exercices),
+/// affecté ensuite aux membres via ProgramAssignment. Remplace Planning.
+model Program {
+  id                Int                 @id @default(autoincrement())
+  displayId         String              @unique
+  title             String
+  description       String?
+  level             String?
+  durationWeeks     Int?
+  createdBy         Int?
+  /// Planning d'origine (migration Rôles V2)
+  sourcePlanningId  Int?                @unique
+  createdAt         DateTime            @default(now())
+  updatedAt         DateTime            @updatedAt
+  Creator           User?               @relation("ProgramCreator", fields: [createdBy], references: [id], onDelete: SetNull)
+  ProgramDay        ProgramDay[]
+  ProgramAssignment ProgramAssignment[]
+
+  @@index([title])
+}
+
+model ProgramDay {
+  id              Int               @id @default(autoincrement())
+  programId       Int
+  dayOfWeek       Int
+  Program         Program           @relation(fields: [programId], references: [id], onDelete: Cascade)
+  ProgramExercise ProgramExercise[]
+
+  @@unique([programId, dayOfWeek])
+}
+
+model ProgramExercise {
+  id           Int        @id @default(autoincrement())
+  programDayId Int
+  exerciseId   Int
+  sets         Int?
+  reps         Int?
+  duration     Int?
+  weight       Float?
+  restTime     Int?
+  notes        String?
+  order        Int        @default(0)
+  ProgramDay   ProgramDay @relation(fields: [programDayId], references: [id], onDelete: Cascade)
+  Exercise     Exercise   @relation(fields: [exerciseId], references: [id])
+
+  @@index([programDayId, order])
+}
+
+/// Affectation d'un programme à un membre. Un membre a au plus une
+/// affectation `active` à la fois (les précédentes passent en `completed`).
+model ProgramAssignment {
+  id               Int       @id @default(autoincrement())
+  displayId        String    @unique
+  programId        Int
+  memberId         Int
+  assignedBy       Int?
+  startDate        DateTime
+  endDate          DateTime?
+  status           String    @default("active") // active, completed, cancelled
+  sourcePlanningId Int?      @unique
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+  Program          Program   @relation(fields: [programId], references: [id], onDelete: Cascade)
+  Member           Member    @relation(fields: [memberId], references: [userId], onDelete: Cascade)
+  Assigner         User?     @relation("ProgramAssigner", fields: [assignedBy], references: [id], onDelete: SetNull)
+
+  @@index([memberId, status])
+  @@index([programId, status])
+}
+
 model PlanningDay {
   id               Int                @id @default(autoincrement())
   planningId       Int
@@ -354,6 +426,8 @@ model User {
   Owner                Owner?
   PasswordResetToken   PasswordResetToken[]
   Planning             Planning[]
+  CreatedPrograms      Program[]            @relation("ProgramCreator")
+  AssignedPrograms     ProgramAssignment[]  @relation("ProgramAssigner")
   StoreProduct         StoreProduct[]
   Gym                  Gym                  @relation(fields: [gymId], references: [id])
 
