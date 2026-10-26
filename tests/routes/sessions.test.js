@@ -66,7 +66,7 @@ describe('Rôles V2 : séances', () => {
     await disconnectDatabase();
   });
 
-  const create = (user, body) => request(app).post('/sessions').set('Authorization', authHeader(user)).send(body);
+  const create = (user, body) => request(app).post('/sessions').set('Authorization', authHeader(user)).send({ type: 'training', ...body });
   const createOne = async (body = {}) => {
     const res = await create(manager, { gymId: gym.id, coachId: coach.id, capacity: 2, title: 'Cross', ...slot(2, 9), ...body });
     expect(res.status).toBe(201);
@@ -75,17 +75,52 @@ describe('Rôles V2 : séances', () => {
 
   describe('POST /sessions', () => {
     it('le manager crée une séance pour un coach de sa salle', async () => {
-      const res = await create(manager, { gymId: gym.id, coachId: coach.id, capacity: 3, title: 'HIIT', type: 'group', ...slot(1, 9) });
+      const res = await create(manager, { gymId: gym.id, coachId: coach.id, capacity: 3, title: 'HIIT', type: 'group_class', ...slot(1, 9) });
 
       expect(res.status).toBe(201);
       expect(res.body.sessions).toHaveLength(1);
       expect(res.body.sessions[0]).toMatchObject({
-        gymId: gym.id, coachId: coach.id, capacity: 3, title: 'HIIT', type: 'group',
+        gymId: gym.id, coachId: coach.id, capacity: 3, title: 'HIIT', type: 'group_class',
         status: 'scheduled', seriesId: null, bookedCount: 0, remaining: 3, members: []
       });
       expect(res.body.sessions[0].coach.id).toBe(coach.id);
       expect(res.body.sessions[0].gym.name).toBe('Salle A');
       expect(res.body.sessions[0].createdBy.id).toBe(manager.id);
+    });
+
+    it('exige un type de séance valide', async () => {
+      const base = { gymId: gym.id, coachId: coach.id, ...slot(1, 9) };
+      const missing = await request(app).post('/sessions').set('Authorization', authHeader(manager)).send(base);
+      expect(missing.status).toBe(400);
+      expect(missing.body.error).toBe('invalid_type');
+
+      const invalid = await create(manager, { ...base, type: 'yoga' });
+      expect(invalid.status).toBe(400);
+      expect(invalid.body.error).toBe('invalid_type');
+    });
+
+    it('filtre les listes par type et permet de le modifier', async () => {
+      const discovery = await createOne({ type: 'discovery', ...slot(2, 9) });
+      const training = await createOne({ type: 'training', ...slot(2, 11) });
+      const range = `from=${encodeURIComponent(slot(0, 0).startAt)}`;
+
+      const list = await request(app).get(`/sessions?type=discovery&${range}`).set('Authorization', authHeader(manager));
+      expect(list.status).toBe(200);
+      expect(list.body.map(s => s.id)).toEqual([discovery.id]);
+
+      const available = await request(app).get(`/sessions/available?gymId=${gym.id}&type=training&${range}`).set('Authorization', authHeader(manager));
+      expect(available.body.map(s => s.id)).toEqual([training.id]);
+
+      const mine = await request(app).get(`/coaches/me/sessions?type=discovery&${range}`).set('Authorization', authHeader(coach));
+      expect(mine.body.map(s => s.id)).toEqual([discovery.id]);
+
+      expect((await request(app).get('/sessions?type=yoga').set('Authorization', authHeader(manager))).body.error).toBe('invalid_type');
+
+      const updated = await request(app).patch(`/sessions/${training.id}`).set('Authorization', authHeader(manager)).send({ type: 'assessment' });
+      expect(updated.status).toBe(200);
+      expect(updated.body.sessions[0].type).toBe('assessment');
+      const bad = await request(app).patch(`/sessions/${training.id}`).set('Authorization', authHeader(manager)).send({ type: null });
+      expect(bad.body.error).toBe('invalid_type');
     });
 
     it('refuse un chevauchement du même coach (409 avec la séance en conflit)', async () => {

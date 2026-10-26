@@ -23,6 +23,7 @@ const DAY_MS = 24 * 60 * 60 * 1000;
 // Statuts d'inscription qui occupent une place
 const ACTIVE_MEMBER_STATUSES = ['booked', 'checked_in', 'absent'];
 const SCOPES = ['this', 'following', 'series'];
+const SESSION_TYPES = ['discovery', 'training', 'group_class', 'assessment', 'private'];
 
 const generateSessionId = () => `SESSION-${crypto.randomBytes(8).toString('hex')}`;
 
@@ -98,6 +99,18 @@ function parseCapacity(value) {
 function assertTimeRange(startAt, endAt) {
   if (endAt <= startAt) throw new SessionError(400, 'invalid_time_range', 'endAt doit être après startAt');
   if (endAt - startAt > DAY_MS) throw new SessionError(400, 'invalid_time_range', 'Une séance dure au plus 24 h');
+}
+
+function parseType(value) {
+  if (!SESSION_TYPES.includes(value)) {
+    throw new SessionError(400, 'invalid_type', `type doit valoir ${SESSION_TYPES.join(', ')}`);
+  }
+  return value;
+}
+
+/** Filtre `?type=` des listes (absent = tous les types). */
+function typeFilter(value) {
+  return value === undefined || value === '' ? {} : { type: parseType(value) };
 }
 
 function parseScope(value) {
@@ -195,6 +208,7 @@ async function createSessions(input, requester) {
   const endAt = parseDate(input.endAt, 'endAt');
   assertTimeRange(startAt, endAt);
   const capacity = parseCapacity(input.capacity ?? 1);
+  const type = parseType(input.type);
   await assertCoachInGym(coachId, gymId);
 
   // Occurrences : une seule, ou une par semaine jusqu'à `until` inclus
@@ -233,7 +247,7 @@ async function createSessions(input, requester) {
           ...range,
           capacity,
           title: input.title || null,
-          type: input.type || null,
+          type,
           notes: input.notes || null,
           seriesId,
           createdBy: requester.id
@@ -288,6 +302,7 @@ async function updateSessions(id, input, scopeRaw, requester) {
   const coachId = input.coachId !== undefined ? Number(input.coachId) : session.coachId;
   if (coachId !== session.coachId) await assertCoachInGym(coachId, session.gymId);
   const capacity = input.capacity !== undefined ? parseCapacity(input.capacity) : null;
+  const type = input.type !== undefined ? parseType(input.type) : null;
 
   const targets = await sessionsInScope(session, scope);
   const ranges = targets.map(t => ({
@@ -323,7 +338,7 @@ async function updateSessions(id, input, scopeRaw, requester) {
           coachId,
           ...(capacity !== null && { capacity }),
           ...(input.title !== undefined && { title: input.title || null }),
-          ...(input.type !== undefined && { type: input.type || null }),
+          ...(type !== null && { type }),
           ...(input.notes !== undefined && { notes: input.notes || null }),
           // Nouvel horaire : le rappel doit repartir
           ...((startShift || endShift) && { reminderSentAt: null })
@@ -360,6 +375,7 @@ async function listSessions(query, requester) {
   }
   if (query.coachId !== undefined) where.coachId = Number(query.coachId);
   if (query.status) where.status = query.status;
+  Object.assign(where, typeFilter(query.type));
 
   const sessions = await prisma.trainingSession.findMany({ where, include: SESSION_INCLUDE, orderBy: { startAt: 'asc' } });
   return sessions.map(toSession);
@@ -368,7 +384,13 @@ async function listSessions(query, requester) {
 async function listCoachSessions(coachId, query) {
   const { start, end } = parseRange(query.from, query.to);
   const sessions = await prisma.trainingSession.findMany({
-    where: { coachId, startAt: { lt: end }, endAt: { gt: start }, ...(query.status && { status: query.status }) },
+    where: {
+      coachId,
+      startAt: { lt: end },
+      endAt: { gt: start },
+      ...(query.status && { status: query.status }),
+      ...typeFilter(query.type)
+    },
     include: SESSION_INCLUDE,
     orderBy: { startAt: 'asc' }
   });
@@ -416,7 +438,8 @@ async function findAvailable(query, requester) {
       gymId,
       status: 'scheduled',
       startAt: { gte: start > now ? start : now, lt: end },
-      ...(query.coachId !== undefined && { coachId: Number(query.coachId) })
+      ...(query.coachId !== undefined && { coachId: Number(query.coachId) }),
+      ...typeFilter(query.type)
     },
     include: SESSION_INCLUDE,
     orderBy: { startAt: 'asc' }
@@ -620,6 +643,7 @@ async function sessionsNeedingReminder(fromMinutes = 45, toMinutes = 75) {
 module.exports = {
   SessionError,
   MAX_OCCURRENCES,
+  SESSION_TYPES,
   createSessions,
   updateSessions,
   cancelSessions,
