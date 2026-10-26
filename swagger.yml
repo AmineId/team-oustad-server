@@ -20,7 +20,7 @@ info:
       (`GET /gyms`, `/gyms/{id}`, horaires, image). Pour un coach, se baser sur `gyms` et non sur `gymId`
       (salle principale).
     - Programmes : l'owner crée des modèles (`/programs`), affectés aux membres
-      (`POST /programs/{id}/assignments`) par l'owner, le manager (sa salle) ou le coach (ses membres).
+      (`POST /programs/{id}/assignments`) par l'owner ou le coach (ses membres) ; le manager les consulte en lecture seule.
       Les routes `/plannings` en lecture (`/member/{id}`, `/next-day/{id}`, `GET /plannings`) gardent leur
       forme et sont alimentées par les affectations (`planning.id` = id de l'affectation) ; les écritures
       `/plannings` renvoient **410** `plannings_deprecated`.
@@ -9365,9 +9365,9 @@ paths:
 
   /programs/{id}/assignments:
     post:
-      summary: Affecter un programme à des membres (Owner / Manager / Coach)
+      summary: Affecter un programme à des membres (Owner / Coach)
       description: |
-        Tout ou rien. Owner : tous les membres ; manager : membres de sa salle ; coach : ses membres affectés.
+        Tout ou rien. Owner : tous les membres ; coach : ses membres affectés. Manager : 403 forbidden.
         Un membre n'a qu'une affectation active : les précédentes passent en `completed` (`replaced`).
         Chaque membre reçoit un FCM `data: { type: "program", assignmentId, programId }`.
       tags: [Programs]
@@ -9431,7 +9431,7 @@ paths:
 
   /program-assignments/{id}:
     delete:
-      summary: Annuler une affectation (Owner / Manager / Coach)
+      summary: Annuler une affectation (Owner / Coach)
       description: "Passe le statut à `cancelled` (historique conservé). Mêmes droits que l'affectation."
       tags: [Programs]
       security:

@@ -188,17 +188,17 @@ describe('Rôles V2 : programmes', () => {
       .set('Authorization', authHeader(user))
       .send(body);
 
-    it('le manager affecte aux membres de sa salle et remplace l\'affectation active', async () => {
+    it('l\'owner affecte et remplace l\'affectation active', async () => {
       const previous = await createTestAssignment(program.id, member.id, owner.id);
       await prisma.user.update({ where: { id: member.id }, data: { fcmToken: 'member-token' } });
 
-      const res = await assign(manager, { memberIds: [member.id, coachedMember.id], startDate: start });
+      const res = await assign(owner, { memberIds: [member.id, coachedMember.id], startDate: start });
 
       expect(res.status).toBe(201);
       expect(res.body.replaced).toBe(1);
       expect(res.body.assignments).toHaveLength(2);
       expect(res.body.assignments[0]).toMatchObject({ programId: program.id, status: 'active', endDate: null });
-      expect(res.body.assignments[0].assignedBy.id).toBe(manager.id);
+      expect(res.body.assignments[0].assignedBy.id).toBe(owner.id);
       expect(res.body.assignments[0].program.title).toBe('Cardio');
 
       const old = await prisma.programAssignment.findUnique({ where: { id: previous.id } });
@@ -211,13 +211,20 @@ describe('Rôles V2 : programmes', () => {
       );
     });
 
+    it('refuse l\'affectation au manager, même dans sa salle', async () => {
+      const res = await assign(manager, { memberIds: [member.id], startDate: start });
+      expect(res.status).toBe(403);
+      expect(res.body.error).toBe('forbidden');
+      expect(await prisma.programAssignment.count()).toBe(0);
+    });
+
     it('est tout ou rien : 422 avec la liste des refus, rien n\'est créé', async () => {
-      const res = await assign(manager, { memberIds: [member.id, otherGymMember.id, 999999], startDate: start });
+      const res = await assign(coach, { memberIds: [coachedMember.id, member.id, 999999], startDate: start });
 
       expect(res.status).toBe(422);
       expect(res.body.error).toBe('assignment_rejected');
       expect(res.body.rejected).toEqual([
-        { memberId: otherGymMember.id, reason: 'other_gym' },
+        { memberId: member.id, reason: 'not_your_member' },
         { memberId: 999999, reason: 'member_not_found' }
       ]);
       expect(await prisma.programAssignment.count()).toBe(0);
@@ -248,8 +255,12 @@ describe('Rôles V2 : programmes', () => {
       const assignment = await createTestAssignment(program.id, coachedMember.id, owner.id);
       const otherAssignment = await createTestAssignment(program.id, otherGymMember.id, owner.id);
 
-      const denied = await request(app).delete(`/program-assignments/${otherAssignment.id}`).set('Authorization', authHeader(manager));
+      const denied = await request(app).delete(`/program-assignments/${otherAssignment.id}`).set('Authorization', authHeader(coach));
       expect(denied.status).toBe(403);
+      expect(denied.body.error).toBe('not_your_member');
+
+      const managerDenied = await request(app).delete(`/program-assignments/${assignment.id}`).set('Authorization', authHeader(manager));
+      expect(managerDenied.status).toBe(403);
 
       const res = await request(app).delete(`/program-assignments/${assignment.id}`).set('Authorization', authHeader(coach));
       expect(res.status).toBe(200);
