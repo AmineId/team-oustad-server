@@ -117,6 +117,7 @@ const coachesRoutes = require('./routes/coaches');
 const programsRoutes = require('./routes/programs');
 const programAssignmentsRoutes = require('./routes/programAssignments');
 const sessionsRoutes = require('./routes/sessions');
+const incidentsRoutes = require('./routes/incidents');
 
 // Use routes
 console.log('🔗 Configuration des routes API...');
@@ -138,7 +139,8 @@ app.use('/coaches', coachesRoutes);
 app.use('/programs', programsRoutes);
 app.use('/program-assignments', programAssignmentsRoutes);
 app.use('/sessions', sessionsRoutes);
-console.log('✅ Routes configurées: /gyms, /users, /auth, /plannings, /subscriptions, /subscription-types, /android, /members, /banners, /check-in, /store, /whatsapp, /public, /showcase, /coaches, /programs, /program-assignments, /sessions');
+app.use('/incidents', incidentsRoutes);
+console.log('✅ Routes configurées: /gyms, /users, /auth, /plannings, /subscriptions, /subscription-types, /android, /members, /banners, /check-in, /store, /whatsapp, /public, /showcase, /coaches, /programs, /program-assignments, /sessions, /incidents');
 
 // Redirection Beta Download vers Google Play Internal Testing
 app.get('/beta/download', (req, res) => {

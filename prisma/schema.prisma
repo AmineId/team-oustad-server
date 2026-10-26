@@ -71,6 +71,7 @@ model Gym {
   ShowcasePage ShowcasePage?
   CoachGym     CoachGym[]
   TrainingSession TrainingSession[]
+  Incident        Incident[]
 
   @@index([name])
   @@index([isPublished])
@@ -373,6 +374,62 @@ model TrainingSessionMember {
   @@index([memberId])
 }
 
+/// Rôles V2 : incident signalé par un manager (app ou kiosk) ou un coach
+/// (app) ; l'owner répond et change le statut.
+model Incident {
+  id          Int               @id @default(autoincrement())
+  displayId   String            @unique
+  gymId       Int
+  createdBy   Int
+  creatorRole String
+  source      String            @default("app") // app, kiosk
+  title       String
+  description String            @db.Text
+  category    String            // equipment, safety, hygiene, member, other
+  severity    String            // low, medium, high, critical
+  photo       Bytes?
+  photoMime   String?
+  status      String            @default("open") // open, in_progress, resolved, closed
+  closedAt    DateTime?
+  closedBy    Int?
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+  Gym         Gym               @relation(fields: [gymId], references: [id], onDelete: Cascade)
+  Creator     User              @relation("IncidentCreator", fields: [createdBy], references: [id], onDelete: Cascade)
+  Closer      User?             @relation("IncidentCloser", fields: [closedBy], references: [id], onDelete: SetNull)
+  Messages    IncidentMessage[]
+  Reads       IncidentRead[]
+
+  @@index([gymId, status])
+  @@index([createdBy])
+  @@index([status, createdAt])
+}
+
+model IncidentMessage {
+  id         Int      @id @default(autoincrement())
+  incidentId Int
+  authorId   Int
+  body       String   @db.Text
+  createdAt  DateTime @default(now())
+  Incident   Incident @relation(fields: [incidentId], references: [id], onDelete: Cascade)
+  Author     User     @relation(fields: [authorId], references: [id], onDelete: Cascade)
+
+  @@index([incidentId, createdAt])
+}
+
+/// Chat d'incident : dernier message lu par utilisateur (calcul de unreadCount)
+model IncidentRead {
+  incidentId        Int
+  userId            Int
+  lastReadMessageId Int
+  readAt            DateTime @default(now())
+  Incident          Incident @relation(fields: [incidentId], references: [id], onDelete: Cascade)
+  User              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([incidentId, userId])
+  @@index([userId])
+}
+
 model PlanningDay {
   id               Int                @id @default(autoincrement())
   planningId       Int
@@ -481,6 +538,10 @@ model User {
   AssignedPrograms     ProgramAssignment[]  @relation("ProgramAssigner")
   CoachedSessions      TrainingSession[]    @relation("SessionCoach")
   CreatedSessions      TrainingSession[]    @relation("SessionCreator")
+  CreatedIncidents     Incident[]           @relation("IncidentCreator")
+  ClosedIncidents      Incident[]           @relation("IncidentCloser")
+  IncidentMessages     IncidentMessage[]
+  IncidentReads        IncidentRead[]
   StoreProduct         StoreProduct[]
   Gym                  Gym                  @relation(fields: [gymId], references: [id])
 
