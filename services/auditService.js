@@ -84,6 +84,8 @@ async function buildWhere(query) {
   if (actorId !== undefined) where.actorId = actorId ?? -1;
   const gymId = await resolveId('gym', query.gymId);
   if (gymId !== undefined) where.gymId = gymId ?? -1;
+  const userId = await resolveId('user', query.userId);
+  if (userId !== undefined) where.subjectUserId = userId ?? -1;
 
   const from = parseDate(query.from, 'from');
   const to = parseDate(query.to, 'to');

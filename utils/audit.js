@@ -192,6 +192,7 @@ async function enrich(base, entries) {
       if (fromLabel) change.fromLabel = fromLabel;
       if (toLabel) change.toLabel = toLabel;
     }
+    entry.subjectUserId = entry.entity === 'User' ? Number(entry.entityId) || null : entry.ownerUserId;
     if (entry.ownerUserId != null) {
       entry.label ||= labels.User?.[entry.ownerUserId] || null;
       if (entry.gymId == null) entry.gymId = userGyms[entry.ownerUserId] ?? null;

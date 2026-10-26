@@ -10465,6 +10465,7 @@ paths:
         - { in: query, name: action, schema: { type: string, enum: [create, update, delete] } }
         - { in: query, name: actorId, schema: { type: string }, description: displayId (ou id) de l'auteur }
         - { in: query, name: gymId, schema: { type: string }, description: displayId (ou id) de la salle }
+        - { in: query, name: userId, schema: { type: string }, description: "displayId (ou id) d'un utilisateur : toutes les lignes qui le concernent (User, Member, Subscription, Payment, GymCheckIn, TrainingSessionMember…)" }
         - { in: query, name: entityId, schema: { type: string }, description: displayId ou id de l'objet }
         - { in: query, name: q, schema: { type: string }, description: "Recherche dans le libellé, l'auteur et le displayId" }
         - { in: query, name: from, schema: { type: string, format: date-time } }

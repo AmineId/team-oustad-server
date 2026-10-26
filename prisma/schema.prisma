@@ -214,6 +214,9 @@ model AuditLog {
   entityDisplayId String?
   label           String?
   gymId           Int?
+  /// Utilisateur concerné (la ligne User elle-même, ou userId / memberId /
+  /// coachId de la ligne) : sans clé étrangère, l'historique survit à sa suppression
+  subjectUserId   Int?
   /// null = système (tâche planifiée, requête non authentifiée)
   actorId         Int?
   actorRole       String?
@@ -230,6 +233,7 @@ model AuditLog {
   @@index([entity, entityId])
   @@index([actorId, createdAt])
   @@index([gymId, createdAt])
+  @@index([subjectUserId, createdAt])
 }
 
 model PasswordResetToken {

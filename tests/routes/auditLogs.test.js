@@ -91,6 +91,8 @@ describe('Historique (AuditLog)', () => {
       expect(user.changes.uniqueCode).toEqual({ from: REDACTED, to: null });
       const profile = deleted.find((e) => e.entity === 'Member');
       expect(profile).toMatchObject({ entityId: String(member.id), label: 'Bob Martin', gymId: gym.id });
+      // Filtre userId : l'historique reste rattaché au membre supprimé
+      expect(deleted.filter((e) => e.subjectUserId === member.id).length).toBeGreaterThanOrEqual(2);
     });
 
     it('fige les libellés des clés étrangères (fromLabel / toLabel)', async () => {
@@ -217,6 +219,8 @@ describe('Historique (AuditLog)', () => {
       expect(await count({ gymId: gym.displayId })).toBe(2);
       expect(await count({ entityId: member.displayId })).toBe(2);
       expect(await count({ entityId: String(member.id) })).toBe(2);
+      expect(await count({ userId: member.displayId })).toBe(2);
+      expect(await count({ userId: manager.displayId })).toBe(0);
       expect(await count({ q: 'durand' })).toBe(1);
       expect(await count({ q: 'max manager' })).toBe(1);
       expect(await count({ from: new Date(Date.now() + 60000).toISOString() })).toBe(0);

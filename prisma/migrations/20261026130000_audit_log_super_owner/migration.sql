@@ -11,6 +11,7 @@ CREATE TABLE "AuditLog" (
     "entityDisplayId" TEXT,
     "label" TEXT,
     "gymId" INTEGER,
+    "subjectUserId" INTEGER,
     "actorId" INTEGER,
     "actorRole" TEXT,
     "actorLabel" TEXT NOT NULL,
@@ -31,6 +32,9 @@ CREATE INDEX "AuditLog_actorId_createdAt_idx" ON "AuditLog"("actorId", "createdA
 
 -- CreateIndex
 CREATE INDEX "AuditLog_gymId_createdAt_idx" ON "AuditLog"("gymId", "createdAt");
+
+-- CreateIndex
+CREATE INDEX "AuditLog_subjectUserId_createdAt_idx" ON "AuditLog"("subjectUserId", "createdAt");
 
 -- AddForeignKey
 ALTER TABLE "AuditLog" ADD CONSTRAINT "AuditLog_actorId_fkey" FOREIGN KEY ("actorId") REFERENCES "User"("id") ON DELETE SET NULL ON UPDATE CASCADE;
