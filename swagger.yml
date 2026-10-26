@@ -3066,7 +3066,7 @@ paths:
                 email:
                   type: string
                   format: email
-                  description: New email address
+                  description: "New email address : normalisé (espaces retirés, minuscules) ; 400 invalid_email ou email_taken"
                   example: "newemail@example.com"
                 firstName:
                   type: string
@@ -3096,6 +3096,10 @@ paths:
                 phoneNumber:
                   type: string
                   description: "Chaîne non vide (espaces retirés) ; 400 invalid_phone ou phone_taken"
+                address:
+                  type: string
+                  nullable: true
+                  description: "Adresse postale ; chaîne vide ou null pour effacer ; 400 invalid_address"
                 gymId:
                   type: integer
                   description: "Salle d'un manager : owner avec canManageAdmins uniquement (403 gym_change_forbidden, 400 gym_not_found). Coach : PATCH /users/{id}/gyms"
@@ -3107,7 +3111,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/User'
         '400':
-          description: invalid_phone, phone_taken, gym_not_found
+          description: invalid_email, email_taken, invalid_address, invalid_phone, phone_taken, gym_not_found
         '403':
           description: "Insufficient permissions, ou gym_change_forbidden"
           content:
@@ -6218,6 +6222,17 @@ paths:
                   type: string
                   description: Image de profil encodée en base64
                   example: "data:image/jpeg;base64,/9j/4AAQSkZJRg..."
+                onboarding:
+                  type: boolean
+                  description: false une fois l'onboarding terminé
+                height:
+                  type: number
+                  nullable: true
+                  description: "Taille en cm, entre 50 et 260 (null pour effacer) ; 400 invalid_height"
+                  example: 178
+                cgAccepted:
+                  type: boolean
+                  description: "true = le membre accepte le règlement. Renseigne cgAcceptedAt à la première acceptation (jamais écrasé ensuite)."
       responses:
         '200':
           description: Profil mis à jour avec succès
@@ -6245,6 +6260,13 @@ paths:
                         format: date
                       phone:
                         type: string
+                      height:
+                        type: number
+                        nullable: true
+                      cgAcceptedAt:
+                        type: string
+                        format: date-time
+                        nullable: true
                       profession:
                         type: string
                       fitnessLevel:
