@@ -99,6 +99,17 @@ async function main() {
             notificationsEnabled: true
           },
           {
+            // Owner simple : pas d'historique, ne peut pas toucher au super-owner
+            displayId: generateUserIdByRole('owner'),
+            uniqueCode: crypto.randomUUID().substring(0, 8).toUpperCase(),
+            email: 'owner2@team-oustad.com',
+            password: ownerPassword,
+            firstName: 'Omar',
+            lastName: 'Benali',
+            role: 'owner',
+            notificationsEnabled: true
+          },
+          {
             displayId: generateUserIdByRole('manager'),
             uniqueCode: crypto.randomUUID().substring(0, 8).toUpperCase(),
             email: 'admin@team-oustad.com',
@@ -245,7 +256,8 @@ async function main() {
   console.log('👥 Création des profils utilisateurs...');
   
   // GYM 1 Users
-  const ownerUser = gym1.User.find(u => u.role === 'owner');
+  const ownerUser = gym1.User.find(u => u.email === 'owner@team-oustad.com');
+  const owner2User = gym1.User.find(u => u.email === 'owner2@team-oustad.com');
   const adminUser = gym1.User.find(u => u.role === 'manager');
   const bobUser = gym1.User.find(u => u.email === 'bob@example.com');
   const charlieUser = gym1.User.find(u => u.email === 'charlie@example.com');
@@ -268,6 +280,16 @@ async function main() {
     }
   });
   console.log(`✅ Owner (super-owner): ${ownerUser.firstName} ${ownerUser.lastName}`);
+  await prisma.owner.create({
+    data: {
+      userId: owner2User.id,
+      canManageAdmins: true,
+      canManageGyms: true,
+      canViewReports: true,
+      maxGymsAllowed: 10,
+    }
+  });
+  console.log(`✅ Owner: ${owner2User.firstName} ${owner2User.lastName}`);
 
   // Manager profiles
   await prisma.manager.create({
@@ -2129,8 +2151,11 @@ async function main() {
   console.log(`   - Exercices assignés: ${totalPlanningExercises}\n`);
   
   console.log('🔐 Identifiants de test:');
-  console.log('   Owner:');
+  console.log('   Super-owner (historique /audit-logs):');
   console.log('     - Email: owner@team-oustad.com');
+  console.log('     - Password: owner123\n');
+  console.log('   Owner:');
+  console.log('     - Email: owner2@team-oustad.com');
   console.log('     - Password: owner123\n');
   console.log('   Manager (Gym 1):');
   console.log('     - Email: admin@team-oustad.com');
