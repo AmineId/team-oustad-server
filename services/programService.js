@@ -360,10 +360,10 @@ async function removeExercise(programId, dayOfWeekRaw, programExerciseId) {
 // ==================== Affectations ====================
 
 /**
- * Raison pour laquelle `requester` ne peut pas gérer le programme du membre,
+ * Raison pour laquelle `requester` ne peut pas consulter le programme du membre,
  * ou null s'il le peut. owner : tous ; manager : sa salle ; coach : ses membres.
  */
-function assignmentDenial(requester, memberUser) {
+function readDenial(requester, memberUser) {
   if (!memberUser || memberUser.role !== 'member' || !memberUser.Member) return 'member_not_found';
   switch (requester.role) {
     case 'owner':
@@ -375,6 +375,15 @@ function assignmentDenial(requester, memberUser) {
     default:
       return 'forbidden';
   }
+}
+
+/**
+ * Affectation et annulation : owner et coach uniquement. Le manager planifie des
+ * créneaux avec un coach mais n'affecte pas de programme (lecture seule).
+ */
+function assignmentDenial(requester, memberUser) {
+  if (requester.role === 'manager') return 'forbidden';
+  return readDenial(requester, memberUser);
 }
 
 async function assignProgram(programId, input, requester) {
@@ -450,7 +459,7 @@ async function cancelAssignment(assignmentId, requester) {
 /** Lecture des programmes d'un membre : lui-même, staff de sa salle, son coach, owner. */
 function canReadMemberPrograms(requester, memberUser) {
   if (requester.role === 'member') return requester.id === memberUser.id;
-  return assignmentDenial(requester, memberUser) === null;
+  return readDenial(requester, memberUser) === null;
 }
 
 async function getMemberUserOrThrow(memberId) {

@@ -3,11 +3,11 @@ const router = express.Router();
 const auth = require('../middleware/auth');
 const { apiLimiter } = require('../middleware/rateLimiter');
 const programService = require('../services/programService');
-const { loadRequester, sendProgramError } = require('./programs');
+const { loadRequester, sendProgramError, ASSIGN_ROLES } = require('./programs');
 
 // Rôles V2 : annuler une affectation (statut `cancelled`, l'historique est conservé).
-// Mêmes droits que l'affectation : owner, manager (sa salle), coach (ses membres).
-router.delete('/:id', auth, loadRequester(['owner', 'manager', 'coach']), apiLimiter, async (req, res) => {
+// Mêmes droits que l'affectation : owner, coach (ses membres).
+router.delete('/:id', auth, loadRequester(ASSIGN_ROLES), apiLimiter, async (req, res) => {
   try {
     const id = Number(req.params.id);
     if (!Number.isInteger(id)) return res.status(400).json({ error: 'invalid_id' });
