@@ -96,7 +96,8 @@ Minimum required vars: `DATABASE_URL`, `JWT_SECRET`, `PORT`.
 
 | Role | Email | Password |
 |------|-------|----------|
-| Owner (super-owner) | `owner@team-oustad.com` | `owner123` |
+| Super-owner | `owner@team-oustad.com` | `owner123` |
+| Owner | `owner2@team-oustad.com` | `owner123` |
 | Manager (ex-admin) | `admin@team-oustad.com` | `admin123` |
 | Coach (Gym 1 + Gym 2) | `coach@team-oustad.com` | `coach123` |
 | Member (pending sub) | `olivia@example.com` | `member123` |
