@@ -35,6 +35,12 @@ const COACH_ROUTES = [
   ['GET', /^\/plannings\/member\/\d+$/],
   ['GET', /^\/plannings\/next-day\/\d+$/],
   ['POST', /^\/plannings\/respond-help$/],
+  // Incidents : signaler (app), suivre les siens, répondre dans le fil
+  ['POST', /^\/incidents$/],
+  ['GET', /^\/incidents$/],
+  ['GET', /^\/incidents\/\d+$/],
+  ['GET', /^\/incidents\/\d+\/photo$/],
+  ['POST', /^\/incidents\/\d+\/messages$/],
   // Salles : lecture
   ['GET', /^\/gyms$/],
   ['GET', /^\/gyms\/\d+$/],

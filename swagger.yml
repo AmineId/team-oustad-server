@@ -29,6 +29,9 @@ info:
       d'ouverture en heure du Maroc). Le coach lit et pointe ses séances.
     - Check-ins : toutes les routes `/check-in/*` appliquent la portée de salle (voir `x-roles-v2`) ;
       `GET /check-in/today` sert au coach (ses salles), au manager (sa salle) et à l'owner.
+    - Incidents (`/incidents`) : signalés par le manager (sa salle, app ou kiosk) ou le coach (ses salles,
+      app uniquement) ; `source` est déduite du token. L'owner et le créateur répondent dans le fil ;
+      seul l'owner change le statut. FCM `data: { type: "incident", incidentId, action }`.
     - Kiosk : `POST /auth/login` avec `client: "kiosk"`, réservé aux owners et managers
       (403 `kiosk_forbidden_role`). La session kiosk est distincte de la session app.
   contact:
@@ -796,6 +799,100 @@ components:
         remaining:
           type: integer
           description: "session_full uniquement"
+
+    IncidentAuthor:
+      type: object
+      nullable: true
+      properties:
+        id:
+          type: integer
+        firstName:
+          type: string
+        lastName:
+          type: string
+        role:
+          type: string
+          enum: [owner, manager, coach]
+
+    IncidentMessage:
+      type: object
+      properties:
+        id:
+          type: integer
+        incidentId:
+          type: integer
+        author:
+          $ref: '#/components/schemas/IncidentAuthor'
+        body:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+
+    Incident:
+      type: object
+      properties:
+        id:
+          type: integer
+        displayId:
+          type: string
+        gymId:
+          type: integer
+        gym:
+          $ref: '#/components/schemas/GymRef'
+        createdBy:
+          $ref: '#/components/schemas/IncidentAuthor'
+        creatorRole:
+          type: string
+          enum: [manager, coach]
+        source:
+          type: string
+          enum: [app, kiosk]
+        title:
+          type: string
+        description:
+          type: string
+        category:
+          type: string
+          enum: [equipment, safety, hygiene, member, other]
+        severity:
+          type: string
+          enum: [low, medium, high, critical]
+        hasPhoto:
+          type: boolean
+          description: "Photo servie par GET /incidents/{id}/photo"
+        status:
+          type: string
+          enum: [open, in_progress, resolved, closed]
+        closedAt:
+          type: string
+          format: date-time
+          nullable: true
+          description: "Posé au passage en resolved ou closed"
+        closedBy:
+          $ref: '#/components/schemas/CoachRef'
+        messagesCount:
+          type: integer
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+        messages:
+          type: array
+          description: "GET /incidents/{id} uniquement, du plus ancien au plus récent"
+          items:
+            $ref: '#/components/schemas/IncidentMessage'
+
+    IncidentError:
+      type: object
+      properties:
+        error:
+          type: string
+          description: "missing_fields, invalid_field, invalid_photo, gym_id_required, kiosk_forbidden_role, incident_not_found, photo_not_found, incident_closed, invalid_id, forbidden"
+        message:
+          type: string
 
     CoachError:
       type: object
@@ -9926,3 +10023,237 @@ paths:
                           nullable: true
         '403':
           description: Membre, ou salle hors portée
+
+  /incidents:
+    post:
+      summary: Signaler un incident (Manager / Coach)
+      description: |
+        Manager : sa salle, depuis l'app ou le kiosk. Coach : une de ses salles, depuis l'app uniquement
+        (403 `kiosk_forbidden_role` avec un token kiosk). `source` est déduite du token (le body est ignoré).
+        Photo optionnelle : multipart `photo` (JPEG/PNG/WebP, 5 Mo) ou JSON `photoData` (data URI base64).
+        Tous les owners reçoivent un FCM `action: "created"`.
+      tags: [Incidents]
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [title, description, category, severity]
+              properties:
+                title:
+                  type: string
+                  maxLength: 200
+                description:
+                  type: string
+                  maxLength: 5000
+                category:
+                  type: string
+                  enum: [equipment, safety, hygiene, member, other]
+                severity:
+                  type: string
+                  enum: [low, medium, high, critical]
+                gymId:
+                  type: integer
+                  description: "Obligatoire pour le coach (une de ses salles) ; forcé pour le manager"
+                photo:
+                  type: string
+                  format: binary
+          application/json:
+            schema:
+              type: object
+              required: [title, description, category, severity]
+              properties:
+                title:
+                  type: string
+                  maxLength: 200
+                description:
+                  type: string
+                  maxLength: 5000
+                category:
+                  type: string
+                  enum: [equipment, safety, hygiene, member, other]
+                severity:
+                  type: string
+                  enum: [low, medium, high, critical]
+                gymId:
+                  type: integer
+                  description: "Obligatoire pour le coach (une de ses salles) ; forcé pour le manager"
+                photoData:
+                  type: string
+                  example: "data:image/jpeg;base64,/9j/4AAQ..."
+      responses:
+        '201':
+          description: Incident créé
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Incident'
+        '400':
+          description: Validation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IncidentError'
+        '403':
+          description: Owner, membre, salle hors portée, ou coach depuis le kiosk
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IncidentError'
+    get:
+      summary: Lister les incidents
+      description: "Owner : tout (`gymId` optionnel) ; manager : sa salle ; coach : les siens. Plus récents d'abord."
+      tags: [Incidents]
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: query
+          name: gymId
+          schema:
+            type: integer
+        - in: query
+          name: status
+          schema:
+            type: string
+            enum: [open, in_progress, resolved, closed]
+      responses:
+        '200':
+          description: Tableau brut (sans `messages`)
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Incident'
+        '403':
+          description: Membre, ou manager sur une autre salle
+
+  /incidents/{id}:
+    get:
+      summary: Détail d'un incident avec son fil
+      tags: [Incidents]
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Incident avec `messages`
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Incident'
+        '403':
+          description: Hors portée
+        '404':
+          description: Introuvable
+    patch:
+      summary: Changer le statut (Owner)
+      description: "Le créateur reçoit un FCM `action: \"status\"`. `resolved` / `closed` posent `closedAt` et `closedBy`."
+      tags: [Incidents]
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [status]
+              properties:
+                status:
+                  type: string
+                  enum: [open, in_progress, resolved, closed]
+      responses:
+        '200':
+          description: Incident mis à jour
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Incident'
+        '400':
+          description: Statut invalide
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IncidentError'
+        '403':
+          description: Pas owner
+
+  /incidents/{id}/messages:
+    post:
+      summary: Répondre dans le fil (Owner / créateur)
+      description: |
+        Réponse de l'owner : le créateur est notifié ; réponse du créateur : les owners sont notifiés
+        (FCM `action: "message"`). 409 `incident_closed` une fois clôturé.
+      tags: [Incidents]
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [body]
+              properties:
+                body:
+                  type: string
+                  maxLength: 5000
+      responses:
+        '201':
+          description: Message ajouté
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IncidentMessage'
+        '403':
+          description: Ni owner, ni créateur
+        '409':
+          description: incident_closed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IncidentError'
+
+  /incidents/{id}/photo:
+    get:
+      summary: Photo de l'incident (binaire)
+      tags: [Incidents]
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Image
+          content:
+            image/*:
+              schema:
+                type: string
+                format: binary
+        '404':
+          description: Pas de photo
