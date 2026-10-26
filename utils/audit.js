@@ -29,8 +29,8 @@ const REDACTED_FIELDS = new Set([
   'password', 'token', 'uniqueCode', 'currentSessionId', 'kioskSessionId', 'fcmToken',
 ]);
 const REDACTED = '[masqué]';
-/** Champs techniques : ignorés dans les diffs (une mise à jour qui ne touche qu'eux n'est pas journalisée). */
-const IGNORED_FIELDS = new Set(['updatedAt', 'lastLoginAt', 'currentSessionId', 'kioskSessionId', 'fcmToken']);
+/** Champs techniques (et la clé, déjà dans entityId) : ignorés dans les diffs (une mise à jour qui ne touche qu'eux n'est pas journalisée). */
+const IGNORED_FIELDS = new Set(['id', 'updatedAt', 'lastLoginAt', 'currentSessionId', 'kioskSessionId', 'fcmToken']);
 
 const PRIMARY_KEYS = {
   Coach: ['userId'],
