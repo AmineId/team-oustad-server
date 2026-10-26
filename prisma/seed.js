@@ -1748,7 +1748,7 @@ async function main() {
   });
   // Bob et Charlie sont suivis par le coach : c'est lui qui leur a affecté le programme
   const assignerFor = (memberId) =>
-    [bobUser.id, charlieUser.id].includes(memberId) ? coachUser.id : adminUser.id;
+    [bobUser.id, charlieUser.id].includes(memberId) ? coachUser.id : ownerUser.id;
   for (const planning of legacyPlannings) {
     await prisma.program.create({
       data: {
