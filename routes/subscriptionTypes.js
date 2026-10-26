@@ -71,7 +71,7 @@ router.post('/', auth, async (req, res) => {
     }
     
     // Seuls les owners et admins peuvent créer des types
-    if (requester.role !== 'owner' && requester.role !== 'admin') {
+    if (requester.role !== 'owner' && requester.role !== 'manager') {
       return res.status(403).json({ error: 'Accès réservé aux propriétaires et administrateurs' });
     }
     
@@ -130,7 +130,7 @@ router.put('/:id', auth, async (req, res) => {
       return res.status(403).json({ error: 'Utilisateur non trouvé' });
     }
     
-    if (requester.role !== 'owner' && requester.role !== 'admin') {
+    if (requester.role !== 'owner' && requester.role !== 'manager') {
       return res.status(403).json({ error: 'Accès réservé aux propriétaires et administrateurs' });
     }
     
@@ -186,7 +186,7 @@ router.delete('/:id', auth, async (req, res) => {
       return res.status(403).json({ error: 'Utilisateur non trouvé' });
     }
     
-    if (requester.role !== 'owner' && requester.role !== 'admin') {
+    if (requester.role !== 'owner' && requester.role !== 'manager') {
       return res.status(403).json({ error: 'Accès réservé aux propriétaires et administrateurs' });
     }
     
@@ -250,10 +250,10 @@ router.get('/:id/subscriptions', auth, async (req, res) => {
     
     let whereClause = { subscriptionTypeId: typeId };
     
-    // Si admin, filtrer par salle
-    if (requester.role === 'admin') {
-      whereClause.member = {
-        user: {
+    // Si manager, filtrer par salle
+    if (requester.role === 'manager') {
+      whereClause.Member = {
+        User: {
           gymId: requester.gymId
         }
       };
@@ -262,9 +262,9 @@ router.get('/:id/subscriptions', auth, async (req, res) => {
     const subscriptions = await prisma.subscription.findMany({
       where: whereClause,
       include: {
-        member: {
+        Member: {
           include: {
-            user: {
+            User: {
               select: {
                 id: true,
                 firstName: true,
@@ -274,7 +274,7 @@ router.get('/:id/subscriptions', auth, async (req, res) => {
             }
           }
         },
-        subscriptionType: true
+        SubscriptionType: true
       },
       orderBy: { createdAt: 'desc' }
     });

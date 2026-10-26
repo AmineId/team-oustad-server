@@ -1,4 +1,5 @@
 const jwt = require('jsonwebtoken');
+const { normalizeRole } = require('../utils/roles');
 
 const JWT_SECRET = process.env.JWT_SECRET || 'change_this_secret';
 
@@ -7,7 +8,7 @@ const JWT_SECRET = process.env.JWT_SECRET || 'change_this_secret';
  * Vérifie :
  * 1. Présence du token JWT
  * 2. Validité du token
- * 3. Rôle utilisateur (admin ou owner uniquement)
+ * 3. Rôle utilisateur (manager — ex-admin — ou owner uniquement)
  * 4. (Optionnel) Token API spécial pour CI/CD
  */
 module.exports = function (req, res, next) {
@@ -27,14 +28,16 @@ module.exports = function (req, res, next) {
 
   try {
     const payload = jwt.verify(token, JWT_SECRET);
-    
-    // Vérifier le rôle (seuls admin et owner peuvent uploader)
-    if (!payload.type || !['admin', 'owner'].includes(payload.type)) {
+    // Les tokens API permanents émis avant Rôles V2 portent `type: "admin"`
+    payload.type = normalizeRole(payload.type);
+
+    // Vérifier le rôle (seuls manager et owner peuvent uploader)
+    if (!payload.type || !['manager', 'owner'].includes(payload.type)) {
       console.log(`❌ Upload denied - Insufficient permissions (role: ${payload.type})`);
       return res.status(403).json({ 
         error: 'Insufficient permissions',
-        message: 'Only admin and owner roles can upload APK files',
-        required_role: ['admin', 'owner'],
+        message: 'Only manager and owner roles can upload APK files',
+        required_role: ['manager', 'owner'],
         current_role: payload.type
       });
     }

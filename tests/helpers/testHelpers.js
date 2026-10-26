@@ -28,7 +28,7 @@ async function cleanDatabase() {
   await prisma.memberGoal.deleteMany({});
   await prisma.subscription.deleteMany({});
   await prisma.member.deleteMany({});
-  await prisma.admin.deleteMany({});
+  await prisma.manager.deleteMany({});
   await prisma.owner.deleteMany({});
   await prisma.user.deleteMany({});
   await prisma.openingHour.deleteMany({});
@@ -95,7 +95,7 @@ async function createTestOwner(gymId, data = {}) {
 }
 
 /**
- * Create a test admin
+ * Create a test manager (ancien rôle admin)
  */
 async function createTestAdmin(gymId, data = {}) {
   const password = await bcrypt.hash(data.password || 'password123', 10);
@@ -110,14 +110,14 @@ async function createTestAdmin(gymId, data = {}) {
       uniqueCode: uniqueCode,
       firstName: data.firstName || 'Test',
       lastName: data.lastName || 'Admin',
-      role: 'admin',
+      role: 'manager',
       gymId: gymId,
-      Admin: {
+      Manager: {
         create: {}
       }
     },
     include: {
-      Admin: true,
+      Manager: true,
       Gym: true
     }
   });
@@ -301,6 +301,7 @@ module.exports = {
   createTestGym,
   createTestOwner,
   createTestAdmin,
+  createTestManager: createTestAdmin,
   createTestMember,
   createTestSubscriptionType,
   createTestSubscription,

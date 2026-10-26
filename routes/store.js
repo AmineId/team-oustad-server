@@ -5,6 +5,33 @@ const storeService = require('../services/storeService');
 const { generateStoreProductId, generateStoreReservationId } = require('../utils/idGenerator');
 const multer = require('multer');
 const path = require('path');
+const prisma = require('../utils/prismaClient');
+
+/**
+ * Rôles V2 : portée staff du store. Le JWT ne contient pas la salle, on la
+ * relit en base. Le manager est limité à sa salle ; l'owner voit tout.
+ * Renvoie { role, gymId } ou null si l'utilisateur n'est pas staff.
+ */
+async function getStaffScope(req) {
+  if (!['manager', 'owner'].includes(req.user.type)) return null;
+  const user = await prisma.user.findUnique({
+    where: { id: req.user.sub },
+    select: { role: true, gymId: true }
+  });
+  if (!user || !['manager', 'owner'].includes(user.role)) return null;
+  return user;
+}
+
+/** true si `scope` peut agir sur la salle `gymId`. */
+function scopeAllowsGym(scope, gymId) {
+  return scope.role === 'owner' || scope.gymId === gymId;
+}
+
+function forbidden(res, error = 'Accessible uniquement aux managers et owners') {
+  return res.status(403).json({ success: false, error });
+}
+
+const OTHER_GYM_ERROR = 'Un manager ne peut gérer que le store de sa salle';
 
 // Middleware pour gérer l'upload et conversion en base64
 const handleProductUpload = (req, res, next) => {
@@ -185,13 +212,8 @@ router.patch('/reservations/:id/cancel', authenticateToken, async (req, res) => 
  */
 router.post('/products', authenticateToken, handleProductUpload, async (req, res) => {
   try {
-    // Vérifier que l'utilisateur est admin ou owner
-    if (!['admin', 'owner'].includes(req.user.type)) {
-      return res.status(403).json({ 
-        success: false, 
-        error: 'Accessible uniquement aux admin et owner' 
-      });
-    }
+    const scope = await getStaffScope(req);
+    if (!scope) return forbidden(res);
 
     const { name, description, price, stock, category, gymId } = req.body;
 
@@ -202,33 +224,9 @@ router.post('/products', authenticateToken, handleProductUpload, async (req, res
       });
     }
 
-    // Déterminer le gymId: depuis le body pour admin, depuis req.user pour owner
-    let finalGymId = gymId ? parseInt(gymId) : req.user.gymId;
-    
-    // Si pas de gymId, récupérer le gym lié au user
-    if (!finalGymId) {
-      const user = await prisma.user.findUnique({
-        where: { id: req.user.sub },
-        include: { Gym: true }
-      });
-      
-      if (user?.Gym?.id) {
-        finalGymId = user.Gym.id;
-      } else {
-        return res.status(400).json({ 
-          success: false, 
-          error: 'Impossible de déterminer le gym. Veuillez fournir un gymId.' 
-        });
-      }
-    }
-    
-    // Pour les owners, imposer leur propre gym
-    if (req.user.type === 'owner' && finalGymId !== req.user.gymId) {
-      return res.status(403).json({ 
-        success: false, 
-        error: 'Un owner ne peut créer des produits que pour sa propre salle' 
-      });
-    }
+    // gymId du body, sinon la salle de l'utilisateur
+    const finalGymId = gymId ? parseInt(gymId) : scope.gymId;
+    if (!scopeAllowsGym(scope, finalGymId)) return forbidden(res, OTHER_GYM_ERROR);
 
     // Générer l'ID du produit
     const productId = generateStoreProductId();
@@ -261,12 +259,8 @@ router.post('/products', authenticateToken, handleProductUpload, async (req, res
  */
 router.put('/products/:id', authenticateToken, handleProductUpload, async (req, res) => {
   try {
-    if (!['admin', 'owner'].includes(req.user.type)) {
-      return res.status(403).json({ 
-        success: false, 
-        error: 'Accessible uniquement aux admin et owner' 
-      });
-    }
+    const scope = await getStaffScope(req);
+    if (!scope) return forbidden(res);
 
     const updates = { ...req.body };
     
@@ -274,6 +268,12 @@ router.put('/products/:id', authenticateToken, handleProductUpload, async (req, 
     const existingProduct = await storeService.getProductById(req.params.id);
     if (!existingProduct) {
       return res.status(404).json({ success: false, error: 'Produit non trouvé' });
+    }
+    if (!scopeAllowsGym(scope, existingProduct.gymId)) return forbidden(res, OTHER_GYM_ERROR);
+    // Un manager ne déplace pas un produit vers une autre salle
+    if (updates.gymId !== undefined) {
+      updates.gymId = parseInt(updates.gymId);
+      if (!scopeAllowsGym(scope, updates.gymId)) return forbidden(res, OTHER_GYM_ERROR);
     }
     
     // Ajouter les nouvelles images en base64 si uploadées
@@ -299,18 +299,15 @@ router.put('/products/:id', authenticateToken, handleProductUpload, async (req, 
  */
 router.delete('/products/:id', authenticateToken, async (req, res) => {
   try {
-    if (!['admin', 'owner'].includes(req.user.type)) {
-      return res.status(403).json({ 
-        success: false, 
-        error: 'Accessible uniquement aux admin et owner' 
-      });
-    }
+    const scope = await getStaffScope(req);
+    if (!scope) return forbidden(res);
 
     // Récupérer le produit existant
     const product = await storeService.getProductById(req.params.id);
     if (!product) {
       return res.status(404).json({ success: false, error: 'Produit non trouvé' });
     }
+    if (!scopeAllowsGym(scope, product.gymId)) return forbidden(res, OTHER_GYM_ERROR);
 
     // Supprimer le produit de la BDD (les images base64 sont dans la BDD)
     await storeService.deleteProduct(req.params.id);
@@ -328,16 +325,15 @@ router.delete('/products/:id', authenticateToken, async (req, res) => {
  */
 router.get('/reservations', authenticateToken, async (req, res) => {
   try {
-    if (!['admin', 'owner'].includes(req.user.type)) {
-      return res.status(403).json({
-        success: false,
-        error: 'Accessible uniquement aux admin et owner'
-      });
-    }
+    const scope = await getStaffScope(req);
+    if (!scope) return forbidden(res);
 
     const { status, productId } = req.query;
+    // Manager : sa salle ; owner : ?gymId= ou toutes les salles
+    const gymId = req.query.gymId ? parseInt(req.query.gymId) : undefined;
+    if (gymId !== undefined && !scopeAllowsGym(scope, gymId)) return forbidden(res, OTHER_GYM_ERROR);
     const reservations = await storeService.getAllReservations({
-      gymId: req.user.gymId,
+      gymId: scope.role === 'owner' ? gymId : scope.gymId,
       status,
       productId: productId ? parseInt(productId) : undefined
     });
@@ -355,11 +351,17 @@ router.get('/reservations', authenticateToken, async (req, res) => {
  */
 router.patch('/reservations/:id/complete', authenticateToken, async (req, res) => {
   try {
-    if (!['admin', 'owner'].includes(req.user.type)) {
-      return res.status(403).json({
-        success: false,
-        error: 'Accessible uniquement aux admin et owner'
+    const scope = await getStaffScope(req);
+    if (!scope) return forbidden(res);
+
+    if (scope.role !== 'owner') {
+      const existing = await prisma.storeReservation.findUnique({
+        where: { displayId: req.params.id },
+        select: { Product: { select: { gymId: true } } }
       });
+      if (existing && !scopeAllowsGym(scope, existing.Product.gymId)) {
+        return forbidden(res, OTHER_GYM_ERROR);
+      }
     }
 
     const reservation = await storeService.completeReservation(req.params.id);
@@ -376,14 +378,13 @@ router.patch('/reservations/:id/complete', authenticateToken, async (req, res) =
  */
 router.get('/stats', authenticateToken, async (req, res) => {
   try {
-    if (!['admin', 'owner'].includes(req.user.type)) {
-      return res.status(403).json({
-        success: false,
-        error: 'Accessible uniquement aux admin et owner'
-      });
-    }
+    const scope = await getStaffScope(req);
+    if (!scope) return forbidden(res);
 
-    const stats = await storeService.getStoreStats(req.user.gymId);
+    // Manager : sa salle ; owner : ?gymId= ou sa salle
+    const gymId = req.query.gymId ? parseInt(req.query.gymId) : scope.gymId;
+    if (!scopeAllowsGym(scope, gymId)) return forbidden(res, OTHER_GYM_ERROR);
+    const stats = await storeService.getStoreStats(gymId);
     res.json({ success: true, stats });
   } catch (error) {
     console.error('Erreur récupération stats:', error);

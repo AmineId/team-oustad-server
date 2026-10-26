@@ -6,7 +6,8 @@ datasource db {
   provider = "postgresql"
 }
 
-model Admin {
+/// Ancien rôle `admin` (renommé en Rôles V2). Gère une seule salle (`User.gymId`).
+model Manager {
   userId Int  @id
   User   User @relation(fields: [userId], references: [id])
 }
@@ -318,7 +319,10 @@ model User {
   phoneNumber          String?              @unique
   address              String?
   currentSessionId     String?
-  Admin                Admin?
+  /// Session kiosk distincte de la session app (une connexion kiosk ne
+  /// déconnecte pas le téléphone du manager, et inversement)
+  kioskSessionId       String?
+  Manager              Manager?
   Member               Member?
   Owner                Owner?
   PasswordResetToken   PasswordResetToken[]

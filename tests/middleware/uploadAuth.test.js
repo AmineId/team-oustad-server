@@ -63,7 +63,7 @@ describe('uploadAuth middleware', () => {
       .set('Authorization', `Bearer ${token}`);
     expect(res.status).toBe(200);
     expect(res.body.ok).toBe(true);
-    expect(res.body.user.type).toBe('admin');
+    expect(res.body.user.type).toBe('manager');
   });
 
   it('calls next and sets req.user when owner token is valid', async () => {

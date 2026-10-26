@@ -35,7 +35,7 @@ const requireCoach = async (req, res, next) => {
     logger.debug(`🔍 Recherche utilisateur en base - ID: ${req.user.sub}`);
     const user = await prisma.user.findUnique({
       where: { id: req.user.sub },
-      include: { Admin: true }
+      include: { Manager: true }
     });
 
     if (!user) {
@@ -46,13 +46,13 @@ const requireCoach = async (req, res, next) => {
     logger.debug(`✅ Utilisateur trouvé: ${getFullName(user)} (${user.role}) - ID: ${user.id}`);
     logger.debug(`🔍 Vérification rôle admin pour coach...`);
 
-    if (user.role !== 'admin') {
+    if (user.role !== 'manager') {
       logger.warn(`🚫 Rôle insuffisant: ${getFullName(user)} est ${user.role}, coach requis`);
       return res.status(403).json({ error: 'Accès réservé aux coachs' });
     }
 
     logger.debug(`✅ Rôle admin validé pour ${getFullName(user)}`);
-    req.user.coachProfile = user.Admin;
+    req.user.coachProfile = user.Manager;
     logger.debug(`✅ Accès coach autorisé pour ${getFullName(user)}`);
     next();
   } catch (error) {
@@ -509,7 +509,7 @@ router.get('/', auth, async (req, res) => {
     let whereClause = {};
     logger.debug(`🔍 Construction de la clause WHERE selon le rôle: ${requester.role}`);
 
-    if (requester.role === 'admin') {
+    if (requester.role === 'manager') {
       logger.debug(`👨‍💼 Mode coach - Planning créés par ce coach`);
       // Coach voit les plannings qu'il a créés
       whereClause.coachId = req.user.sub;
@@ -1244,7 +1244,7 @@ router.get('/member/:memberId', auth, async (req, res) => {
         return res.status(403).json({ error: 'Vous ne pouvez voir que vos propres plannings' });
       }
       logger.debug(`✅ Accès personnel validé`);
-    } else if (requester.role === 'admin') {
+    } else if (requester.role === 'manager') {
       logger.debug(`👨‍💼 Mode coach - Vérification appartenance salle`);
       // Un coach ne peut voir que les plannings des membres de sa salle
       logger.debug(`👨‍💼 Comparaison salles: requester.gymId (${requester.gymId}) vs member.gymId (${member.User.gymId})`);
@@ -1504,7 +1504,7 @@ router.get('/next-day/:memberId', auth, async (req, res) => {
         return res.status(403).json({ error: 'Vous ne pouvez voir que votre propre planning' });
       }
       logger.debug(`✅ Accès personnel validé`);
-    } else if (requester.role === 'admin') {
+    } else if (requester.role === 'manager') {
       logger.debug(`👨‍💼 Mode coach - Vérification appartenance salle`);
       logger.debug(`👨‍💼 Comparaison salles: requester.gymId (${requester.gymId}) vs member.gymId (${member.User.gymId})`);
 

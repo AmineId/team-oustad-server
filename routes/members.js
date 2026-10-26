@@ -50,7 +50,7 @@ const canAccessMemberProfile = async (req, res, next) => {
     }
 
     // Admin peut modifier les membres de sa salle
-    if (requester.role === 'admin' && memberUser.gymId === requester.gymId) {
+    if (requester.role === 'manager' && memberUser.gymId === requester.gymId) {
       logger.info(`✅ Accès autorisé: Admin de la même salle`);
       req.targetMember = memberUser;
       return next();

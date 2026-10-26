@@ -7,6 +7,7 @@ const { splitFullName, getFullName } = require('../utils/nameUtils');
 const { generateUserId } = require('../utils/idGenerator');
 const prisma = require('../utils/prismaClient');
 const { ownerHasPermission, requireOwnerPermission } = require('../utils/ownerPermissions');
+const { normalizeRole } = require('../utils/roles');
 
 const router = express.Router();
 const auth = require('../middleware/auth');
@@ -62,7 +63,7 @@ const requireAdmin = async (req, res, next) => {
   try {
     const user = await prisma.user.findUnique({
       where: { id: req.user.sub },
-      include: { Admin: true }
+      include: { Manager: true }
     });
 
     if (!user) {
@@ -70,12 +71,12 @@ const requireAdmin = async (req, res, next) => {
       return res.status(403).json({ error: 'Accès réservé aux administrateurs' });
     }
 
-    if (user.role !== 'admin') {
+    if (user.role !== 'manager') {
       console.log(`🚫 Rôle insuffisant: ${getFullName(user)} est ${user.role}, admin requis`);
       return res.status(403).json({ error: 'Accès réservé aux administrateurs' });
     }
 
-    req.user.adminProfile = user.admin;
+    req.user.adminProfile = user.Manager;
     console.log(`✅ Accès admin autorisé pour ${getFullName(user)}`);
     next();
   } catch (error) {
@@ -90,7 +91,7 @@ router.get('/me', auth, async (req, res) => {
     const user = await prisma.user.findUnique({
       where: { id: req.user.sub },
       include: {
-        Admin: true,
+        Manager: true,
         Member: true,
         Owner: true,
         Gym: { select: { id: true, name: true } }
@@ -331,7 +332,9 @@ router.delete('/fcm-token', auth, async (req, res) => {
  */
 router.post('/', auth, async (req, res) => {
   try {
-    const { email, password, firstName, lastName, role, gymId, address, permissions, sendSetupEmail = true } = req.body;
+    const { email, password, firstName, lastName, gymId, address, permissions, sendSetupEmail = true } = req.body;
+    // `admin` reste accepté comme alias de `manager` (Rôles V2)
+    const role = normalizeRole(req.body.role);
     console.log(`👤 Création utilisateur - Email: ${email}, Role: ${role}, Gym: ${gymId}`);
 
     if (!email || !firstName || !lastName || !role || !gymId) {
@@ -349,11 +352,11 @@ router.post('/', auth, async (req, res) => {
     let canCreate = false;
 
     if (requester.role === 'owner') {
-      // Owner peut créer des members, et des admins s'il a canManageAdmins
+      // Owner peut créer des members, et des managers s'il a canManageAdmins
       canCreate = role === 'member' ||
-        (role === 'admin' && await ownerHasPermission(requester, 'canManageAdmins'));
-    } else if (requester.role === 'admin') {
-      // Admin peut créer seulement des members dans sa salle
+        (role === 'manager' && await ownerHasPermission(requester, 'canManageAdmins'));
+    } else if (requester.role === 'manager') {
+      // Manager peut créer seulement des members dans sa salle
       canCreate = role === 'member' && gymId === requester.gymId;
     } else {
       canCreate = false;
@@ -447,8 +450,8 @@ router.post('/', auth, async (req, res) => {
     }
 
     // Créer le profil spécifique selon le rôle
-    if (role === 'admin') {
-      await prisma.admin.create({
+    if (role === 'manager') {
+      await prisma.manager.create({
         data: { userId: user.id }
       });
       console.log(`✅ Profil admin créé pour ${getFullName(user)}`);
@@ -564,7 +567,7 @@ router.get('/', auth, async (req, res) => {
 
     let whereClause = {};
 
-    if (requester.role === 'admin') {
+    if (requester.role === 'manager') {
       // Admin voit seulement les utilisateurs de sa salle
       whereClause.gymId = requester.gymId;
     }
@@ -580,7 +583,7 @@ router.get('/', auth, async (req, res) => {
             Payment: { orderBy: { createdAt: 'desc' }, take: 3 }
           }
         },
-        Admin: true,
+        Manager: true,
         Owner: true
       },
       orderBy: { createdAt: 'desc' }
@@ -606,7 +609,7 @@ router.get('/:id/qr', auth, async (req, res) => {
       include: {
         Gym: { select: { id: true, name: true } },
         Member: true,
-        Admin: true,
+        Manager: true,
         Owner: true
       }
     });
@@ -632,7 +635,7 @@ router.get('/:id/qr', auth, async (req, res) => {
     if (requester.role === 'owner') {
       hasAccess = true; // Owner can access all QR codes
       console.log(`👑 Owner ${getFullName(requester)} a accès à tous les QR codes`);
-    } else if (requester.role === 'admin') {
+    } else if (requester.role === 'manager') {
       // Admin can only access QR codes of users in their gym (gymId is on the User model, not Admin)
       hasAccess = user.gymId === requester.gymId;
       console.log(`👨‍💼 Admin ${getFullName(requester)} - Accès: ${hasAccess} (requester.gymId: ${requester?.gymId}, user.gymId: ${user.gymId})`);
@@ -872,7 +875,7 @@ router.put('/:id', auth, async (req, res) => {
       // Owner : tout le monde ; un autre admin/owner exige canManageAdmins
       canUpdate = isSelf || targetUser.role === 'member' ||
         await ownerHasPermission(requester, 'canManageAdmins');
-    } else if (requester.role === 'admin') {
+    } else if (requester.role === 'manager') {
       // Admin : lui-même et les membres de sa salle (jamais un admin/owner)
       canUpdate = isSelf ||
         (targetUser.role === 'member' && targetUser.gymId === requester.gymId);
@@ -905,7 +908,7 @@ router.put('/:id', auth, async (req, res) => {
       include: {
         Gym: { select: { id: true, name: true } },
         Member: true,
-        Admin: true,
+        Manager: true,
         Owner: true
       }
     });
@@ -1012,7 +1015,7 @@ router.delete('/:id', auth, async (req, res) => {
       // Owner : membres ; admins/owners avec canManageAdmins ; jamais lui-même
       canDelete = id !== req.user.sub && (targetUser.role === 'member' ||
         await ownerHasPermission(requester, 'canManageAdmins'));
-    } else if (requester.role === 'admin') {
+    } else if (requester.role === 'manager') {
       // Admin peut supprimer seulement les membres de sa salle
       canDelete = targetUser.gymId === requester.gymId && targetUser.role === 'member';
     } else {
@@ -1027,8 +1030,8 @@ router.delete('/:id', auth, async (req, res) => {
     await prisma.passwordResetToken.deleteMany({ where: { userId: id } });
 
     // Supprimer d'abord les profils spécifiques
-    if (targetUser.role === 'admin') {
-      await prisma.admin.deleteMany({ where: { userId: id } });
+    if (targetUser.role === 'manager') {
+      await prisma.manager.deleteMany({ where: { userId: id } });
     } else if (targetUser.role === 'member') {
       await prisma.member.deleteMany({ where: { userId: id } });
     } else if (targetUser.role === 'owner') {
@@ -1158,7 +1161,7 @@ router.put('/:id/profile-image', auth, async (req, res) => {
     if (requester.role === 'owner') {
       canUpdate = true;
       console.log(`👑 Owner ${getFullName(requester)} peut modifier photo profil user ${id}`);
-    } else if (requester.role === 'admin') {
+    } else if (requester.role === 'manager') {
       // Lui-même et les membres de sa salle, pas les autres admins/owners
       canUpdate = id === req.user.sub ||
         (targetUser.role === 'member' && targetUser.gymId === requester.gymId);
@@ -1290,7 +1293,7 @@ router.get('/:id/profile-image', auth, async (req, res) => {
     if (requester.role === 'owner') {
       hasAccess = true;
       console.log(`👑 Owner ${getFullName(requester)} accède à photo profil user ${id}`);
-    } else if (requester.role === 'admin') {
+    } else if (requester.role === 'manager') {
       hasAccess = targetUser.gymId === requester.gymId;
       console.log(`👨‍💼 Admin ${getFullName(requester)} ${hasAccess ? 'accède' : 'refuse accès'} à photo profil user ${id}`);
     } else if (requester.role === 'member') {
@@ -1442,7 +1445,7 @@ router.delete('/:id/profile-image', auth, async (req, res) => {
     if (requester.role === 'owner') {
       canDelete = true;
       console.log(`👑 Owner ${getFullName(requester)} peut supprimer photo profil user ${id}`);
-    } else if (requester.role === 'admin') {
+    } else if (requester.role === 'manager') {
       canDelete = id === req.user.sub ||
         (targetUser.role === 'member' && targetUser.gymId === requester.gymId);
       console.log(`👨‍💼 Admin ${getFullName(requester)} ${canDelete ? 'peut supprimer' : 'ne peut pas supprimer'} photo profil user ${id}`);
@@ -1577,7 +1580,7 @@ router.get('/stats', auth, requireOwnerPermission('canViewReports'), async (req,
     ] = await Promise.all([
       prisma.gym.count(),
       prisma.user.count(),
-      prisma.admin.count(),
+      prisma.manager.count(),
       prisma.member.count(),
       prisma.owner.count(),
       prisma.payment.count(),
@@ -1591,6 +1594,8 @@ router.get('/stats', auth, requireOwnerPermission('canViewReports'), async (req,
       stats: {
         totalGyms,
         totalUsers,
+        totalManagers: totalAdmins,
+        // Ancien nom, conservé pendant la transition Rôles V2
         totalAdmins,
         totalMembers,
         totalOwners,
@@ -1621,7 +1626,7 @@ router.get('/:id', auth, async (req, res) => {
             }
           }
         },
-        Admin: true,
+        Manager: true,
         Owner: true
       }
     });
@@ -1636,7 +1641,7 @@ router.get('/:id', auth, async (req, res) => {
 
     if (requester.role === 'owner') {
       hasAccess = true;
-    } else if (requester.role === 'admin') {
+    } else if (requester.role === 'manager') {
       hasAccess = user.gymId === requester.gymId;
     } else if (requester.role === 'member') {
       hasAccess = req.user.sub === id;
@@ -1953,7 +1958,7 @@ router.post('/create-owner', auth, requireOwnerPermission('canManageAdmins'), as
 // Créer un nouvel admin (seulement pour les owners)
 /**
  * @swagger
- * /users/create-admin:
+ * /users/create-manager:
  *   post:
  *     summary: Create a new admin (Owner only)
  *     description: Create a new admin user. Only owners can create admins.
@@ -2041,12 +2046,12 @@ router.post('/create-owner', auth, requireOwnerPermission('canManageAdmins'), as
  *                   type: string
  *                   example: "Erreur lors de la création de l'admin"
  */
-router.post('/create-admin', auth, requireOwnerPermission('canManageAdmins'), async (req, res) => {
-  console.log('📝 CREATE-ADMIN - Body reçu:', JSON.stringify(req.body, null, 2));
+async function createManagerHandler(req, res) {
+  console.log('📝 CREATE-MANAGER - Body reçu:', JSON.stringify(req.body, null, 2));
   
   const { email, password, firstName, lastName, gymId, address, sendSetupEmail = true } = req.body;
 
-  console.log('📋 CREATE-ADMIN - Données extraites:', { 
+  console.log('📋 CREATE-MANAGER - Données extraites:', { 
     email, 
     password: password ? '***' : undefined, 
     firstName, 
@@ -2056,7 +2061,7 @@ router.post('/create-admin', auth, requireOwnerPermission('canManageAdmins'), as
   });
 
   if (!email || !firstName || !lastName || !gymId) {
-    console.log('❌ CREATE-ADMIN - Validation échouée, données manquantes');
+    console.log('❌ CREATE-MANAGER - Validation échouée, données manquantes');
     return res.status(400).json({ error: 'Email, firstName, lastName et gymId requis' });
   }
 
@@ -2096,7 +2101,7 @@ router.post('/create-admin', auth, requireOwnerPermission('canManageAdmins'), as
         password: hashedPassword,
         firstName,
         lastName,
-        role: 'admin',
+        role: 'manager',
         gymId,
         uniqueCode,
         displayId,
@@ -2107,7 +2112,7 @@ router.post('/create-admin', auth, requireOwnerPermission('canManageAdmins'), as
       }
     });
 
-    await prisma.admin.create({
+    await prisma.manager.create({
       data: { userId: user.id }
     });
 
@@ -2118,7 +2123,7 @@ router.post('/create-admin', auth, requireOwnerPermission('canManageAdmins'), as
         userId: user.id,
         uniqueCode: user.uniqueCode,
         fullName: getFullName(user),
-        role: 'admin',
+        role: 'manager',
         gymName: gym.name,
         accessType: 'gym_access',
         generatedAt: new Date().toISOString()
@@ -2136,9 +2141,9 @@ router.post('/create-admin', auth, requireOwnerPermission('canManageAdmins'), as
         data: { qrCode: qrCodeBuffer }
       });
 
-      console.log(`✅ QR code généré et stocké pour admin ${getFullName(user)}`);
+      console.log(`✅ QR code généré et stocké pour manager ${getFullName(user)}`);
     } catch (qrError) {
-      console.error(`⚠️ Erreur génération QR code pour admin ${getFullName(user)}:`, qrError);
+      console.error(`⚠️ Erreur génération QR code pour manager ${getFullName(user)}:`, qrError);
     }
 
     // Si pas de mot de passe fourni, envoyer l'email d'activation
@@ -2165,23 +2170,32 @@ router.post('/create-admin', auth, requireOwnerPermission('canManageAdmins'), as
       }
     }
 
+    const manager = {
+      id: user.id,
+      email: user.email,
+      firstName: user.firstName,
+      lastName: user.lastName,
+      role: 'manager',
+      gymId: user.gymId,
+    };
     res.status(201).json({
       message: shouldSendSetupEmail 
-        ? 'Admin créé avec succès. Un email d\'activation a été envoyé.'
-        : 'Admin créé avec succès',
-      admin: {
-        id: user.id,
-        email: user.email,
-        firstName: user.firstName,
-        lastName: user.lastName,
-      },
+        ? 'Manager créé avec succès. Un email d\'activation a été envoyé.'
+        : 'Manager créé avec succès',
+      manager,
+      // Ancienne clé, conservée pendant la transition Rôles V2
+      admin: manager,
       setupEmailSent: shouldSendSetupEmail
     });
   } catch (error) {
-    console.error('Erreur création admin:', error);
-    res.status(500).json({ error: 'Erreur lors de la création de l\'admin' });
+    console.error('Erreur création manager:', error);
+    res.status(500).json({ error: 'Erreur lors de la création du manager' });
   }
-});
+}
+
+router.post('/create-manager', auth, requireOwnerPermission('canManageAdmins'), createManagerHandler);
+// Alias de transition Rôles V2 (anciens clients)
+router.post('/create-admin', auth, requireOwnerPermission('canManageAdmins'), createManagerHandler);
 
 // Lister tous les gyms (pour les owners)
 /**
@@ -2360,7 +2374,7 @@ router.get('/gym/:gymId/members', auth, async (req, res) => {
     if (requester.role === 'owner') {
       hasAccess = true;
       console.log(`👑 Owner ${getFullName(requester)} accède aux membres de la salle ${gymId}`);
-    } else if (requester.role === 'admin' && requester.gymId === gymId) {
+    } else if (requester.role === 'manager' && requester.gymId === gymId) {
       hasAccess = true;
       console.log(`👨‍💼 Admin ${getFullName(requester)} accède aux membres de sa salle`);
     }

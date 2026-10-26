@@ -105,7 +105,7 @@ router.get('/gyms/:slugOrId', async (req, res) => {
           select: { id: true, isCover: true }
         },
         User: {
-          where: { role: { in: ['admin', 'owner'] } },
+          where: { role: { in: ['manager', 'owner'] } },
           select: { id: true, firstName: true, lastName: true, role: true }
         },
         _count: {
@@ -194,7 +194,7 @@ router.get('/gyms/:gymId/team/:userId/image', async (req, res) => {
     if (!gym || !gym.isPublished) return res.status(404).json({ error: 'Not found' });
 
     const user = await prisma.user.findFirst({
-      where: { id: userId, gymId, role: { in: ['admin', 'owner'] } },
+      where: { id: userId, gymId, role: { in: ['manager', 'owner'] } },
       select: { profileImage: true, firstName: true, lastName: true }
     });
     if (!user) return res.status(404).json({ error: 'Not found' });

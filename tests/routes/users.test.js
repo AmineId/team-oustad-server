@@ -36,7 +36,7 @@ describe('Users Routes', () => {
     // Clean up before each test
     await prisma.passwordResetToken.deleteMany({});
     await prisma.member.deleteMany({});
-    await prisma.admin.deleteMany({});
+    await prisma.manager.deleteMany({});
     await prisma.user.deleteMany({});
     
     // Create fresh test users
@@ -490,7 +490,7 @@ describe('Users Routes', () => {
           .send({ email: 'newadmin@test.com', firstName: 'New', lastName: 'Admin', gymId: testGym.id, password: 'admin123', sendSetupEmail: false });
         expect(res.status).toBe(201);
         expect(res.body.admin).toBeDefined();
-        await prisma.admin.deleteMany({ where: { User: { email: 'newadmin@test.com' } } });
+        await prisma.manager.deleteMany({ where: { User: { email: 'newadmin@test.com' } } });
         await prisma.user.deleteMany({ where: { email: 'newadmin@test.com' } });
       });
 

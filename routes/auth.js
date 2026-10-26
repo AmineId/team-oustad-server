@@ -8,6 +8,7 @@ const { sendPasswordResetNotification } = require('../services/notificationServi
 const { getActiveSubscription, getSubscriptionsWithStatus } = require('../utils/subscriptionUtils');
 const prisma = require('../utils/prismaClient');
 const { authLimiter } = require('../middleware/rateLimiter');
+const { CLIENTS, KIOSK_ROLES } = require('../utils/roles');
 
 const JWT_SECRET = process.env.JWT_SECRET || 'change_this_secret';
 
@@ -86,6 +87,8 @@ const sanitizeEmail = (email) => {
 // Login: expect { email, password } or { phoneNumber, password }
 router.post('/login', authLimiter, async (req, res) => {
   const { email, phoneNumber, password } = req.body;
+  // `client: "kiosk"` : connexion depuis la borne. Toute autre valeur = app.
+  const client = req.body.client === CLIENTS.KIOSK ? CLIENTS.KIOSK : CLIENTS.APP;
   console.log(`🔐 Tentative de connexion - Email: ${email}, Phone: ${phoneNumber}`);
   
   if ((!email && !phoneNumber) || !password) {
@@ -105,7 +108,7 @@ router.post('/login', authLimiter, async (req, res) => {
     const user = await prisma.user.findFirst({
       where: email ? { email: sanitizedEmail } : { phoneNumber },
       include: {
-        Admin: true,
+        Manager: true,
         Member: {
           include: {
             Subscription: {
@@ -138,13 +141,24 @@ router.post('/login', authLimiter, async (req, res) => {
 
     console.log(`✅ Connexion réussie pour: ${user.firstName} ${user.lastName} (${user.role})`);
 
-    // Generate a unique session ID — invalidates any previous session on another device
+    // Le kiosk est réservé au staff de salle ; le refus se fait ici, pas dans le client
+    if (client === CLIENTS.KIOSK && !KIOSK_ROLES.includes(user.role)) {
+      console.log(`🚫 Connexion kiosk refusée pour le rôle ${user.role}: ${user.email}`);
+      return res.status(403).json({
+        error: 'kiosk_forbidden_role',
+        message: 'Le kiosk est réservé aux owners et managers'
+      });
+    }
+
+    // Generate a unique session ID — invalidates any previous session on another device.
+    // Le kiosk a son propre emplacement : se connecter à la borne ne déconnecte pas le téléphone.
     const sessionId = crypto.randomUUID();
+    const sessionField = client === CLIENTS.KIOSK ? 'kioskSessionId' : 'currentSessionId';
 
     // Persist session ID so the auth middleware can verify single-device constraint
     await prisma.user.update({
       where: { id: user.id },
-      data: { currentSessionId: sessionId, lastLoginAt: new Date() }
+      data: { [sessionField]: sessionId, lastLoginAt: new Date() }
     });
 
     // Token valid for 30 days
@@ -152,13 +166,14 @@ router.post('/login', authLimiter, async (req, res) => {
       sub: user.id,
       email: user.email,
       type: user.role,
+      client,
       sessionId
     }, JWT_SECRET, { expiresIn: '30d' });
 
     console.log(`🎫 Token JWT généré pour: ${user.email}`);
 
     // Return different data based on user role
-    if (user.role === 'admin') {
+    if (user.role === 'manager') {
       console.log(`👨‍💼 Réponse admin préparée pour: ${user.firstName} ${user.lastName}`);
       const responseData = {
         token,
@@ -167,10 +182,11 @@ router.post('/login', authLimiter, async (req, res) => {
           email: user.email,
           phoneNumber: user.phoneNumber,
           firstName: user.firstName, lastName: user.lastName,
-          role: 'admin',
+          role: 'manager',
           gymId: user.gymId,
           gym: user.Gym,
-          type: 'admin'
+          type: 'manager',
+          client
         }
       };
       console.log(`📤 Réponse login admin:`, {
@@ -191,7 +207,8 @@ router.post('/login', authLimiter, async (req, res) => {
           gymId: user.gymId,
           gym: user.Gym,
           permissions: await getOwnerPermissions(user.id),
-          type: 'owner'
+          type: 'owner',
+          client
         }
       };
       console.log(`� Réponse login owner:`, {
@@ -214,7 +231,8 @@ router.post('/login', authLimiter, async (req, res) => {
           member: user.Member,
           subscriptions: user.Member?.Subscription || [],
           payments: user.Member?.Payment || [],
-          type: 'member'
+          type: 'member',
+          client
         }
       };
       console.log(`📤 Réponse login membre:`, {
@@ -311,9 +329,9 @@ router.post('/scan-qr', auth, async (req, res) => {
 
   try {
     // Vérifier que l'utilisateur est un admin ou un owner
-    if (!['admin', 'owner'].includes(req.user.type)) {
-      console.log(`❌ Accès refusé: utilisateur ${req.user.email} n'est pas admin/owner (type: ${req.user.type})`);
-      return res.status(403).json({ error: 'Only admins or owners can scan QR codes' });
+    if (!['manager', 'owner'].includes(req.user.type)) {
+      console.log(`❌ Accès refusé: utilisateur ${req.user.email} n'est pas manager/owner (type: ${req.user.type})`);
+      return res.status(403).json({ error: 'Only managers or owners can scan QR codes' });
     }
 
     // Sans qrCode, Prisma ignore le filtre et findFirst renverrait n'importe quel utilisateur
@@ -482,7 +500,7 @@ router.get('/me', auth, async (req, res) => {
       where: { id: req.user.sub },
       include: {
         Gym: true,
-        Admin: true,
+        Manager: true,
         Member: {
           include: {
             Subscription: {
@@ -511,7 +529,7 @@ router.get('/me', auth, async (req, res) => {
 
     console.log(`✅ Utilisateur trouvé: ${user.firstName} ${user.lastName} (${user.role}) - ID: ${user.id}, uniqueCode: ${user.uniqueCode}`);
 
-    if (user.role === 'admin') {
+    if (user.role === 'manager') {
       console.log(`👨‍💼 Réponse admin pour: ${user.firstName} ${user.lastName}`);
       // Pour les admins : retourner leur salle
       const responseData = {
@@ -532,7 +550,7 @@ router.get('/me', auth, async (req, res) => {
         role: user.role,
         gymId: user.gymId,
         gym: user.Gym,
-        type: 'admin'
+        type: 'manager'
       };
       console.log(`📤 Réponse /me admin:`, responseData);
       res.json(responseData);
@@ -567,7 +585,9 @@ router.get('/me', auth, async (req, res) => {
         stats: {
           totalUsers: gym._count.User,
           members: gym.User.filter(u => u.role === 'member').length,
-          admins: gym.User.filter(u => u.role === 'admin').length,
+          managers: gym.User.filter(u => u.role === 'manager').length,
+          // Ancien nom, conservé pendant la transition Rôles V2
+          admins: gym.User.filter(u => u.role === 'manager').length,
           owners: gym.User.filter(u => u.role === 'owner').length
         }
       }));
@@ -946,7 +966,7 @@ router.post('/send-setup-email', auth, async (req, res) => {
     // Find user by email or userId
     const user = await prisma.user.findFirst({ 
       where: email ? { email: sanitizedEmail } : { id: userId },
-      include: { Member: true, Admin: true }
+      include: { Member: true, Manager: true }
     });
     if (!user) {
       console.log(`❌ Utilisateur non trouvé: ${email || userId}`);
@@ -956,11 +976,11 @@ router.post('/send-setup-email', auth, async (req, res) => {
     // Check permissions
     const requestingUser = await prisma.user.findUnique({
       where: { id: req.user.sub },
-      include: { Admin: true }
+      include: { Manager: true }
     });
 
     // If requesting user is admin, verify target user is in same gym
-    if (requestingUser.role === 'admin') {
+    if (requestingUser.role === 'manager') {
       if (user.gymId !== requestingUser.gymId) {
         console.log(`❌ Admin ${requestingUser.email} trying to access user from different gym`);
         return res.status(403).json({ error: 'Cannot send setup email to user from different gym' });

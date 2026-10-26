@@ -350,7 +350,7 @@ describe('Gyms Routes', () => {
       expect(response.body.openingHours[0].dayOfWeek).toBe(1);
     });
 
-    it('should allow admin to set opening hours for their gym', async () => {
+    it('should return 403 if manager sets opening hours, even for their gym (Rôles V2)', async () => {
       const openingHours = [
         { dayOfWeek: 1, openTime: '08:00', closeTime: '20:00' }
       ];
@@ -360,8 +360,7 @@ describe('Gyms Routes', () => {
         .set('Authorization', authHeader(testAdmin))
         .send(openingHours);
 
-      expect(response.status).toBe(200);
-      expect(response.body.openingHours).toHaveLength(1);
+      expect(response.status).toBe(403);
     });
 
     it('should return 403 if admin tries to set hours for other gym', async () => {
@@ -483,7 +482,7 @@ describe('Gyms Routes', () => {
       expect(gym.image).not.toBeNull();
     });
 
-    it('should allow admin to upload image for their gym', async () => {
+    it('should return 403 if manager uploads image, even for their gym (Rôles V2)', async () => {
       const imageData = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAAB';
 
       const response = await request(app)
@@ -491,7 +490,7 @@ describe('Gyms Routes', () => {
         .set('Authorization', authHeader(testAdmin))
         .send({ imageData });
 
-      expect(response.status).toBe(200);
+      expect(response.status).toBe(403);
     });
 
     it('should return 403 if admin tries to upload to other gym', async () => {
@@ -608,12 +607,12 @@ describe('Gyms Routes', () => {
       expect(gym.image).toBeNull();
     });
 
-    it('should allow admin to delete image of their gym', async () => {
+    it('should return 403 if manager deletes image, even for their gym (Rôles V2)', async () => {
       const response = await request(app)
         .delete(`/gyms/${testGym.id}/image`)
         .set('Authorization', authHeader(testAdmin));
 
-      expect(response.status).toBe(200);
+      expect(response.status).toBe(403);
     });
 
     it('should return 403 if admin tries to delete image of other gym', async () => {
