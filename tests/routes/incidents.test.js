@@ -199,7 +199,7 @@ describe('Rôles V2 : incidents', () => {
       await waitForPush();
       expect(sendPushNotification).toHaveBeenCalledWith(
         'coach-token',
-        expect.objectContaining({ data: expect.objectContaining({ action: 'message' }) }),
+        expect.objectContaining({ data: expect.objectContaining({ action: 'message', messageId: String(reply.body.id) }) }),
         coach.id
       );
 
@@ -212,6 +212,51 @@ describe('Rôles V2 : incidents', () => {
       const detail = await request(app).get(`/incidents/${incident.id}`).set('Authorization', authHeader(coach));
       expect(detail.body.messages.map(m => m.body)).toEqual(['On envoie un technicien demain', 'Merci']);
       expect(detail.body.messagesCount).toBe(2);
+    });
+
+    it('chat : pagination par curseur, non-lus et marquage lu', async () => {
+      const get = (user, qs = '') => request(app)
+        .get(`/incidents/${incident.id}/messages${qs}`).set('Authorization', authHeader(user));
+      const read = (user, body = {}) => request(app)
+        .post(`/incidents/${incident.id}/read`).set('Authorization', authHeader(user)).send(body);
+
+      const ids = [];
+      for (const text of ['m1', 'm2', 'm3']) ids.push((await post(owner, text)).body.id);
+      const coachList = await request(app).get('/incidents').set('Authorization', authHeader(coach));
+      expect(coachList.body[0]).toMatchObject({ unreadCount: 3, messagesCount: 3 });
+      expect(coachList.body[0].lastMessage).toMatchObject({ id: ids[2], body: 'm3', author: { id: owner.id } });
+
+      // Écrire vaut lecture de tout le fil ; l'owner a 1 non-lu
+      const mine = await post(coach, 'réponse coach');
+      expect(mine.body.authorId).toBe(coach.id);
+      expect((await request(app).get(`/incidents/${incident.id}`).set('Authorization', authHeader(coach))).body.unreadCount).toBe(0);
+      expect((await request(app).get(`/incidents/${incident.id}`).set('Authorization', authHeader(owner))).body.unreadCount).toBe(1);
+
+      // Sans curseur : les plus récents ; before : les précédents ; after : les suivants (exclusif)
+      const latest = await get(coach, '?limit=2');
+      expect(latest.status).toBe(200);
+      expect(latest.body.messages.map(m => m.body)).toEqual(['m3', 'réponse coach']);
+      expect(latest.body.hasMore).toBe(true);
+      const older = await get(coach, `?before=${ids[2]}&limit=2`);
+      expect(older.body).toMatchObject({ hasMore: false });
+      expect(older.body.messages.map(m => m.body)).toEqual(['m1', 'm2']);
+      const newer = await get(coach, `?after=${ids[0]}&limit=2`);
+      expect(newer.body.messages.map(m => m.body)).toEqual(['m2', 'm3']);
+      expect(newer.body.hasMore).toBe(true);
+      expect((await get(coach, `?after=${mine.body.id}`)).body).toEqual({ messages: [], hasMore: false });
+      expect((await get(coach, '?after=x')).body.error).toBe('invalid_cursor');
+      expect((await get(coach, '?after=1&before=2')).status).toBe(400);
+
+      // Lecture partielle puis complète (manager de la salle) ; le curseur ne recule jamais
+      const partial = await read(manager, { lastMessageId: ids[1] });
+      expect(partial.body).toEqual({ incidentId: incident.id, lastReadMessageId: ids[1], unreadCount: 2 });
+      const all = await read(manager);
+      expect(all.body).toMatchObject({ lastReadMessageId: mine.body.id, unreadCount: 0 });
+      expect((await read(manager, { lastMessageId: ids[0] })).body.lastReadMessageId).toBe(mine.body.id);
+
+      // Hors portée : 403
+      expect((await get(otherManager)).status).toBe(403);
+      expect((await read(member)).status).toBe(403);
     });
 
     it('le manager de la salle lit mais ne répond pas s\'il n\'est pas le créateur', async () => {

@@ -822,6 +822,8 @@ components:
           type: integer
         incidentId:
           type: integer
+        authorId:
+          type: integer
         author:
           $ref: '#/components/schemas/IncidentAuthor'
         body:
@@ -874,6 +876,14 @@ components:
           $ref: '#/components/schemas/CoachRef'
         messagesCount:
           type: integer
+        lastMessage:
+          allOf:
+            - $ref: '#/components/schemas/IncidentMessage'
+          nullable: true
+          description: "Dernier message du chat (null si aucun)"
+        unreadCount:
+          type: integer
+          description: "Messages des autres postérieurs au dernier lu par l'appelant (voir POST /incidents/{id}/read)"
         createdAt:
           type: string
           format: date-time
@@ -891,7 +901,7 @@ components:
       properties:
         error:
           type: string
-          description: "missing_fields, invalid_field, invalid_photo, gym_id_required, kiosk_forbidden_role, incident_not_found, photo_not_found, incident_closed, invalid_id, forbidden"
+          description: "missing_fields, invalid_field, invalid_photo, gym_id_required, kiosk_forbidden_role, incident_not_found, photo_not_found, incident_closed, invalid_id, invalid_cursor, forbidden"
         message:
           type: string
 
@@ -10215,11 +10225,62 @@ paths:
           description: Pas owner
 
   /incidents/{id}/messages:
-    post:
-      summary: Répondre dans le fil (Owner / créateur)
+    get:
+      summary: Messages du chat, paginés par curseur (lecteurs de l'incident)
       description: |
-        Réponse de l'owner : le créateur est notifié ; réponse du créateur : les owners sont notifiés
-        (FCM `action: "message"`). 409 `incident_closed` une fois clôturé.
+        Réponse `{ messages, hasMore }`, messages toujours en ordre chronologique (id croissant).
+        - `after=<messageId>` (exclusif) : messages suivants, pour le polling ; `hasMore` = d'autres plus récents.
+        - `before=<messageId>` (exclusif) : messages précédents ; `hasMore` = d'autres plus anciens.
+        - sans curseur : les `limit` plus récents ; `hasMore` = d'autres plus anciens.
+        `after` et `before` sont exclusifs entre eux (400 `invalid_cursor`). Ne marque pas comme lu.
+      tags: [Incidents]
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+        - in: query
+          name: after
+          schema:
+            type: integer
+        - in: query
+          name: before
+          schema:
+            type: integer
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 50
+      responses:
+        '200':
+          description: Page de messages
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  messages:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/IncidentMessage'
+                  hasMore:
+                    type: boolean
+        '400':
+          description: invalid_cursor
+        '403':
+          description: Hors portée
+    post:
+      summary: Écrire dans le chat (Owner / créateur)
+      description: |
+        Message de l'owner : le créateur est notifié ; message du créateur : les owners sont notifiés
+        (FCM `data: { type: "incident", incidentId, action: "message", messageId }`).
+        Écrire marque tout le fil comme lu pour l'auteur. 409 `incident_closed` une fois clôturé.
       tags: [Incidents]
       security:
         - bearerAuth: []
@@ -10255,6 +10316,49 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/IncidentError'
+
+  /incidents/{id}/read:
+    post:
+      summary: Marquer le chat comme lu (lecteurs de l'incident)
+      description: |
+        Avance le curseur de lecture de l'appelant jusqu'à `lastMessageId` (défaut : dernier message).
+        Le curseur ne recule jamais. Ouvert à tout lecteur de l'incident (owner, manager de la salle, créateur).
+      tags: [Incidents]
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                lastMessageId:
+                  type: integer
+      responses:
+        '200':
+          description: État de lecture
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  incidentId:
+                    type: integer
+                  lastReadMessageId:
+                    type: integer
+                  unreadCount:
+                    type: integer
+        '400':
+          description: invalid_cursor
+        '403':
+          description: Hors portée
 
   /incidents/{id}/photo:
     get:

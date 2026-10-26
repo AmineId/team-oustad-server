@@ -398,6 +398,7 @@ model Incident {
   Creator     User              @relation("IncidentCreator", fields: [createdBy], references: [id], onDelete: Cascade)
   Closer      User?             @relation("IncidentCloser", fields: [closedBy], references: [id], onDelete: SetNull)
   Messages    IncidentMessage[]
+  Reads       IncidentRead[]
 
   @@index([gymId, status])
   @@index([createdBy])
@@ -414,6 +415,19 @@ model IncidentMessage {
   Author     User     @relation(fields: [authorId], references: [id], onDelete: Cascade)
 
   @@index([incidentId, createdAt])
+}
+
+/// Chat d'incident : dernier message lu par utilisateur (calcul de unreadCount)
+model IncidentRead {
+  incidentId        Int
+  userId            Int
+  lastReadMessageId Int
+  readAt            DateTime @default(now())
+  Incident          Incident @relation(fields: [incidentId], references: [id], onDelete: Cascade)
+  User              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([incidentId, userId])
+  @@index([userId])
 }
 
 model PlanningDay {
@@ -527,6 +541,7 @@ model User {
   CreatedIncidents     Incident[]           @relation("IncidentCreator")
   ClosedIncidents      Incident[]           @relation("IncidentCloser")
   IncidentMessages     IncidentMessage[]
+  IncidentReads        IncidentRead[]
   StoreProduct         StoreProduct[]
   Gym                  Gym                  @relation(fields: [gymId], references: [id])
 

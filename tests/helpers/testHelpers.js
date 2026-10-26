@@ -18,6 +18,7 @@ async function cleanDatabase() {
   await prisma.quotaNotification.deleteMany({});
   await prisma.storeReservation.deleteMany({});
   await prisma.storeProduct.deleteMany({});
+  await prisma.incidentRead.deleteMany({});
   await prisma.incidentMessage.deleteMany({});
   await prisma.incident.deleteMany({});
   await prisma.trainingSessionMember.deleteMany({});

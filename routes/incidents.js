@@ -40,8 +40,8 @@ function parseId(value) {
   return id;
 }
 
-/** FCM `data: { type: "incident", incidentId, action }`, sans bloquer la réponse. */
-async function notify(where, incident, action, title, body) {
+/** FCM `data: { type: "incident", incidentId, action[, messageId] }`, sans bloquer la réponse. */
+async function notify(where, incident, action, title, body, extra = {}) {
   try {
     const users = await prisma.user.findMany({
       where: { ...where, fcmToken: { not: null }, notificationsEnabled: true },
@@ -51,7 +51,7 @@ async function notify(where, incident, action, title, body) {
       sendPushNotification(user.fcmToken, {
         title,
         body,
-        data: { type: 'incident', incidentId: String(incident.id), action }
+        data: { type: 'incident', incidentId: String(incident.id), action, ...extra }
       }, user.id).catch(err => logger.warn(`⚠️ Notification incident non envoyée: ${err.message}`));
     }
   } catch (error) {
@@ -100,6 +100,22 @@ router.get('/:id/photo', auth, requireIncidentRole, async (req, res) => {
   }
 });
 
+router.get('/:id/messages', auth, requireIncidentRole, async (req, res) => {
+  try {
+    res.json(await incidentService.listMessages(parseId(req.params.id), req.query, req.requester));
+  } catch (error) {
+    sendError(res, error, 'Erreur lors de la récupération des messages');
+  }
+});
+
+router.post('/:id/read', auth, requireIncidentRole, async (req, res) => {
+  try {
+    res.json(await incidentService.markRead(parseId(req.params.id), req.body, req.requester));
+  } catch (error) {
+    sendError(res, error, 'Erreur lors du marquage comme lu');
+  }
+});
+
 router.post('/:id/messages', auth, requireIncidentRole, apiLimiter, async (req, res) => {
   try {
     const { message, incident } = await incidentService.addMessage(parseId(req.params.id), req.body.body, req.requester);
@@ -107,7 +123,7 @@ router.post('/:id/messages', auth, requireIncidentRole, apiLimiter, async (req, 
     const where = req.requester.role === 'owner'
       ? { id: incident.createdBy }
       : { role: 'owner' };
-    notify(where, incident, 'message', `💬 Réponse — ${incident.title}`, message.body.slice(0, 140));
+    notify(where, incident, 'message', `💬 ${incident.title}`, message.body.slice(0, 140), { messageId: String(message.id) });
     res.status(201).json(message);
   } catch (error) {
     sendError(res, error, 'Erreur lors de l\'envoi du message');

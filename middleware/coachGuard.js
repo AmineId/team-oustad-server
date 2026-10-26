@@ -41,6 +41,8 @@ const COACH_ROUTES = [
   ['GET', /^\/incidents\/\d+$/],
   ['GET', /^\/incidents\/\d+\/photo$/],
   ['POST', /^\/incidents\/\d+\/messages$/],
+  ['GET', /^\/incidents\/\d+\/messages$/],
+  ['POST', /^\/incidents\/\d+\/read$/],
   // Salles : lecture
   ['GET', /^\/gyms$/],
   ['GET', /^\/gyms\/\d+$/],

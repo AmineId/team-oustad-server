@@ -7,7 +7,7 @@ const { CLIENTS } = require('../utils/roles');
  * Rôles V2 : incidents.
  * - Création : manager (sa salle, app ou kiosk), coach (une de ses salles, app uniquement)
  * - Lecture : owner (tout), manager (sa salle), coach (les siens)
- * - Fil : l'owner et le créateur répondent (choix provisoire n°4)
+ * - Chat : l'owner et le créateur écrivent ; tout lecteur suit ses non-lus (IncidentRead)
  * - Statut : owner uniquement
  */
 class IncidentError extends Error {
@@ -24,6 +24,9 @@ const STATUSES = ['open', 'in_progress', 'resolved', 'closed'];
 const PHOTO_MIME = /^image\/(jpeg|png|webp)$/;
 const MAX_PHOTO_BYTES = 5 * 1024 * 1024;
 
+const DEFAULT_MESSAGE_PAGE = 50;
+const MAX_MESSAGE_PAGE = 100;
+
 const generateIncidentId = () => `INCIDENT-${crypto.randomBytes(8).toString('hex')}`;
 
 const AUTHOR_SELECT = { ...COACH_REF_SELECT, role: true };
@@ -32,14 +35,15 @@ const INCIDENT_INCLUDE = {
   Gym: { select: GYM_REF_SELECT },
   Creator: { select: AUTHOR_SELECT },
   Closer: { select: COACH_REF_SELECT },
-  _count: { select: { Messages: true } }
+  _count: { select: { Messages: true } },
+  Messages: { orderBy: { id: 'desc' }, take: 1, include: { Author: { select: AUTHOR_SELECT } } }
 };
 
 function toAuthor(user) {
   return user ? { ...toCoachRef(user), role: user.role } : null;
 }
 
-function toIncident(incident, { messages } = {}) {
+function toIncident(incident, { messages, unreadCount = 0 } = {}) {
   return {
     id: incident.id,
     displayId: incident.displayId,
@@ -57,6 +61,8 @@ function toIncident(incident, { messages } = {}) {
     closedAt: incident.closedAt,
     closedBy: toCoachRef(incident.Closer),
     messagesCount: incident._count?.Messages ?? 0,
+    lastMessage: incident.Messages?.[0] ? toMessage(incident.Messages[0]) : null,
+    unreadCount,
     createdAt: incident.createdAt,
     updatedAt: incident.updatedAt,
     ...(messages && { messages: messages.map(toMessage) })
@@ -67,6 +73,7 @@ function toMessage(message) {
   return {
     id: message.id,
     incidentId: message.incidentId,
+    authorId: message.authorId,
     author: toAuthor(message.Author),
     body: message.body,
     createdAt: message.createdAt
@@ -134,6 +141,32 @@ async function getReadableIncident(id, requester) {
   return withHasPhoto(incident);
 }
 
+// ==================== Non-lus ====================
+
+/** Messages des autres postérieurs au dernier lu par `userId`, par incident. */
+async function unreadCounts(userId, incidentIds) {
+  if (incidentIds.length === 0) return new Map();
+  const rows = await prisma.$queryRaw`
+    SELECT m."incidentId" AS "incidentId", COUNT(*)::int AS "count"
+    FROM "IncidentMessage" m
+    LEFT JOIN "IncidentRead" r ON r."incidentId" = m."incidentId" AND r."userId" = ${userId}
+    WHERE m."incidentId" = ANY(${incidentIds}::int[])
+      AND m."authorId" <> ${userId}
+      AND m."id" > COALESCE(r."lastReadMessageId", 0)
+    GROUP BY m."incidentId"`;
+  return new Map(rows.map(r => [r.incidentId, r.count]));
+}
+
+/** Avance le curseur de lecture, sans jamais reculer. */
+async function advanceRead(incidentId, userId, messageId) {
+  await prisma.$executeRaw`
+    INSERT INTO "IncidentRead" ("incidentId", "userId", "lastReadMessageId", "readAt")
+    VALUES (${incidentId}, ${userId}, ${messageId}, NOW())
+    ON CONFLICT ("incidentId", "userId") DO UPDATE
+    SET "lastReadMessageId" = GREATEST("IncidentRead"."lastReadMessageId", EXCLUDED."lastReadMessageId"),
+        "readAt" = NOW()`;
+}
+
 // ==================== Opérations ====================
 
 async function createIncident(input, file, requester, client) {
@@ -196,7 +229,8 @@ async function listIncidents(query, requester) {
   if (query.status) where.status = oneOf(query.status, STATUSES, 'status');
 
   const incidents = await prisma.incident.findMany({ where, select: INCIDENT_SELECT, orderBy: { createdAt: 'desc' } });
-  return incidents.map(i => toIncident(withHasPhoto(i)));
+  const unread = await unreadCounts(requester.id, incidents.map(i => i.id));
+  return incidents.map(i => toIncident(withHasPhoto(i), { unreadCount: unread.get(i.id) || 0 }));
 }
 
 async function getIncident(id, requester) {
@@ -204,9 +238,65 @@ async function getIncident(id, requester) {
   const messages = await prisma.incidentMessage.findMany({
     where: { incidentId: id },
     include: { Author: { select: AUTHOR_SELECT } },
-    orderBy: { createdAt: 'asc' }
+    orderBy: { id: 'asc' }
   });
-  return toIncident(incident, { messages });
+  const unread = await unreadCounts(requester.id, [id]);
+  return toIncident(incident, { messages, unreadCount: unread.get(id) || 0 });
+}
+
+function parseCursor(value, field) {
+  if (value === undefined || value === '') return undefined;
+  const id = Number(value);
+  if (!Number.isInteger(id) || id < 0) throw new IncidentError(400, 'invalid_cursor', `${field} doit être un id de message`);
+  return id;
+}
+
+/**
+ * Page de messages, toujours en ordre chronologique (id croissant).
+ * - after=<id> (exclusif) : les suivants, pour le polling ; hasMore = d'autres plus récents
+ * - before=<id> (exclusif) : les précédents ; hasMore = d'autres plus anciens
+ * - sans curseur : les plus récents ; hasMore = d'autres plus anciens
+ */
+async function listMessages(id, query, requester) {
+  await getReadableIncident(id, requester);
+  const after = parseCursor(query.after, 'after');
+  const before = parseCursor(query.before, 'before');
+  if (after !== undefined && before !== undefined) {
+    throw new IncidentError(400, 'invalid_cursor', 'after et before sont exclusifs');
+  }
+  const limit = Math.min(Math.max(Number(query.limit) || DEFAULT_MESSAGE_PAGE, 1), MAX_MESSAGE_PAGE);
+
+  const forward = after !== undefined;
+  const rows = await prisma.incidentMessage.findMany({
+    where: {
+      incidentId: id,
+      ...(forward && { id: { gt: after } }),
+      ...(before !== undefined && { id: { lt: before } })
+    },
+    include: { Author: { select: AUTHOR_SELECT } },
+    orderBy: { id: forward ? 'asc' : 'desc' },
+    take: limit + 1
+  });
+  const hasMore = rows.length > limit;
+  const page = rows.slice(0, limit);
+  if (!forward) page.reverse();
+  return { messages: page.map(toMessage), hasMore };
+}
+
+/** Marque le fil lu jusqu'à `lastMessageId` (défaut : le dernier message). */
+async function markRead(id, input, requester) {
+  await getReadableIncident(id, requester);
+  const latest = await prisma.incidentMessage.findFirst({
+    where: { incidentId: id }, orderBy: { id: 'desc' }, select: { id: true }
+  });
+  let upTo = latest?.id ?? 0;
+  const requested = parseCursor(input?.lastMessageId, 'lastMessageId');
+  if (requested !== undefined) upTo = Math.min(requested, upTo);
+  await advanceRead(id, requester.id, upTo);
+
+  const read = await prisma.incidentRead.findUnique({ where: { incidentId_userId: { incidentId: id, userId: requester.id } } });
+  const unread = await unreadCounts(requester.id, [id]);
+  return { incidentId: id, lastReadMessageId: read.lastReadMessageId, unreadCount: unread.get(id) || 0 };
 }
 
 async function getPhoto(id, requester) {
@@ -216,7 +306,7 @@ async function getPhoto(id, requester) {
   return { photo: Buffer.from(photo), photoMime };
 }
 
-/** Réponse dans le fil : owner, ou créateur de l'incident (choix provisoire n°4). */
+/** Message dans le chat : owner, ou créateur de l'incident. */
 async function addMessage(id, body, requester) {
   const incident = await getReadableIncident(id, requester);
   if (requester.role !== 'owner' && incident.createdBy !== requester.id) {
@@ -229,6 +319,8 @@ async function addMessage(id, body, requester) {
     include: { Author: { select: AUTHOR_SELECT } }
   });
   await prisma.incident.update({ where: { id }, data: { updatedAt: new Date() } });
+  // Son propre message est lu
+  await advanceRead(id, requester.id, message.id);
   return { message: toMessage(message), incident };
 }
 
@@ -260,6 +352,8 @@ module.exports = {
   listIncidents,
   getIncident,
   getPhoto,
+  listMessages,
+  markRead,
   addMessage,
   updateStatus
 };
