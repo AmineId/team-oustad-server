@@ -12,10 +12,11 @@ const { ProgramError } = programService;
  * Rôles V2 : programmes.
  * - Lecture : owner, manager, coach (les programmes sont communs à toutes les salles)
  * - Écriture : owner uniquement
- * - Affectation : owner (tous), manager (sa salle), coach (ses membres affectés)
+ * - Affectation : owner (tous), coach (ses membres affectés) ; le manager n'affecte pas
  */
 
 const READ_ROLES = ['owner', 'manager', 'coach'];
+const ASSIGN_ROLES = ['owner', 'coach'];
 
 function loadRequester(roles) {
   return async (req, res, next) => {
@@ -34,6 +35,7 @@ function loadRequester(roles) {
 
 const requireOwner = loadRequester(['owner']);
 const requireReader = loadRequester(READ_ROLES);
+const requireAssigner = loadRequester(ASSIGN_ROLES);
 
 function sendError(res, error, fallback) {
   if (error instanceof ProgramError) {
@@ -118,7 +120,7 @@ router.delete('/:id/days/:dayOfWeek/exercises/:exerciseId', auth, requireOwner, 
   }
 });
 
-router.post('/:id/assignments', auth, requireReader, apiLimiter, async (req, res) => {
+router.post('/:id/assignments', auth, requireAssigner, apiLimiter, async (req, res) => {
   try {
     const { assignments, replaced, members, program } = await programService.assignProgram(
       parseId(req.params.id), req.body, req.requester
@@ -148,4 +150,5 @@ router.post('/:id/assignments', auth, requireReader, apiLimiter, async (req, res
 
 module.exports = router;
 module.exports.loadRequester = loadRequester;
+module.exports.ASSIGN_ROLES = ASSIGN_ROLES;
 module.exports.sendProgramError = sendError;
