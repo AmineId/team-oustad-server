@@ -27,6 +27,8 @@ info:
     - Séances (`/sessions`) : plage de travail d'un coach avec un ou plusieurs membres, gérée par l'owner
       ou le manager de la salle (chevauchement coach → 409, récurrence hebdomadaire ≤ 26, horaires
       d'ouverture en heure du Maroc). Le coach lit et pointe ses séances.
+    - Check-ins : toutes les routes `/check-in/*` appliquent la portée de salle (voir `x-roles-v2`) ;
+      `GET /check-in/today` sert au coach (ses salles), au manager (sa salle) et à l'owner.
     - Kiosk : `POST /auth/login` avec `client: "kiosk"`, réservé aux owners et managers
       (403 `kiosk_forbidden_role`). La session kiosk est distincte de la session app.
   contact:
@@ -7374,6 +7376,7 @@ paths:
   # ==================== CHECK-IN API ====================
   /check-in:
     post:
+      x-roles-v2: "Rôles V2 : staff de la salle uniquement (owner, manager de `gymId`)."
       summary: Enregistrer une entrée en salle
       description: Check-in manuel par staff
       tags:
@@ -7416,6 +7419,7 @@ paths:
 
   /check-in/{id}/checkout:
     post:
+      x-roles-v2: "Rôles V2 : staff de la salle du check-in, ou le membre lui-même."
       summary: Checkout d'un membre
       description: Enregistre l'heure de sortie d'un membre de la salle
       tags:
@@ -7453,6 +7457,7 @@ paths:
 
   /check-in/scan:
     post:
+      x-roles-v2: "Rôles V2 : staff de la salle `gymId` (app staff ou kiosk)."
       summary: Check-in via QR code
       description: Scanner le QR code du membre (1 scan par jour)
       tags:
@@ -7545,6 +7550,7 @@ paths:
 
   /check-in/member/{memberId}:
     get:
+      x-roles-v2: "Rôles V2 : le membre, le staff de sa salle, ou son coach."
       summary: Historique des check-ins
       description: Récupère l'historique des entrées d'un membre
       tags:
@@ -7589,6 +7595,7 @@ paths:
 
   /check-in/subscription/{subscriptionId}/quota:
     get:
+      x-roles-v2: "Rôles V2 : le membre titulaire, le staff de sa salle, ou son coach."
       summary: Informations de quota
       description: Récupère les séances utilisées/restantes
       tags:
@@ -7634,6 +7641,7 @@ paths:
 
   /check-in/gym/{gymId}/today:
     get:
+      x-roles-v2: "Rôles V2 : owner ou manager de la salle (le coach utilise GET /check-in/today)."
       summary: Membres présents aujourd'hui
       description: Liste des membres qui ont scanné aujourd'hui
       tags:
@@ -7665,6 +7673,7 @@ paths:
 
   /check-in/stats/gym/{gymId}:
     get:
+      x-roles-v2: "Rôles V2 : owner ou manager de la salle."
       summary: Statistiques de fréquentation
       description: Stats d'une salle sur une période
       tags:
@@ -9836,3 +9845,84 @@ paths:
                 type: array
                 items:
                   $ref: '#/components/schemas/Session'
+
+  /check-in/today:
+    get:
+      summary: Check-ins du jour (Coach / Manager / Owner)
+      description: |
+        Coach : ses salles (toutes si `gymId` absent, 403 hors de ses salles) ; manager : sa salle ; owner : `gymId` ou toutes.
+        Entrées du jour (présents et sortis), plus récentes d'abord.
+      tags: [Check-In]
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: query
+          name: gymId
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Tableau brut
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    id:
+                      type: integer
+                    displayId:
+                      type: string
+                    memberId:
+                      type: integer
+                    member:
+                      type: object
+                      properties:
+                        id:
+                          type: integer
+                        displayId:
+                          type: string
+                        firstName:
+                          type: string
+                        lastName:
+                          type: string
+                    gymId:
+                      type: integer
+                    gym:
+                      $ref: '#/components/schemas/GymRef'
+                    checkInTime:
+                      type: string
+                      format: date-time
+                    checkOutTime:
+                      type: string
+                      format: date-time
+                      nullable: true
+                    isManual:
+                      type: boolean
+                    coachId:
+                      type: integer
+                      nullable: true
+                    isMyMember:
+                      type: boolean
+                      description: "Membre suivi par le demandeur (coach)"
+                    nextSessionToday:
+                      type: object
+                      nullable: true
+                      description: "Prochaine séance du jour (non terminée) où le membre est inscrit"
+                      properties:
+                        id:
+                          type: integer
+                        startAt:
+                          type: string
+                          format: date-time
+                        endAt:
+                          type: string
+                          format: date-time
+                        coachId:
+                          type: integer
+                        title:
+                          type: string
+                          nullable: true
+        '403':
+          description: Membre, ou salle hors portée

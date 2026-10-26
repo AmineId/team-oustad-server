@@ -6,6 +6,8 @@ const {
   disconnectDatabase,
   createTestGym,
   createTestAdmin,
+  createTestOwner,
+  createTestCoach,
   createTestMember,
   authHeader,
   prisma
@@ -34,11 +36,16 @@ describe('Check-In Routes', () => {
 
   beforeEach(async () => {
     // Clean up before each test
+    await prisma.trainingSessionMember.deleteMany({});
+    await prisma.trainingSession.deleteMany({});
     await prisma.gymCheckIn.deleteMany({});
     await prisma.subscription.deleteMany({});
     await prisma.passwordResetToken.deleteMany({});
     await prisma.member.deleteMany({});
     await prisma.manager.deleteMany({});
+    await prisma.coachGym.deleteMany({});
+    await prisma.coach.deleteMany({});
+    await prisma.owner.deleteMany({});
     await prisma.user.deleteMany({});
     await prisma.subscriptionType.deleteMany({});
     
@@ -79,10 +86,10 @@ describe('Check-In Routes', () => {
   });
 
   describe('POST /check-in', () => {
-    it('should create a check-in for member', async () => {
+    it('should create a check-in for member (manager de la salle)', async () => {
       const response = await request(app)
         .post('/check-in')
-        .set('Authorization', authHeader(testMember))
+        .set('Authorization', authHeader(testAdmin))
         .send({
           memberId: testMember.id,
           subscriptionId: testSubscription.id,
@@ -98,7 +105,7 @@ describe('Check-In Routes', () => {
       // First check-in
       await request(app)
         .post('/check-in')
-        .set('Authorization', authHeader(testMember))
+        .set('Authorization', authHeader(testAdmin))
         .send({
           memberId: testMember.id,
           subscriptionId: testSubscription.id,
@@ -108,7 +115,7 @@ describe('Check-In Routes', () => {
       // Second check-in should fail
       const response = await request(app)
         .post('/check-in')
-        .set('Authorization', authHeader(testMember))
+        .set('Authorization', authHeader(testAdmin))
         .send({
           memberId: testMember.id,
           subscriptionId: testSubscription.id,
@@ -240,6 +247,118 @@ describe('Check-In Routes', () => {
         .set('Authorization', authHeader(testMember));
 
       expect(response.status).toBe(403);
+    });
+  });
+  describe('Rôles V2 : portée des check-ins', () => {
+    let otherGym;
+    let otherManager;
+    let coach;
+    let checkIn;
+
+    beforeEach(async () => {
+      otherGym = await createTestGym({ name: `Autre ${Date.now()}` });
+      otherManager = await createTestAdmin(otherGym.id);
+      coach = await createTestCoach([testGym.id]);
+      checkIn = await prisma.gymCheckIn.create({
+        data: {
+          displayId: `CHECKIN${Date.now()}-scope`,
+          memberId: testMember.id,
+          subscriptionId: testSubscription.id,
+          gymId: testGym.id,
+          checkInTime: new Date()
+        }
+      });
+    });
+
+    it('réserve le check-in manuel et le scan au staff de la salle', async () => {
+      const body = { memberId: testMember.id, subscriptionId: testSubscription.id, gymId: testGym.id };
+      for (const user of [testMember, otherManager, coach]) {
+        const res = await request(app).post('/check-in').set('Authorization', authHeader(user)).send(body);
+        expect(res.status).toBe(403);
+      }
+      const scan = await request(app).post('/check-in/scan').set('Authorization', authHeader(otherManager))
+        .send({ qrCode: testMember.uniqueCode, gymId: testGym.id });
+      expect(scan.status).toBe(403);
+    });
+
+    it('refuse le checkout au manager d\'une autre salle', async () => {
+      const res = await request(app).post(`/check-in/${checkIn.id}/checkout`).set('Authorization', authHeader(otherManager));
+      expect(res.status).toBe(403);
+    });
+
+    it('historique et quota : le membre, le staff de sa salle et son coach seulement', async () => {
+      const other = await createTestMember(testGym.id);
+      for (const user of [other, otherManager, coach]) {
+        const res = await request(app).get(`/check-in/member/${testMember.id}`).set('Authorization', authHeader(user));
+        expect(res.status).toBe(403);
+      }
+      await prisma.member.update({ where: { userId: testMember.id }, data: { coachId: coach.id } });
+      const byCoach = await request(app).get(`/check-in/member/${testMember.id}`).set('Authorization', authHeader(coach));
+      expect(byCoach.status).toBe(200);
+
+      const quota = await request(app).get(`/check-in/subscription/${testSubscription.id}/quota`).set('Authorization', authHeader(other));
+      expect(quota.status).toBe(403);
+      const ownQuota = await request(app).get(`/check-in/subscription/${testSubscription.id}/quota`).set('Authorization', authHeader(testMember));
+      expect(ownQuota.status).toBe(200);
+    });
+
+    it('/gym/:gymId/today et /stats refusent le manager d\'une autre salle', async () => {
+      for (const path of [`/check-in/gym/${testGym.id}/today`, `/check-in/stats/gym/${testGym.id}`]) {
+        const res = await request(app).get(path).set('Authorization', authHeader(otherManager));
+        expect(res.status).toBe(403);
+      }
+    });
+
+    describe('GET /check-in/today', () => {
+      it('coach : ses salles, avec isMyMember et la prochaine séance du jour', async () => {
+        await prisma.member.update({ where: { userId: testMember.id }, data: { coachId: coach.id } });
+        const start = new Date(Date.now() + 30 * 60 * 1000);
+        const session = await prisma.trainingSession.create({
+          data: {
+            displayId: `SESSION-${Date.now()}`,
+            gymId: testGym.id,
+            coachId: coach.id,
+            startAt: start,
+            endAt: new Date(start.getTime() + 60 * 60 * 1000),
+            Members: { create: { memberId: testMember.id } }
+          }
+        });
+        const otherMember = await createTestMember(otherGym.id);
+        await prisma.gymCheckIn.create({
+          data: { displayId: `CHECKIN${Date.now()}-other`, memberId: otherMember.id, subscriptionId: testSubscription.id, gymId: otherGym.id }
+        });
+
+        const res = await request(app).get('/check-in/today').set('Authorization', authHeader(coach));
+        expect(res.status).toBe(200);
+        expect(res.body).toHaveLength(1);
+        expect(res.body[0]).toMatchObject({
+          id: checkIn.id, memberId: testMember.id, gymId: testGym.id, isMyMember: true, checkOutTime: null
+        });
+        expect(res.body[0].member.firstName).toBe(testMember.firstName);
+        expect(res.body[0].gym.id).toBe(testGym.id);
+        expect(res.body[0].nextSessionToday.id).toBe(session.id);
+
+        const outside = await request(app).get(`/check-in/today?gymId=${otherGym.id}`).set('Authorization', authHeader(coach));
+        expect(outside.status).toBe(403);
+      });
+
+      it('manager : sa salle ; owner : toutes ; membre refusé', async () => {
+        const otherMember = await createTestMember(otherGym.id);
+        await prisma.gymCheckIn.create({
+          data: { displayId: `CHECKIN${Date.now()}-o`, memberId: otherMember.id, subscriptionId: testSubscription.id, gymId: otherGym.id }
+        });
+
+        const mgr = await request(app).get('/check-in/today').set('Authorization', authHeader(testAdmin));
+        expect(mgr.body.map(c => c.gymId)).toEqual([testGym.id]);
+        expect(mgr.body[0].isMyMember).toBe(false);
+
+        const owner = await createTestOwner(testGym.id);
+        const all = await request(app).get('/check-in/today').set('Authorization', authHeader(owner));
+        expect(all.body).toHaveLength(2);
+
+        const member = await request(app).get('/check-in/today').set('Authorization', authHeader(testMember));
+        expect(member.status).toBe(403);
+      });
     });
   });
 });

@@ -20,6 +20,9 @@ const COACH_ROUTES = [
   // Séances : lecture et pointage de ses séances (portée vérifiée dans le service)
   ['GET', /^\/sessions\/\d+$/],
   ['POST', /^\/sessions\/\d+\/check-in$/],
+  // Check-ins du jour de ses salles, historique de ses membres
+  ['GET', /^\/check-in\/today$/],
+  ['GET', /^\/check-in\/member\/\d+$/],
   // Programmes : lecture, affectation à ses membres, plannings de ses membres
   ['GET', /^\/programs$/],
   ['GET', /^\/programs\/\d+$/],
