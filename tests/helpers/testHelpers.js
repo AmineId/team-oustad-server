@@ -29,6 +29,8 @@ async function cleanDatabase() {
   await prisma.subscription.deleteMany({});
   await prisma.member.deleteMany({});
   await prisma.manager.deleteMany({});
+  await prisma.coachGym.deleteMany({});
+  await prisma.coach.deleteMany({});
   await prisma.owner.deleteMany({});
   await prisma.user.deleteMany({});
   await prisma.openingHour.deleteMany({});
@@ -92,6 +94,30 @@ async function createTestOwner(gymId, data = {}) {
   });
 
   return user;
+}
+
+/**
+ * Create a test coach (Rôles V2) rattaché aux salles `gymIds`
+ */
+async function createTestCoach(gymIds, data = {}) {
+  const ids = Array.isArray(gymIds) ? gymIds : [gymIds];
+  const password = await bcrypt.hash(data.password || 'password123', 10);
+
+  return prisma.user.create({
+    data: {
+      displayId: data.displayId || `COACH${uid()}`,
+      email: data.email || `coach${uid()}@test.com`,
+      phoneNumber: data.phoneNumber || `+337${uid().slice(0, 8)}`,
+      password,
+      uniqueCode: data.uniqueCode || `COA${uid()}`,
+      firstName: data.firstName || 'Test',
+      lastName: data.lastName || 'Coach',
+      role: 'coach',
+      gymId: ids[0],
+      Coach: { create: { CoachGym: { create: ids.map(gymId => ({ gymId })) } } }
+    },
+    include: { Coach: { include: { CoachGym: true } }, Gym: true }
+  });
 }
 
 /**
@@ -302,6 +328,7 @@ module.exports = {
   createTestOwner,
   createTestAdmin,
   createTestManager: createTestAdmin,
+  createTestCoach,
   createTestMember,
   createTestSubscriptionType,
   createTestSubscription,

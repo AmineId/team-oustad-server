@@ -45,7 +45,7 @@ This is an Express.js REST API for gym management with Prisma ORM (PostgreSQL). 
 
 ### User roles
 
-Users have a `role` field (`owner`, `admin`, `member`) plus a matching detail table (`Owner`, `Admin`, `Member`). Role-specific capabilities live in those detail tables. The `Member` table holds fitness profile data; `Owner`/`Admin` hold permission flags.
+Users have a `role` field (`owner`, `manager`, `coach`, `member`) plus a matching detail table (`Owner`, `Manager`, `Coach`, `Member`). `admin` is the legacy name of `manager`: accepted as input (`utils/roles.js` `normalizeRole`, old JWTs) but never returned. A coach belongs to one or more gyms through `CoachGym` (`User.gymId` is only their primary gym); `Member.coachId` is the member's main coach. Coaches are denied by default: `middleware/coachGuard.js` lists the routes they may call — add a route there when opening it to coaches, and scope it in the handler.
 
 ### ID conventions
 
@@ -91,6 +91,7 @@ Minimum required vars: `DATABASE_URL`, `JWT_SECRET`, `PORT`.
 | Role | Email | Password |
 |------|-------|----------|
 | Owner | `owner@team-oustad.com` | `owner123` |
-| Admin | `admin@team-oustad.com` | `admin123` |
+| Manager (ex-admin) | `admin@team-oustad.com` | `admin123` |
+| Coach (Gym 1 + Gym 2) | `coach@team-oustad.com` | `coach123` |
 | Member (pending sub) | `olivia@example.com` | `member123` |
 | Member (active sub) | `bob@example.com` | `member123` |

@@ -6,6 +6,25 @@ datasource db {
   provider = "postgresql"
 }
 
+/// Rôles V2 : coach créé par l'owner, rattaché à une ou plusieurs salles
+/// (CoachGym). `User.gymId` = sa salle principale ; la source de vérité est CoachGym.
+model Coach {
+  userId    Int        @id
+  User      User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  CoachGym  CoachGym[]
+}
+
+model CoachGym {
+  coachId   Int
+  gymId     Int
+  createdAt DateTime @default(now())
+  Coach     Coach    @relation(fields: [coachId], references: [userId], onDelete: Cascade)
+  Gym       Gym      @relation(fields: [gymId], references: [id], onDelete: Cascade)
+
+  @@id([coachId, gymId])
+  @@index([gymId])
+}
+
 /// Ancien rôle `admin` (renommé en Rôles V2). Gère une seule salle (`User.gymId`).
 model Manager {
   userId Int  @id
@@ -49,6 +68,7 @@ model Gym {
   StoreProduct StoreProduct[]
   GymPhoto     GymPhoto[]
   ShowcasePage ShowcasePage?
+  CoachGym     CoachGym[]
 
   @@index([name])
   @@index([isPublished])
@@ -90,7 +110,10 @@ model Member {
   onboarding                  Boolean             @default(true)
   preferredTrainingDays       Int[]               @default([])
   workoutNotificationsEnabled Boolean             @default(true)
-  User                        User                @relation(fields: [userId], references: [id])
+  /// Coach principal du membre (Rôles V2), rattaché à la salle du membre
+  coachId                     Int?
+  User                        User                @relation("MemberProfile", fields: [userId], references: [id])
+  Coach                       User?               @relation("MemberCoach", fields: [coachId], references: [id], onDelete: SetNull)
   MemberGoal                  MemberGoal[]
   MemberMeasurement           MemberMeasurement[]
   Payment                     Payment[]
@@ -98,6 +121,8 @@ model Member {
   Subscription                Subscription[]
   GymCheckIn                  GymCheckIn[]
   StoreReservation            StoreReservation[]
+
+  @@index([coachId])
 }
 
 model MemberGoal {
@@ -323,7 +348,9 @@ model User {
   /// déconnecte pas le téléphone du manager, et inversement)
   kioskSessionId       String?
   Manager              Manager?
-  Member               Member?
+  Coach                Coach?
+  Member               Member?              @relation("MemberProfile")
+  CoachedMembers       Member[]             @relation("MemberCoach")
   Owner                Owner?
   PasswordResetToken   PasswordResetToken[]
   Planning             Planning[]

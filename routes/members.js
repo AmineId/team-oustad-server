@@ -5,6 +5,7 @@ const { apiLimiter } = require('../middleware/rateLimiter');
 
 const router = express.Router();
 const auth = require('../middleware/auth');
+const coachService = require('../services/coachService');
 const { generateUserIdByRole } = require('../utils/idGenerator');
 const { getFullName } = require('../utils/nameUtils');
 
@@ -854,6 +855,37 @@ router.get('/:id/measurements', auth, canAccessMemberProfile, async (req, res) =
   } catch (e) {
     logger.error('💥 Erreur récupération mesures:', e);
     handleError(res, e, 500);
+  }
+});
+
+// Rôles V2 : affecter (ou retirer avec null) le coach principal d'un membre.
+// Owner : tout membre ; manager : membres de sa salle. :id = userId du membre.
+router.patch('/:id/coach', auth, apiLimiter, async (req, res) => {
+  try {
+    const memberId = Number(req.params.id);
+    const { coachId } = req.body;
+    if (coachId === undefined || (coachId !== null && !Number.isInteger(coachId))) {
+      return res.status(400).json({ error: 'coachId (entier ou null) requis' });
+    }
+
+    const requester = await prisma.user.findUnique({ where: { id: req.user.sub } });
+    if (!requester || !['owner', 'manager'].includes(requester.role)) {
+      return res.status(403).json({ error: 'Accès réservé aux owners et managers' });
+    }
+    if (requester.role === 'manager') {
+      const member = await prisma.user.findUnique({ where: { id: memberId }, select: { gymId: true } });
+      if (member && member.gymId !== requester.gymId) {
+        return res.status(403).json({ error: 'Un manager ne gère que les membres de sa salle' });
+      }
+    }
+
+    res.json(await coachService.assignCoach(memberId, coachId));
+  } catch (error) {
+    if (error instanceof coachService.CoachError) {
+      return res.status(error.status).json({ error: error.code, message: error.message });
+    }
+    logger.error('💥 Erreur affectation coach:', error);
+    res.status(500).json({ error: 'Erreur lors de l\'affectation du coach' });
   }
 });
 

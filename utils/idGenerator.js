@@ -154,6 +154,8 @@ function generateUserIdByRole(role) {
     case 'manager':
     case 'admin':
       return generateAdminId();
+    case 'coach':
+      return `COACH-${generateRandomHex()}`;
     case 'owner':
       return generateOwnerId();
     default:

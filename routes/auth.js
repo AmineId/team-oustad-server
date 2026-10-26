@@ -9,6 +9,7 @@ const { getActiveSubscription, getSubscriptionsWithStatus } = require('../utils/
 const prisma = require('../utils/prismaClient');
 const { authLimiter } = require('../middleware/rateLimiter');
 const { CLIENTS, KIOSK_ROLES } = require('../utils/roles');
+const { getCoachGyms } = require('../utils/staffScope');
 
 const JWT_SECRET = process.env.JWT_SECRET || 'change_this_secret';
 
@@ -240,6 +241,23 @@ router.post('/login', authLimiter, async (req, res) => {
         user: responseData.user
       });
       res.json(responseData);
+    } else if (user.role === 'coach') {
+      // Rôles V2 : le client se base sur `gyms` (CoachGym), pas sur `gymId`
+      res.json({
+        token,
+        user: {
+          id: user.id,
+          email: user.email,
+          phoneNumber: user.phoneNumber,
+          firstName: user.firstName, lastName: user.lastName,
+          role: 'coach',
+          gymId: user.gymId,
+          gym: user.Gym,
+          gyms: await getCoachGyms(user.id),
+          type: 'coach',
+          client
+        }
+      });
     } else {
       console.log(`❓ Rôle inconnu: ${user.role} pour ${user.firstName} ${user.lastName}`);
       return res.status(400).json({ error: 'Invalid user role' });
@@ -566,7 +584,8 @@ router.get('/me', auth, async (req, res) => {
           },
           _count: {
             select: {
-              User: true
+              User: true,
+              CoachGym: true
             }
           }
         }
@@ -586,6 +605,7 @@ router.get('/me', auth, async (req, res) => {
           totalUsers: gym._count.User,
           members: gym.User.filter(u => u.role === 'member').length,
           managers: gym.User.filter(u => u.role === 'manager').length,
+          coaches: gym._count.CoachGym,
           // Ancien nom, conservé pendant la transition Rôles V2
           admins: gym.User.filter(u => u.role === 'manager').length,
           owners: gym.User.filter(u => u.role === 'owner').length
@@ -655,6 +675,28 @@ router.get('/me', auth, async (req, res) => {
         Subscription: `${responseData.Subscription?.length || 0} abonnements`
       });
       res.json(responseData);
+    } else if (user.role === 'coach') {
+      res.json({
+        id: user.id,
+        email: user.email,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        uniqueCode: user.uniqueCode,
+        phoneNumber: user.phoneNumber,
+        address: user.address,
+        profileImage: user.profileImage,
+        displayId: user.displayId,
+        createdAt: user.createdAt,
+        updatedAt: user.updatedAt,
+        lastLoginAt: user.lastLoginAt,
+        notificationsEnabled: user.notificationsEnabled,
+        fcmToken: user.fcmToken,
+        role: user.role,
+        gymId: user.gymId,
+        gym: user.Gym,
+        gyms: await getCoachGyms(user.id),
+        type: 'coach'
+      });
     } else {
       console.log(`❓ Rôle inconnu: ${user.role} pour ${user.firstName} ${user.lastName}`);
       return res.status(400).json({ error: 'Invalid user role' });
