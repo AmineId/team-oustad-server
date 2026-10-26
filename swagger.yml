@@ -3904,7 +3904,7 @@ paths:
   /gyms/{id}/opening-hours:
     post:
       summary: Set opening hours for gym
-      description: Create or update opening hours for each day of the week. Owner uniquement (Rôles V2 : 403 pour le manager).
+      description: "Create or update opening hours for each day of the week. Owner uniquement (Rôles V2 : 403 pour le manager)."
       tags: [Gyms, Opening Hours]
       security:
         - bearerAuth: []
@@ -3994,7 +3994,7 @@ paths:
   /gyms/{id}/image:
     put:
       summary: Upload gym image
-      description: Upload or update a gym's image (base64). Owner uniquement (Rôles V2 : 403 pour le manager).
+      description: "Upload or update a gym's image (base64). Owner uniquement (Rôles V2 : 403 pour le manager)."
       tags: [Gyms, Images]
       security:
         - bearerAuth: []
@@ -4080,7 +4080,7 @@ paths:
           description: Server error
     delete:
       summary: Delete gym image
-      description: Delete a gym's image. Owner uniquement (Rôles V2 : 403 pour le manager).
+      description: "Delete a gym's image. Owner uniquement (Rôles V2 : 403 pour le manager)."
       tags: [Gyms, Images]
       security:
         - bearerAuth: []
@@ -7833,7 +7833,7 @@ paths:
   /store/reservations:
     get:
       summary: Toutes les réservations
-      description: Liste les réservations : manager = sa salle ; owner = toutes, ou `?gymId=`
+      description: "Liste les réservations : manager = sa salle ; owner = toutes, ou `?gymId=`"
       tags:
         - Store
       security:
@@ -8023,7 +8023,7 @@ paths:
   /store/stats:
     get:
       summary: Statistiques du store
-      description: Statistiques du store : manager = sa salle ; owner = `?gymId=` ou sa salle
+      description: "Statistiques du store : manager = sa salle ; owner = `?gymId=` ou sa salle"
       tags:
         - Store
       security:
@@ -8519,7 +8519,7 @@ paths:
           type: integer
     get:
       summary: Contenu CMS de la fiche vitrine d'une salle
-      description: Owner avec canManageGyms uniquement (Rôles V2 : 403 pour le manager).
+      description: "Owner avec canManageGyms uniquement (Rôles V2 : 403 pour le manager)."
       tags: [Showcase]
       security:
         - bearerAuth: []
@@ -8536,7 +8536,7 @@ paths:
           description: Salle introuvable
     put:
       summary: Remplacer la fiche vitrine d'une salle
-      description: Owner avec canManageGyms uniquement (Rôles V2 : 403 pour le manager). `hero` refusé.
+      description: "Owner avec canManageGyms uniquement (Rôles V2 : 403 pour le manager). `hero` refusé."
       tags: [Showcase]
       security:
         - bearerAuth: []
