@@ -31,6 +31,8 @@ const sanitizeEmail = (email) => {
   return email.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F]/g, '').trim().toLowerCase();
 };
 
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
 // Middleware pour vérifier que c'est un owner
 const requireOwner = async (req, res, next) => {
   console.log(`👑 Vérification rôle Owner - User: ${req.user?.email} (${req.user?.type})`);
@@ -863,7 +865,7 @@ router.get('/:id/qr', auth, async (req, res) => {
 router.put('/:id', auth, async (req, res) => {
   try {
     const id = Number(req.params.id);
-    const { email, firstName, lastName, password, permissions, phoneNumber, gymId } = req.body;
+    const { email, firstName, lastName, password, permissions, phoneNumber, gymId, address } = req.body;
 
     const requester = await prisma.user.findUnique({ where: { id: req.user.sub } });
     if (!requester) return res.status(403).json({ error: 'Forbidden' });
@@ -904,7 +906,21 @@ router.put('/:id', auth, async (req, res) => {
     }
 
     const updateData = {};
-    if (email) updateData.email = email;
+    if (email !== undefined) {
+      const cleanEmail = sanitizeEmail(email);
+      if (typeof cleanEmail !== 'string' || !EMAIL_PATTERN.test(cleanEmail)) {
+        return res.status(400).json({ error: 'invalid_email', message: 'Adresse email invalide' });
+      }
+      const taken = await prisma.user.findFirst({ where: { email: cleanEmail, id: { not: id } }, select: { id: true } });
+      if (taken) return res.status(400).json({ error: 'email_taken', message: 'Cet email est déjà utilisé' });
+      updateData.email = cleanEmail;
+    }
+    if (address !== undefined) {
+      if (address !== null && typeof address !== 'string') {
+        return res.status(400).json({ error: 'invalid_address', message: 'address doit être une chaîne' });
+      }
+      updateData.address = address?.trim() || null;
+    }
     if (firstName) updateData.firstName = firstName;
     if (lastName) updateData.lastName = lastName;
     if (password) updateData.password = await bcrypt.hash(password, 10);

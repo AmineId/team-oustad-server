@@ -116,6 +116,41 @@ describe('Users Routes', () => {
     });
   });
 
+  describe('PUT /users/:id : email et adresse', () => {
+    it('normalise l\'email, refuse un format invalide ou un email déjà pris', async () => {
+      const ok = await request(app).put(`/users/${testMember.id}`).set('Authorization', authHeader(testMember))
+        .send({ email: '  Nouveau.Mail@Example.com ' });
+      expect(ok.status).toBe(200);
+      expect(ok.body.email).toBe('nouveau.mail@example.com');
+
+      const invalid = await request(app).put(`/users/${testMember.id}`).set('Authorization', authHeader(testMember))
+        .send({ email: 'pas-un-email' });
+      expect([invalid.status, invalid.body.error]).toEqual([400, 'invalid_email']);
+
+      const taken = await request(app).put(`/users/${testMember.id}`).set('Authorization', authHeader(testMember))
+        .send({ email: testAdmin.email.toUpperCase() });
+      expect([taken.status, taken.body.error]).toEqual([400, 'email_taken']);
+
+      const same = await request(app).put(`/users/${testMember.id}`).set('Authorization', authHeader(testMember))
+        .send({ email: 'nouveau.mail@example.com' });
+      expect(same.status).toBe(200);
+    });
+
+    it('enregistre et efface l\'adresse', async () => {
+      const set = await request(app).put(`/users/${testMember.id}`).set('Authorization', authHeader(testMember))
+        .send({ address: ' 12 rue des Lilas, Casablanca ' });
+      expect(set.body.address).toBe('12 rue des Lilas, Casablanca');
+
+      const cleared = await request(app).put(`/users/${testMember.id}`).set('Authorization', authHeader(testMember))
+        .send({ address: '' });
+      expect(cleared.body.address).toBeNull();
+
+      const invalid = await request(app).put(`/users/${testMember.id}`).set('Authorization', authHeader(testMember))
+        .send({ address: 42 });
+      expect(invalid.body.error).toBe('invalid_address');
+    });
+  });
+
   describe('PUT /users/:id : téléphone et salle', () => {
     it('enregistre le téléphone et refuse un numéro déjà pris', async () => {
       const ok = await request(app).put(`/users/${testAdmin.id}`).set('Authorization', authHeader(testAdmin))

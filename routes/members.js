@@ -142,7 +142,7 @@ router.put('/:id/profile', auth, canAccessMemberProfile, apiLimiter, async (req,
 
   try {
     const memberId = Number(req.params.id);
-    const { birthDate, phone, profession, fitnessLevel, profileImage, preferredTrainingDays, workoutNotificationsEnabled, onboarding } = req.body;
+    const { birthDate, phone, profession, fitnessLevel, profileImage, preferredTrainingDays, workoutNotificationsEnabled, onboarding, height, cgAccepted } = req.body;
 
     const updateData = {};
     
@@ -160,7 +160,18 @@ router.put('/:id/profile', auth, canAccessMemberProfile, apiLimiter, async (req,
     }
     if (fitnessLevel !== undefined) memberUpdateData.fitnessLevel = fitnessLevel;
     if (onboarding !== undefined) memberUpdateData.onboarding = onboarding;
-    if (onboarding !== undefined) memberUpdateData.onboarding = onboarding;
+    if (height !== undefined) {
+      const cm = height === null || height === '' ? null : Number(height);
+      if (cm !== null && !(Number.isFinite(cm) && cm >= 50 && cm <= 260)) {
+        return res.status(400).json({ error: 'invalid_height', message: 'height doit être une taille en cm entre 50 et 260' });
+      }
+      memberUpdateData.height = cm;
+    }
+    // Règlement : on garde la date de la première acceptation
+    if (cgAccepted === true) {
+      const current = await prisma.member.findUnique({ where: { userId: memberId }, select: { cgAcceptedAt: true } });
+      if (current && !current.cgAcceptedAt) memberUpdateData.cgAcceptedAt = new Date();
+    }
     if (preferredTrainingDays !== undefined) {
       // Valider que c'est un tableau de nombres entre 0 et 6
       if (Array.isArray(preferredTrainingDays) && preferredTrainingDays.every(day => typeof day === 'number' && day >= 0 && day <= 6)) {
@@ -241,6 +252,8 @@ router.put('/:id/profile', auth, canAccessMemberProfile, apiLimiter, async (req,
         preferredTrainingDays: updatedMember.preferredTrainingDays,
         workoutNotificationsEnabled: updatedMember.workoutNotificationsEnabled,
         onboarding: updatedMember.onboarding,
+        height: updatedMember.height,
+        cgAcceptedAt: updatedMember.cgAcceptedAt,
         joinedAt: updatedMember.joinedAt
       }
     });

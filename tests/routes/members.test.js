@@ -76,6 +76,24 @@ describe('Members Routes', () => {
       expect(response.body.member.fitnessLevel).toBe(profileData.fitnessLevel);
     });
 
+    it('enregistre la taille et la date de première acceptation du règlement', async () => {
+      const put = (body) => request(app).put(`/members/${testMember.id}/profile`).set('Authorization', authHeader(testMember)).send(body);
+
+      const first = await put({ height: 178, cgAccepted: true, onboarding: false });
+      expect(first.status).toBe(200);
+      expect(first.body.member).toMatchObject({ height: 178, onboarding: false });
+      const acceptedAt = first.body.member.cgAcceptedAt;
+      expect(acceptedAt).toBeTruthy();
+
+      const again = await put({ cgAccepted: true, height: '180.5' });
+      expect(again.body.member.cgAcceptedAt).toBe(acceptedAt);
+      expect(again.body.member.height).toBe(180.5);
+
+      expect((await put({ height: null })).body.member.height).toBeNull();
+      expect((await put({ height: 20 })).body.error).toBe('invalid_height');
+      expect((await put({ height: 'grand' })).body.error).toBe('invalid_height');
+    });
+
     it('should allow admin to update member profile', async () => {
       const response = await request(app)
         .put(`/members/${testMember.id}/profile`)

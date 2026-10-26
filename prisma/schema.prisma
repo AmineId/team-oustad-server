@@ -112,6 +112,10 @@ model Member {
   profession                  String?
   fitnessLevel                String?
   onboarding                  Boolean                 @default(true)
+  /// Taille en cm (saisie à l'onboarding)
+  height                      Float?
+  /// Première acceptation du règlement (cgAccepted: true à l'onboarding)
+  cgAcceptedAt                DateTime?
   preferredTrainingDays       Int[]                   @default([])
   workoutNotificationsEnabled Boolean                 @default(true)
   /// Coach principal du membre (Rôles V2), rattaché à la salle du membre
