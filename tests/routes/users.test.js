@@ -37,6 +37,7 @@ describe('Users Routes', () => {
     await prisma.passwordResetToken.deleteMany({});
     await prisma.member.deleteMany({});
     await prisma.manager.deleteMany({});
+    await prisma.owner.deleteMany({});
     await prisma.user.deleteMany({});
     
     // Create fresh test users
@@ -87,6 +88,75 @@ describe('Users Routes', () => {
         .set('Authorization', authHeader(testAdmin));
 
       expect(response.status).toBe(404);
+    });
+  });
+
+  describe('réponses sans données sensibles', () => {
+    it('GET /users/me ne renvoie ni mot de passe, ni sessions, ni photo brute', async () => {
+      await prisma.user.update({
+        where: { id: testMember.id },
+        data: { profileImage: Buffer.from([0xff, 0xd8, 0xff, 0xe0]), currentSessionId: 'sess-1' }
+      });
+      const response = await request(app).get('/users/me').set('Authorization', authHeader(testMember));
+
+      expect(response.status).toBe(200);
+      expect(response.body).not.toHaveProperty('password');
+      expect(response.body).not.toHaveProperty('profileImage');
+      expect(response.body).not.toHaveProperty('currentSessionId');
+      expect(response.body.hasProfileImage).toBe(true);
+    });
+
+    it('GET /users et PUT /users/:id exposent hasProfileImage', async () => {
+      const list = await request(app).get('/users').set('Authorization', authHeader(testAdmin));
+      expect(list.body.every(u => !('password' in u) && !('profileImage' in u) && u.hasProfileImage === false)).toBe(true);
+
+      const updated = await request(app).put(`/users/${testMember.id}`).set('Authorization', authHeader(testMember)).send({ firstName: 'Zoé' });
+      expect(updated.body).toMatchObject({ firstName: 'Zoé', hasProfileImage: false });
+      expect(updated.body).not.toHaveProperty('profileImage');
+    });
+  });
+
+  describe('PUT /users/:id : téléphone et salle', () => {
+    it('enregistre le téléphone et refuse un numéro déjà pris', async () => {
+      const ok = await request(app).put(`/users/${testAdmin.id}`).set('Authorization', authHeader(testAdmin))
+        .send({ phoneNumber: ' +212600000001 ' });
+      expect(ok.status).toBe(200);
+      expect(ok.body.phoneNumber).toBe('+212600000001');
+
+      const taken = await request(app).put(`/users/${testMember.id}`).set('Authorization', authHeader(testMember))
+        .send({ phoneNumber: '+212600000001' });
+      expect([taken.status, taken.body.error]).toEqual([400, 'phone_taken']);
+
+      const empty = await request(app).put(`/users/${testMember.id}`).set('Authorization', authHeader(testMember))
+        .send({ phoneNumber: '' });
+      expect(empty.body.error).toBe('invalid_phone');
+    });
+
+    it('l\'owner (canManageAdmins) change la salle d\'un manager ; personne d\'autre', async () => {
+      const otherGym = await createTestGym({ name: 'Salle 2' });
+      const owner = await createTestOwner(testGym.id);
+
+      const moved = await request(app).put(`/users/${testAdmin.id}`).set('Authorization', authHeader(owner))
+        .send({ gymId: otherGym.id });
+      expect(moved.status).toBe(200);
+      expect(moved.body.gymId).toBe(otherGym.id);
+
+      const unknown = await request(app).put(`/users/${testAdmin.id}`).set('Authorization', authHeader(owner))
+        .send({ gymId: 999999 });
+      expect(unknown.body.error).toBe('gym_not_found');
+
+      const self = await request(app).put(`/users/${testAdmin.id}`).set('Authorization', authHeader(testAdmin))
+        .send({ gymId: testGym.id });
+      expect([self.status, self.body.error]).toEqual([403, 'gym_change_forbidden']);
+
+      const member = await request(app).put(`/users/${testMember.id}`).set('Authorization', authHeader(owner))
+        .send({ gymId: otherGym.id });
+      expect(member.body.error).toBe('gym_change_forbidden');
+
+      await prisma.owner.update({ where: { userId: owner.id }, data: { canManageAdmins: false } });
+      const noPerm = await request(app).put(`/users/${testAdmin.id}`).set('Authorization', authHeader(owner))
+        .send({ gymId: testGym.id });
+      expect(noPerm.status).toBe(403);
     });
   });
 

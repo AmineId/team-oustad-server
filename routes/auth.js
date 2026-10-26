@@ -10,6 +10,7 @@ const prisma = require('../utils/prismaClient');
 const { authLimiter } = require('../middleware/rateLimiter');
 const { CLIENTS, KIOSK_ROLES } = require('../utils/roles');
 const { getCoachGyms } = require('../utils/staffScope');
+const checkInService = require('../services/checkInService');
 
 const JWT_SECRET = process.env.JWT_SECRET || 'change_this_secret';
 
@@ -269,6 +270,22 @@ router.post('/login', authLimiter, async (req, res) => {
 });
 
 /**
+ * Identifiant lu dans un QR membre : JSON `{ displayId, ... }` (QR de l'app),
+ * objet déjà parsé, ou code brut (displayId ou ancien uniqueCode).
+ */
+function parseMemberQr(raw) {
+  if (raw && typeof raw === 'object') return typeof raw.displayId === 'string' ? raw.displayId.trim() : null;
+  if (typeof raw !== 'string' || !raw.trim()) return null;
+  try {
+    const parsed = JSON.parse(raw);
+    if (parsed && typeof parsed === 'object') return typeof parsed.displayId === 'string' ? parsed.displayId.trim() : null;
+  } catch (e) {
+    // Code brut
+  }
+  return raw.trim();
+}
+
+/**
  * @swagger
  * /auth/scan-qr:
  *   post:
@@ -342,7 +359,8 @@ router.post('/login', authLimiter, async (req, res) => {
  */
 // Protected: scan QR code for access
 router.post('/scan-qr', auth, async (req, res) => {
-  const { qrCode } = req.body;
+  // Le kiosk envoie `qrData` (contenu brut du QR) ; `qrCode` reste accepté
+  const qrCode = parseMemberQr(req.body.qrCode ?? req.body.qrData);
   console.log(`📱 Scan QR - User ID: ${req.user?.sub}, Email: ${req.user?.email}, QR Code: ${qrCode}`);
 
   try {
@@ -353,7 +371,7 @@ router.post('/scan-qr', auth, async (req, res) => {
     }
 
     // Sans qrCode, Prisma ignore le filtre et findFirst renverrait n'importe quel utilisateur
-    if (typeof qrCode !== 'string' || !qrCode.trim()) {
+    if (!qrCode) {
       console.log(`❌ QR code manquant ou invalide`);
       return res.status(400).json({ error: 'qrCode is required' });
     }
@@ -371,9 +389,9 @@ router.post('/scan-qr', auth, async (req, res) => {
 
     console.log(`✅ Admin trouvé: ${adminUser.firstName} ${adminUser.lastName} (Gym: ${adminUser.gymId})`);
 
-    // Trouver l'utilisateur par son uniqueCode
+    // displayId (QR de l'app), ou uniqueCode pour les anciens QR
     const member = await prisma.user.findFirst({
-      where: { uniqueCode: qrCode },
+      where: { OR: [{ displayId: qrCode }, { uniqueCode: qrCode }] },
       include: {
         Member: {
           include: {
@@ -445,6 +463,8 @@ router.post('/scan-qr', auth, async (req, res) => {
             daysUntilDue: activeSubscription.activeCheck.details?.daysUntilDue
           } : null
         },
+        // Quota de séances : le kiosk n'autorise l'entrée que si quota.canCheckIn
+        quota: await checkInService.getSubscriptionQuota(activeSubscription.id),
         message: 'Access granted'
       };
 
@@ -558,7 +578,7 @@ router.get('/me', auth, async (req, res) => {
         uniqueCode: user.uniqueCode,
         phoneNumber: user.phoneNumber,
         address: user.address,
-        profileImage: user.profileImage,
+        hasProfileImage: user.profileImage != null,
         displayId: user.displayId,
         createdAt: user.createdAt,
         updatedAt: user.updatedAt,
@@ -620,7 +640,7 @@ router.get('/me', auth, async (req, res) => {
         uniqueCode: user.uniqueCode,
         phoneNumber: user.phoneNumber,
         address: user.address,
-        profileImage: user.profileImage,
+        hasProfileImage: user.profileImage != null,
         displayId: user.displayId,
         createdAt: user.createdAt,
         updatedAt: user.updatedAt,
@@ -652,7 +672,7 @@ router.get('/me', auth, async (req, res) => {
         uniqueCode: user.uniqueCode,
         phoneNumber: user.phoneNumber,
         address: user.address,
-        profileImage: user.profileImage,
+        hasProfileImage: user.profileImage != null,
         displayId: user.displayId,
         createdAt: user.createdAt,
         updatedAt: user.updatedAt,
@@ -684,7 +704,7 @@ router.get('/me', auth, async (req, res) => {
         uniqueCode: user.uniqueCode,
         phoneNumber: user.phoneNumber,
         address: user.address,
-        profileImage: user.profileImage,
+        hasProfileImage: user.profileImage != null,
         displayId: user.displayId,
         createdAt: user.createdAt,
         updatedAt: user.updatedAt,

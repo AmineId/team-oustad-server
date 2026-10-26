@@ -100,6 +100,9 @@ components:
           example: 1
         gym:
           $ref: '#/components/schemas/Gym'
+        hasProfileImage:
+          type: boolean
+          description: "Présence d'une photo de profil (GET /users/{id}/profile-image). Le binaire n'est jamais inclus dans le JSON."
       required:
         - id
         - firstName
@@ -2276,7 +2279,7 @@ paths:
   /auth/scan-qr:
     post:
       summary: Scan and validate QR code
-      description: Scan a QR code and validate gym access based on user role and active subscription
+      description: "Valide l'accès d'un membre (manager : sa salle ; owner : toutes). `qrData` = contenu brut du QR (JSON avec displayId, ou code brut) ; `qrCode` accepté en alias. Ne pointe pas : le kiosk n'autorise l'entrée que si `quota.canCheckIn`, puis appelle POST /check-in/scan."
       tags: [Authentication]
       security:
         - bearerAuth: []
@@ -3002,21 +3005,23 @@ paths:
                       type: boolean
                     maxGymsAllowed:
                       type: integer
+                phoneNumber:
+                  type: string
+                  description: "Chaîne non vide (espaces retirés) ; 400 invalid_phone ou phone_taken"
+                gymId:
+                  type: integer
+                  description: "Salle d'un manager : owner avec canManageAdmins uniquement (403 gym_change_forbidden, 400 gym_not_found). Coach : PATCH /users/{id}/gyms"
       responses:
         '200':
-          description: User updated successfully
+          description: "Utilisateur mis à jour (objet brut, sans password ni profileImage : voir hasProfileImage)"
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  message:
-                    type: string
-                    example: "Utilisateur mis à jour avec succès"
-                  user:
-                    $ref: '#/components/schemas/User'
+                $ref: '#/components/schemas/User'
+        '400':
+          description: invalid_phone, phone_taken, gym_not_found
         '403':
-          description: Insufficient permissions
+          description: "Insufficient permissions, ou gym_change_forbidden"
           content:
             application/json:
               schema:
