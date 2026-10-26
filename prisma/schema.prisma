@@ -337,7 +337,8 @@ model TrainingSession {
   endAt          DateTime
   capacity       Int                     @default(1)
   title          String?
-  type           String?
+  /// discovery, training, group_class, assessment, private
+  type           String                  @default("training")
   notes          String?
   /// Série hebdomadaire (même valeur pour toutes les occurrences)
   seriesId       String?
@@ -352,6 +353,7 @@ model TrainingSession {
   Members        TrainingSessionMember[]
 
   @@index([gymId, startAt])
+  @@index([gymId, type, startAt])
   @@index([coachId, startAt])
   @@index([seriesId])
   @@index([status, startAt])

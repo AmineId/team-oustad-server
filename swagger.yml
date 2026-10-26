@@ -743,7 +743,8 @@ components:
           nullable: true
         type:
           type: string
-          nullable: true
+          enum: [discovery, training, group_class, assessment, private]
+          description: "discovery = découverte, training = entraînement, group_class = cours collectif, assessment = bilan, private = coaching individuel"
         notes:
           type: string
           nullable: true
@@ -777,7 +778,7 @@ components:
       properties:
         error:
           type: string
-          description: "missing_fields, invalid_date, invalid_time_range, invalid_capacity, invalid_repeat, too_many_occurrences, invalid_scope, range_too_large, coach_not_found, coach_not_in_gym, outside_opening_hours, gym_closed, session_overlap, capacity_below_booked, session_not_found, session_not_open, member_ids_required, booking_rejected, session_full, member_not_in_session, member_id_required, no_active_subscription, quota_exhausted, subscription_expired, gym_id_required, member_not_found, forbidden"
+          description: "missing_fields, invalid_type, invalid_date, invalid_time_range, invalid_capacity, invalid_repeat, too_many_occurrences, invalid_scope, range_too_large, coach_not_found, coach_not_in_gym, outside_opening_hours, gym_closed, session_overlap, capacity_below_booked, session_not_found, session_not_open, member_ids_required, booking_rejected, session_full, member_not_in_session, member_id_required, no_active_subscription, quota_exhausted, subscription_expired, gym_id_required, member_not_found, forbidden"
         message:
           type: string
         conflicts:
@@ -9495,6 +9496,12 @@ paths:
         - bearerAuth: []
       parameters:
         - in: query
+          name: type
+          schema:
+            type: string
+            enum: [discovery, training, group_class, assessment, private]
+          description: "Filtre par type de séance (400 invalid_type si inconnu)"
+        - in: query
           name: gymId
           schema:
             type: integer
@@ -9550,7 +9557,7 @@ paths:
           application/json:
             schema:
               type: object
-              required: [gymId, coachId, startAt, endAt]
+              required: [gymId, coachId, type, startAt, endAt]
               properties:
                 gymId:
                   type: integer
@@ -9570,6 +9577,7 @@ paths:
                   type: string
                 type:
                   type: string
+                  enum: [discovery, training, group_class, assessment, private]
                 notes:
                   type: string
                 repeat:
@@ -9618,6 +9626,12 @@ paths:
       security:
         - bearerAuth: []
       parameters:
+        - in: query
+          name: type
+          schema:
+            type: string
+            enum: [discovery, training, group_class, assessment, private]
+          description: "Filtre par type de séance (400 invalid_type si inconnu)"
         - in: query
           name: gymId
           schema:
@@ -9721,6 +9735,7 @@ paths:
                   type: string
                 type:
                   type: string
+                  enum: [discovery, training, group_class, assessment, private]
                 notes:
                   type: string
       responses:
@@ -9917,6 +9932,12 @@ paths:
       security:
         - bearerAuth: []
       parameters:
+        - in: query
+          name: type
+          schema:
+            type: string
+            enum: [discovery, training, group_class, assessment, private]
+          description: "Filtre par type de séance (400 invalid_type si inconnu)"
         - in: query
           name: status
           schema:
