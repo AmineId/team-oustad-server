@@ -9,9 +9,9 @@ datasource db {
 /// Rôles V2 : coach créé par l'owner, rattaché à une ou plusieurs salles
 /// (CoachGym). `User.gymId` = sa salle principale ; la source de vérité est CoachGym.
 model Coach {
-  userId    Int        @id
-  User      User       @relation(fields: [userId], references: [id], onDelete: Cascade)
-  CoachGym  CoachGym[]
+  userId   Int        @id
+  User     User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  CoachGym CoachGym[]
 }
 
 model CoachGym {
@@ -41,7 +41,7 @@ model Exercise {
   difficulty       String
   instructions     String?
   createdAt        DateTime           @default(now())
-  updatedAt            DateTime @updatedAt
+  updatedAt        DateTime           @updatedAt
   displayId        String             @unique
   PlanningExercise PlanningExercise[]
   ProgramExercise  ProgramExercise[]
@@ -51,27 +51,28 @@ model Exercise {
 }
 
 model Gym {
-  id           Int            @id @default(autoincrement())
-  name         String
-  address      String
-  createdAt    DateTime       @default(now())
-  phone        String?
-  updatedAt    DateTime       @updatedAt
-  image        Bytes?
-  displayId    String         @unique
-  isPublished  Boolean        @default(false)
-  slug         String?        @unique
-  description  String?        @db.Text
-  OpeningHour  OpeningHour[]
-  User         User[]
-  Banner       Banner[]
-  GymCheckIn   GymCheckIn[]
-  StoreProduct StoreProduct[]
-  GymPhoto     GymPhoto[]
-  ShowcasePage ShowcasePage?
-  CoachGym     CoachGym[]
+  id              Int               @id @default(autoincrement())
+  name            String
+  address         String
+  createdAt       DateTime          @default(now())
+  phone           String?
+  updatedAt       DateTime          @updatedAt
+  image           Bytes?
+  displayId       String            @unique
+  isPublished     Boolean           @default(false)
+  slug            String?           @unique
+  description     String?           @db.Text
+  OpeningHour     OpeningHour[]
+  User            User[]
+  Banner          Banner[]
+  GymCheckIn      GymCheckIn[]
+  StoreProduct    StoreProduct[]
+  GymPhoto        GymPhoto[]
+  ShowcasePage    ShowcasePage?
+  CoachGym        CoachGym[]
   TrainingSession TrainingSession[]
   Incident        Incident[]
+  AuditLogs       AuditLog[]
 
   @@index([name])
   @@index([isPublished])
@@ -104,19 +105,19 @@ model ShowcasePage {
 }
 
 model Member {
-  joinedAt                    DateTime            @default(now())
-  userId                      Int                 @id
+  joinedAt                    DateTime                @default(now())
+  userId                      Int                     @id
   birthDate                   DateTime?
   phone                       String?
   profession                  String?
   fitnessLevel                String?
-  onboarding                  Boolean             @default(true)
-  preferredTrainingDays       Int[]               @default([])
-  workoutNotificationsEnabled Boolean             @default(true)
+  onboarding                  Boolean                 @default(true)
+  preferredTrainingDays       Int[]                   @default([])
+  workoutNotificationsEnabled Boolean                 @default(true)
   /// Coach principal du membre (Rôles V2), rattaché à la salle du membre
   coachId                     Int?
-  User                        User                @relation("MemberProfile", fields: [userId], references: [id])
-  Coach                       User?               @relation("MemberCoach", fields: [coachId], references: [id], onDelete: SetNull)
+  User                        User                    @relation("MemberProfile", fields: [userId], references: [id])
+  Coach                       User?                   @relation("MemberCoach", fields: [coachId], references: [id], onDelete: SetNull)
   MemberGoal                  MemberGoal[]
   MemberMeasurement           MemberMeasurement[]
   Payment                     Payment[]
@@ -144,7 +145,7 @@ model MemberGoal {
   status       String    @default("active")
   achievedAt   DateTime?
   createdAt    DateTime  @default(now())
-  updatedAt            DateTime @updatedAt
+  updatedAt    DateTime  @updatedAt
   Member       Member    @relation(fields: [memberId], references: [userId], onDelete: Cascade)
 
   @@index([memberId])
@@ -167,7 +168,7 @@ model MemberMeasurement {
   measuredBy Int?
   measuredAt DateTime @default(now())
   createdAt  DateTime @default(now())
-  updatedAt            DateTime @updatedAt
+  updatedAt  DateTime @updatedAt
   Member     Member   @relation(fields: [memberId], references: [userId], onDelete: Cascade)
 
   @@index([memberId, measuredAt])
@@ -181,7 +182,7 @@ model OpeningHour {
   closeTime String
   isClosed  Boolean  @default(false)
   createdAt DateTime @default(now())
-  updatedAt            DateTime @updatedAt
+  updatedAt DateTime @updatedAt
   Gym       Gym      @relation(fields: [gymId], references: [id], onDelete: Cascade)
 
   @@unique([gymId, dayOfWeek])
@@ -193,7 +194,42 @@ model Owner {
   canManageGyms   Boolean @default(true)
   canViewReports  Boolean @default(true)
   maxGymsAllowed  Int     @default(5)
+  /// Seul le super-owner voit l'historique (AuditLog) et ne peut être ni
+  /// modifié ni supprimé par un autre owner. Attribué par script, pas par l'API.
+  isSuperOwner    Boolean @default(false)
   User            User    @relation(fields: [userId], references: [id])
+}
+
+/// Historique des écritures en base (qui, quoi, quand), rempli par
+/// l'extension Prisma de utils/audit.js. Lecture réservée au super-owner.
+model AuditLog {
+  id              Int      @id @default(autoincrement())
+  createdAt       DateTime @default(now())
+  /// create | update | delete
+  action          String
+  /// Nom du modèle Prisma (User, Subscription…)
+  entity          String
+  /// Clé primaire de la ligne (valeurs jointes par ":" si composite)
+  entityId        String?
+  entityDisplayId String?
+  label           String?
+  gymId           Int?
+  /// null = système (tâche planifiée, requête non authentifiée)
+  actorId         Int?
+  actorRole       String?
+  /// Nom de l'auteur figé au moment de l'action
+  actorLabel      String
+  /// "PUT /users/USR-42" ou "cron:dailyPaymentCheck"
+  source          String?
+  /// { champ: { from, to } } ; champs sensibles masqués
+  changes         Json
+  Actor           User?    @relation("AuditActor", fields: [actorId], references: [id], onDelete: SetNull)
+  Gym             Gym?     @relation(fields: [gymId], references: [id], onDelete: SetNull)
+
+  @@index([createdAt])
+  @@index([entity, entityId])
+  @@index([actorId, createdAt])
+  @@index([gymId, createdAt])
 }
 
 model PasswordResetToken {
@@ -217,7 +253,7 @@ model Payment {
   transactionId  String?       @unique
   description    String?
   createdAt      DateTime      @default(now())
-  updatedAt            DateTime @updatedAt
+  updatedAt      DateTime      @updatedAt
   subscriptionId Int?
   dueDate        DateTime      @default(now())
   monthNumber    Int?
@@ -243,7 +279,7 @@ model Planning {
   endDate     DateTime
   status      String        @default("active")
   createdAt   DateTime      @default(now())
-  updatedAt            DateTime @updatedAt
+  updatedAt   DateTime      @updatedAt
   displayId   String        @unique
   User        User          @relation(fields: [coachId], references: [id])
   Member      Member        @relation(fields: [memberId], references: [userId])
@@ -385,8 +421,8 @@ model Incident {
   source      String            @default("app") // app, kiosk
   title       String
   description String            @db.Text
-  category    String            // equipment, safety, hygiene, member, other
-  severity    String            // low, medium, high, critical
+  category    String // equipment, safety, hygiene, member, other
+  severity    String // low, medium, high, critical
   photo       Bytes?
   photoMime   String?
   status      String            @default("open") // open, in_progress, resolved, closed
@@ -470,7 +506,7 @@ model Subscription {
   paymentFrequency   Int                 @default(12)
   displayId          String              @unique
   sessionsUsed       Int                 @default(0) // Séances consommées
-  sessionQuota       Int?                // Quota copié du SubscriptionType au moment de la création
+  sessionQuota       Int? // Quota copié du SubscriptionType au moment de la création
   Payment            Payment[]
   GymCheckIn         GymCheckIn[]
   QuotaNotification  QuotaNotification[]
@@ -485,19 +521,19 @@ model Subscription {
 }
 
 model SubscriptionType {
-  id           Int            @id @default(autoincrement())
-  name         String         @unique
-  description  String?
-  monthlyPrice Float
-  features     String[]
-  isActive     Boolean        @default(true)
-  createdAt    DateTime       @default(now())
-  updatedAt            DateTime @updatedAt
-  displayId    String         @unique
-  sessionQuota Int?           // Nombre de séances (12, 18, 36, null=illimité)
-  sessionType  String         @default("unlimited") // "limited" ou "unlimited"
-  durationMonths Int          @default(1) // Durée en mois (1 mois pour quotas, 12 pour annuel)
-  Subscription Subscription[]
+  id             Int            @id @default(autoincrement())
+  name           String         @unique
+  description    String?
+  monthlyPrice   Float
+  features       String[]
+  isActive       Boolean        @default(true)
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+  displayId      String         @unique
+  sessionQuota   Int? // Nombre de séances (12, 18, 36, null=illimité)
+  sessionType    String         @default("unlimited") // "limited" ou "unlimited"
+  durationMonths Int            @default(1) // Durée en mois (1 mois pour quotas, 12 pour annuel)
+  Subscription   Subscription[]
 
   @@index([isActive])
   @@index([name])
@@ -513,7 +549,7 @@ model User {
   role                 String
   gymId                Int
   createdAt            DateTime             @default(now())
-  updatedAt            DateTime @updatedAt
+  updatedAt            DateTime             @updatedAt
   uniqueCode           String               @unique
   qrCode               Bytes?
   profileImage         Bytes?
@@ -543,6 +579,7 @@ model User {
   IncidentMessages     IncidentMessage[]
   IncidentReads        IncidentRead[]
   StoreProduct         StoreProduct[]
+  AuditLogs            AuditLog[]           @relation("AuditActor")
   Gym                  Gym                  @relation(fields: [gymId], references: [id])
 
   @@index([gymId])
@@ -552,37 +589,37 @@ model User {
 }
 
 model Banner {
-  id              Int             @id @default(autoincrement())
-  displayId       String          @unique
-  title           String
-  titleEn         String?
-  titleAr         String?
-  description     String?
-  descriptionEn   String?
-  descriptionAr   String?
-  imageUrl        String?
-  imageBase64     String?         @db.Text
-  videoUrl        String?
-  mediaType       String          @default("image") // image, video, gif
-  type            String          // seasonal, event, promotion, info, announcement
-  startDate       DateTime
-  endDate         DateTime
-  actionType      String          @default("none") // navigate, externalUrl, showDetails, none
-  actionData      String?
-  actionParams    Json?
-  priority        Int             @default(0)
-  isActive        Boolean         @default(true)
-  gymId           Int?
-  backgroundColor String?
-  textColor       String?
-  maxViewsPerUser Int?            // Limite d'affichage par utilisateur
-  isScheduled     Boolean         @default(true) // Auto-activation selon dates
-  createdAt       DateTime        @default(now())
-  updatedAt       DateTime        @updatedAt
-  Gym             Gym?            @relation(fields: [gymId], references: [id], onDelete: Cascade)
-  BannerStats     BannerStats[]
-  BannerVariant   BannerVariant[]
-  subscriptionTypes Int[]         // IDs des types d'abonnement ciblés (vide = tous)
+  id                Int             @id @default(autoincrement())
+  displayId         String          @unique
+  title             String
+  titleEn           String?
+  titleAr           String?
+  description       String?
+  descriptionEn     String?
+  descriptionAr     String?
+  imageUrl          String?
+  imageBase64       String?         @db.Text
+  videoUrl          String?
+  mediaType         String          @default("image") // image, video, gif
+  type              String // seasonal, event, promotion, info, announcement
+  startDate         DateTime
+  endDate           DateTime
+  actionType        String          @default("none") // navigate, externalUrl, showDetails, none
+  actionData        String?
+  actionParams      Json?
+  priority          Int             @default(0)
+  isActive          Boolean         @default(true)
+  gymId             Int?
+  backgroundColor   String?
+  textColor         String?
+  maxViewsPerUser   Int? // Limite d'affichage par utilisateur
+  isScheduled       Boolean         @default(true) // Auto-activation selon dates
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
+  Gym               Gym?            @relation(fields: [gymId], references: [id], onDelete: Cascade)
+  BannerStats       BannerStats[]
+  BannerVariant     BannerVariant[]
+  subscriptionTypes Int[] // IDs des types d'abonnement ciblés (vide = tous)
 
   @@index([isActive, startDate, endDate])
   @@index([gymId])
@@ -591,10 +628,10 @@ model Banner {
 }
 
 model BannerVariant {
-  id              Int      @id @default(autoincrement())
-  displayId       String   @unique
+  id              Int           @id @default(autoincrement())
+  displayId       String        @unique
   bannerId        Int
-  variantName     String   // A, B, C...
+  variantName     String // A, B, C...
   title           String
   titleEn         String?
   titleAr         String?
@@ -602,15 +639,15 @@ model BannerVariant {
   descriptionEn   String?
   descriptionAr   String?
   imageUrl        String?
-  imageBase64     String?  @db.Text
+  imageBase64     String?       @db.Text
   videoUrl        String?
   backgroundColor String?
   textColor       String?
-  isActive        Boolean  @default(true)
-  weight          Int      @default(50) // % de distribution du trafic
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
-  Banner          Banner   @relation(fields: [bannerId], references: [id], onDelete: Cascade)
+  isActive        Boolean       @default(true)
+  weight          Int           @default(50) // % de distribution du trafic
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+  Banner          Banner        @relation(fields: [bannerId], references: [id], onDelete: Cascade)
   BannerStats     BannerStats[]
 
   @@unique([bannerId, variantName])
@@ -618,18 +655,18 @@ model BannerVariant {
 }
 
 model BannerStats {
-  id              Int            @id @default(autoincrement())
-  bannerId        Int
-  variantId       Int?
-  userId          Int?           // Pour tracking par utilisateur
-  eventType       String         // view, click
-  viewedAt        DateTime?
-  clickedAt       DateTime?
-  userAgent       String?
-  ipAddress       String?
-  createdAt       DateTime       @default(now())
-  Banner          Banner         @relation(fields: [bannerId], references: [id], onDelete: Cascade)
-  BannerVariant   BannerVariant? @relation(fields: [variantId], references: [id], onDelete: Cascade)
+  id            Int            @id @default(autoincrement())
+  bannerId      Int
+  variantId     Int?
+  userId        Int? // Pour tracking par utilisateur
+  eventType     String // view, click
+  viewedAt      DateTime?
+  clickedAt     DateTime?
+  userAgent     String?
+  ipAddress     String?
+  createdAt     DateTime       @default(now())
+  Banner        Banner         @relation(fields: [bannerId], references: [id], onDelete: Cascade)
+  BannerVariant BannerVariant? @relation(fields: [variantId], references: [id], onDelete: Cascade)
 
   @@index([bannerId, eventType])
   @@index([bannerId, userId])
@@ -644,10 +681,10 @@ model GymCheckIn {
   subscriptionId Int
   gymId          Int
   checkInTime    DateTime     @default(now())
-  checkOutTime   DateTime?    // Auto checkout à minuit
-  duration       Int?         // Durée en minutes
+  checkOutTime   DateTime? // Auto checkout à minuit
+  duration       Int? // Durée en minutes
   isManual       Boolean      @default(false) // Check-in manuel par staff
-  createdBy      Int?         // ID du staff qui a fait le check-in manuel
+  createdBy      Int? // ID du staff qui a fait le check-in manuel
   notes          String?
   createdAt      DateTime     @default(now())
   updatedAt      DateTime     @updatedAt
@@ -673,24 +710,24 @@ model QuotaNotification {
 }
 
 model StoreProduct {
-  id                Int                 @id @default(autoincrement())
-  displayId         String              @unique
-  name              String
-  description       String?
-  imagesBase64      String[]            @default([])
-  price             Float
-  stock             Int                 @default(0)
-  reservedStock     Int                 @default(0) // Stock réservé (en attente de retrait)
-  availableStock    Int                 @default(0) // Stock disponible (calculé: stock - reservedStock)
-  isActive          Boolean             @default(true)
-  category          String?
-  gymId             Int
-  createdBy         Int
-  createdAt         DateTime            @default(now())
-  updatedAt         DateTime            @updatedAt
-  Gym               Gym                 @relation(fields: [gymId], references: [id], onDelete: Cascade)
-  Creator           User                @relation(fields: [createdBy], references: [id])
-  StoreReservation  StoreReservation[]
+  id               Int                @id @default(autoincrement())
+  displayId        String             @unique
+  name             String
+  description      String?
+  imagesBase64     String[]           @default([])
+  price            Float
+  stock            Int                @default(0)
+  reservedStock    Int                @default(0) // Stock réservé (en attente de retrait)
+  availableStock   Int                @default(0) // Stock disponible (calculé: stock - reservedStock)
+  isActive         Boolean            @default(true)
+  category         String?
+  gymId            Int
+  createdBy        Int
+  createdAt        DateTime           @default(now())
+  updatedAt        DateTime           @updatedAt
+  Gym              Gym                @relation(fields: [gymId], references: [id], onDelete: Cascade)
+  Creator          User               @relation(fields: [createdBy], references: [id])
+  StoreReservation StoreReservation[]
 
   @@index([gymId])
   @@index([isActive])
@@ -699,21 +736,21 @@ model StoreProduct {
 }
 
 model StoreReservation {
-  id              Int           @id @default(autoincrement())
-  displayId       String        @unique
-  productId       Int
-  memberId        Int
-  quantity        Int           @default(1)
-  totalPrice      Float
-  status          String        @default("pending") // pending, completed, cancelled
-  reservedAt      DateTime      @default(now())
-  completedAt     DateTime?     // Date de retrait
-  cancelledAt     DateTime?
-  notes           String?
-  createdAt       DateTime      @default(now())
-  updatedAt       DateTime      @updatedAt
-  Product         StoreProduct  @relation(fields: [productId], references: [id], onDelete: Cascade)
-  Member          Member        @relation(fields: [memberId], references: [userId], onDelete: Cascade)
+  id          Int          @id @default(autoincrement())
+  displayId   String       @unique
+  productId   Int
+  memberId    Int
+  quantity    Int          @default(1)
+  totalPrice  Float
+  status      String       @default("pending") // pending, completed, cancelled
+  reservedAt  DateTime     @default(now())
+  completedAt DateTime? // Date de retrait
+  cancelledAt DateTime?
+  notes       String?
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+  Product     StoreProduct @relation(fields: [productId], references: [id], onDelete: Cascade)
+  Member      Member       @relation(fields: [memberId], references: [userId], onDelete: Cascade)
 
   @@index([productId])
   @@index([memberId])

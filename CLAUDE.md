@@ -47,6 +47,12 @@ This is an Express.js REST API for gym management with Prisma ORM (PostgreSQL). 
 
 Users have a `role` field (`owner`, `manager`, `coach`, `member`) plus a matching detail table (`Owner`, `Manager`, `Coach`, `Member`). `admin` is the legacy name of `manager`: accepted as input (`utils/roles.js` `normalizeRole`, old JWTs) but never returned. A coach belongs to one or more gyms through `CoachGym` (`User.gymId` is only their primary gym); `Member.coachId` is the member's main coach. Coaches are denied by default: `middleware/coachGuard.js` lists the routes they may call — add a route there when opening it to coaches, and scope it in the handler.
 
+The super-owner is an `owner` with `Owner.isSuperOwner` (set with `npm run owner:super -- <email>`, never via the API). Only they can read `/audit-logs`, and other owners cannot update or delete them.
+
+### Audit log
+
+`utils/prismaClient.js` wraps the client with `utils/audit.js`: every create/update/upsert/delete (and `*Many`) made inside an audit context is written to `AuditLog` (who, what, when, field diff, sensitive fields masked). The context comes from `utils/auditContext.js` — set per request (`auditContextMiddleware`, `middleware/auth.js` attaches the actor) and by `runAsSystem(name, fn)` for cron jobs. Writes without a context (seed, scripts, direct test setup) are not logged. Entries are written after the operation; tests call `flushAudit()` (done by `cleanDatabase`). Raw SQL and nested writes are not captured.
+
 ### ID conventions
 
 Every model has both `id` (internal integer PK) and `displayId` (unique string, e.g. `USR-123`). API responses expose `displayId`, never the raw `id`. Lookups from routes use `displayId`; internal service calls use `id`.
@@ -90,7 +96,7 @@ Minimum required vars: `DATABASE_URL`, `JWT_SECRET`, `PORT`.
 
 | Role | Email | Password |
 |------|-------|----------|
-| Owner | `owner@team-oustad.com` | `owner123` |
+| Owner (super-owner) | `owner@team-oustad.com` | `owner123` |
 | Manager (ex-admin) | `admin@team-oustad.com` | `admin123` |
 | Coach (Gym 1 + Gym 2) | `coach@team-oustad.com` | `coach123` |
 | Member (pending sub) | `olivia@example.com` | `member123` |

@@ -899,6 +899,88 @@ components:
           items:
             $ref: '#/components/schemas/IncidentMessage'
 
+    AuditChange:
+      type: object
+      description: "Changement d'un champ. Dates en ISO 8601, champs sensibles et binaires valent \"[masqué]\". Pour un create, from = null ; pour un delete, to = null. fromLabel / toLabel : libellé figé d'une clé étrangère (coachId → nom du coach, gymId → nom de la salle…)."
+      properties:
+        from: {}
+        to: {}
+        fromLabel:
+          type: string
+        toLabel:
+          type: string
+    AuditEntry:
+      type: object
+      properties:
+        id:
+          type: integer
+          description: Curseur de pagination (before)
+        createdAt:
+          type: string
+          format: date-time
+        action:
+          type: string
+          enum: [create, update, delete]
+        entity:
+          type: string
+          description: Nom du modèle (voir GET /audit-logs/meta)
+          example: Subscription
+        entityId:
+          type: string
+          nullable: true
+          description: Clé primaire (valeurs jointes par ":" si composite) ; null pour une entrée de synthèse
+        entityDisplayId:
+          type: string
+          nullable: true
+        label:
+          type: string
+          nullable: true
+          description: Libellé lisible (nom, titre, sinon displayId) ; "N lignes" pour une synthèse
+        gym:
+          type: object
+          nullable: true
+          properties:
+            displayId:
+              type: string
+            name:
+              type: string
+        actor:
+          type: object
+          nullable: true
+          description: null = système (tâche planifiée), requête anonyme ou auteur supprimé
+          properties:
+            displayId:
+              type: string
+            firstName:
+              type: string
+            lastName:
+              type: string
+            role:
+              type: string
+        actorLabel:
+          type: string
+          description: Nom de l'auteur figé au moment de l'action, ou "Système (<tâche>)" / "Anonyme"
+        actorRole:
+          type: string
+          nullable: true
+        source:
+          type: string
+          nullable: true
+          example: PUT /users/42
+        changes:
+          type: object
+          description: "{ champ: AuditChange }. Une opération de masse (> 200 lignes) donne une seule entrée avec _count."
+          additionalProperties:
+            $ref: '#/components/schemas/AuditChange'
+    AuditError:
+      type: object
+      properties:
+        error:
+          type: string
+          description: "super_owner_required, invalid_entity, invalid_action, invalid_date, invalid_cursor, invalid_limit, invalid_id, not_found"
+        message:
+          type: string
+
     IncidentError:
       type: object
       properties:
@@ -2263,6 +2345,9 @@ paths:
                         type: boolean
                       maxGymsAllowed:
                         type: integer
+                      isSuperOwner:
+                        type: boolean
+                        description: "Seul le super-owner voit l'historique (/audit-logs). Attribué par script serveur."
         '401':
           description: Unauthorized
           content:
@@ -2935,6 +3020,9 @@ paths:
                         type: boolean
                       maxGymsAllowed:
                         type: integer
+                      isSuperOwner:
+                        type: boolean
+                        description: "Seul le super-owner voit l'historique (/audit-logs). Attribué par script serveur."
         '403':
           description: Forbidden - insufficient permissions
           content:
@@ -2956,7 +3044,7 @@ paths:
 
     put:
       summary: Update user
-      description: Update user information. Owners can update anyone, admins can update members in their gym, members can update their own profile.
+      description: "Update user information. Owners can update anyone, admins can update members in their gym, members can update their own profile. Le super-owner ne peut être modifié que par lui-même (403 `super_owner_protected`)."
       tags: [Users]
       security:
         - bearerAuth: []
@@ -3041,7 +3129,7 @@ paths:
 
     delete:
       summary: Delete user
-      description: Delete a user. Owners can delete anyone, admins can delete members in their gym, members cannot delete users.
+      description: "Delete a user. Owners can delete anyone, admins can delete members in their gym, members cannot delete users. Le super-owner ne peut pas être supprimé (403 `super_owner_protected`)."
       tags: [Users]
       security:
         - bearerAuth: []
@@ -10365,6 +10453,96 @@ paths:
         '403':
           description: Hors portée
 
+  /audit-logs:
+    get:
+      summary: Historique des modifications (super-owner)
+      description: "Qui a modifié quoi et quand, sur toute la base. Entrées de la plus récente à la plus ancienne ; page suivante avec before = id de la dernière entrée. Réservé au super-owner (403 super_owner_required)."
+      tags: [Audit]
+      security:
+        - bearerAuth: []
+      parameters:
+        - { in: query, name: entity, schema: { type: string }, description: Nom du modèle (GET /audit-logs/meta) }
+        - { in: query, name: action, schema: { type: string, enum: [create, update, delete] } }
+        - { in: query, name: actorId, schema: { type: string }, description: displayId (ou id) de l'auteur }
+        - { in: query, name: gymId, schema: { type: string }, description: displayId (ou id) de la salle }
+        - { in: query, name: entityId, schema: { type: string }, description: displayId ou id de l'objet }
+        - { in: query, name: q, schema: { type: string }, description: "Recherche dans le libellé, l'auteur et le displayId" }
+        - { in: query, name: from, schema: { type: string, format: date-time } }
+        - { in: query, name: to, schema: { type: string, format: date-time } }
+        - { in: query, name: before, schema: { type: integer }, description: Curseur exclusif (id d'entrée) }
+        - { in: query, name: limit, schema: { type: integer, default: 50, maximum: 100 } }
+      responses:
+        '200':
+          description: Page d'entrées
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  entries:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/AuditEntry'
+                  hasMore:
+                    type: boolean
+        '400':
+          description: Paramètre invalide
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuditError'
+        '403':
+          description: super_owner_required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuditError'
+  /audit-logs/meta:
+    get:
+      summary: Valeurs des filtres de l'historique (super-owner)
+      tags: [Audit]
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Entités et actions
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  entities:
+                    type: array
+                    items:
+                      type: string
+                  actions:
+                    type: array
+                    items:
+                      type: string
+                      enum: [create, update, delete]
+        '403':
+          description: super_owner_required
+  /audit-logs/{id}:
+    get:
+      summary: Une entrée de l'historique (super-owner)
+      tags: [Audit]
+      security:
+        - bearerAuth: []
+      parameters:
+        - { in: path, name: id, required: true, schema: { type: integer } }
+      responses:
+        '200':
+          description: Entrée
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuditEntry'
+        '400':
+          description: invalid_id
+        '403':
+          description: super_owner_required
+        '404':
+          description: not_found
   /incidents/{id}/photo:
     get:
       summary: Photo de l'incident (binaire)

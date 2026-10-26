@@ -82,6 +82,10 @@ app.use(morgan('combined', { stream: { write: message => logger.info(message.tri
 app.use(express.json({ limit: '5mb' }));
 app.use(express.urlencoded({ limit: '5mb', extended: true }));
 
+// Historique (AuditLog) : chaque requête porte son contexte d'audit
+const { auditContextMiddleware, runAsSystem } = require('./utils/auditContext');
+app.use(auditContextMiddleware);
+
 // Servir les fichiers statiques (page HTML de configuration)
 console.log('📁 Configuration des fichiers statiques...');
 app.use(express.static('public'));
@@ -118,6 +122,7 @@ const programsRoutes = require('./routes/programs');
 const programAssignmentsRoutes = require('./routes/programAssignments');
 const sessionsRoutes = require('./routes/sessions');
 const incidentsRoutes = require('./routes/incidents');
+const auditLogsRoutes = require('./routes/auditLogs');
 
 // Use routes
 console.log('🔗 Configuration des routes API...');
@@ -140,6 +145,7 @@ app.use('/programs', programsRoutes);
 app.use('/program-assignments', programAssignmentsRoutes);
 app.use('/sessions', sessionsRoutes);
 app.use('/incidents', incidentsRoutes);
+app.use('/audit-logs', auditLogsRoutes);
 console.log('✅ Routes configurées: /gyms, /users, /auth, /plannings, /subscriptions, /subscription-types, /android, /members, /banners, /check-in, /store, /whatsapp, /public, /showcase, /coaches, /programs, /program-assignments, /sessions, /incidents');
 
 // Redirection Beta Download vers Google Play Internal Testing
@@ -252,7 +258,7 @@ const bannerService = require('./services/bannerService');
 cron.schedule('0 * * * *', async () => {
   console.log('🔄 Mise à jour des bannières programmées...');
   try {
-    await bannerService.updateScheduledBanners();
+    await runAsSystem('bannerSchedule', () => bannerService.updateScheduledBanners());
     console.log('✅ Bannières programmées mises à jour');
   } catch (error) {
     console.error('❌ Erreur mise à jour bannières:', error);
@@ -265,7 +271,7 @@ const checkInService = require('./services/checkInService');
 cron.schedule('1 0 * * *', async () => {
   console.log('🔄 Auto checkout des check-ins de la veille...');
   try {
-    const count = await checkInService.autoCheckOutYesterday();
+    const count = await runAsSystem('autoCheckOut', () => checkInService.autoCheckOutYesterday());
     console.log(`✅ ${count} check-ins de la veille fermés automatiquement`);
   } catch (error) {
     console.error('❌ Erreur auto checkout:', error);
@@ -278,7 +284,7 @@ const { checkLowQuotaSubscriptions } = require('./jobs/lowQuotaNotification');
 cron.schedule('0 10 * * *', async () => {
   console.log('🔍 Vérification des quotas de séances bas...');
   try {
-    const result = await checkLowQuotaSubscriptions();
+    const result = await runAsSystem('lowQuotaNotification', () => checkLowQuotaSubscriptions());
     console.log(`✅ Vérification quotas terminée: ${result.notificationsSent} notifications, ${result.emailsSent} emails`);
   } catch (error) {
     console.error('❌ Erreur vérification quotas:', error);
@@ -290,8 +296,10 @@ console.log('✅ Job de vérification des quotas: tous les jours à 10h00');
 const { sendSessionReminders, closePastSessions } = require('./jobs/sessionReminder');
 cron.schedule('*/15 * * * *', async () => {
   try {
-    const reminders = await sendSessionReminders();
-    const closed = await closePastSessions();
+    const { reminders, closed } = await runAsSystem('sessionJobs', async () => ({
+      reminders: await sendSessionReminders(),
+      closed: await closePastSessions(),
+    }));
     if (reminders.sessions || closed.closed) {
       console.log(`✅ Séances : ${reminders.sent} rappel(s), ${closed.closed} clôturée(s), ${closed.absent} absent(s)`);
     }

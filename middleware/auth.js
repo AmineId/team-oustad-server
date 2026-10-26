@@ -2,6 +2,7 @@ const jwt = require('jsonwebtoken');
 const prisma = require('../utils/prismaClient');
 const { CLIENTS, ROLES, normalizeRole } = require('../utils/roles');
 const { isCoachAllowed } = require('./coachGuard');
+const { setAuditActor } = require('../utils/auditContext');
 
 const JWT_SECRET = process.env.JWT_SECRET || 'change_this_secret';
 
@@ -53,5 +54,6 @@ module.exports = async function (req, res, next) {
   }
 
   req.user = payload;
+  setAuditActor(req, payload.sub, payload.type);
   next();
 };
