@@ -9,6 +9,7 @@
 
 const cron = require('node-cron');
 const { getFullName } = require('../utils/nameUtils');
+const { runAsSystem } = require('../utils/auditContext');
 const { 
   checkOverduePayments, 
   checkUpcomingPayments 
@@ -129,7 +130,7 @@ function startDailyPaymentCheckCron(cronSchedule = '0 23 * * *') {
   
   // Planifier le job
   const job = cron.schedule(cronSchedule, async () => {
-    await runDailyPaymentCheck();
+    await runAsSystem('dailyPaymentCheck', () => runDailyPaymentCheck());
   }, {
     scheduled: true,
     timezone: "Europe/Paris"

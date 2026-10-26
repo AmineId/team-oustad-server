@@ -6,7 +6,7 @@ const { sendPasswordResetNotification } = require('../services/notificationServi
 const { splitFullName, getFullName } = require('../utils/nameUtils');
 const { generateUserId } = require('../utils/idGenerator');
 const prisma = require('../utils/prismaClient');
-const { ownerHasPermission, requireOwnerPermission } = require('../utils/ownerPermissions');
+const { ownerHasPermission, requireOwnerPermission, isSuperOwner } = require('../utils/ownerPermissions');
 const { normalizeRole } = require('../utils/roles');
 const { toSafeUser } = require('../utils/safeUser');
 const coachService = require('../services/coachService');
@@ -891,6 +891,9 @@ router.put('/:id', auth, async (req, res) => {
     if (!canUpdate) {
       return res.status(403).json({ error: 'Vous n\'avez pas les permissions pour modifier cet utilisateur' });
     }
+    if (!isSelf && await isSuperOwner(id)) {
+      return res.status(403).json({ error: 'super_owner_protected', message: 'Le super-owner ne peut pas être modifié par un autre compte' });
+    }
 
     // Les permissions d'un owner ne se modifient qu'avec canManageAdmins, et
     // jamais les siennes (pas d'auto-élévation).
@@ -1049,6 +1052,9 @@ router.delete('/:id', auth, async (req, res) => {
 
     if (!canDelete) {
       return res.status(403).json({ error: "Vous n'avez pas les permissions pour supprimer cet utilisateur" });
+    }
+    if (await isSuperOwner(id)) {
+      return res.status(403).json({ error: 'super_owner_protected', message: 'Le super-owner ne peut pas être supprimé' });
     }
 
     // Supprimer les tokens de réinitialisation de mot de passe

@@ -18,6 +18,7 @@
     "migrate:preprod": "dotenv run -f .env.preprod -- prisma migrate deploy",
     "migrate:prod": "dotenv run -f .env.prod -- prisma migrate deploy",
     "studio": "prisma studio",
+    "owner:super": "node scripts/promoteSuperOwner.js",
     "preprod:full": "npm run db:preprod:up && npm run migrate:preprod && npx prisma generate && npm run start:preprod",
     "preprod:setup": "npm run db:preprod:up && npm run migrate:preprod && npx prisma generate && dotenv run -f .env.preprod -- node prisma/seed.js",
     "prod:deploy": "npm run migrate:prod && npm start",

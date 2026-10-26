@@ -38,6 +38,7 @@ async function main() {
   // Clear existing data (safe for dev only) - in correct order due to foreign keys
   console.log('🗑️  Suppression des données existantes...');
   // Delete dependent entities first (planning exercises -> planning days -> plannings)
+  await prisma.auditLog.deleteMany();
   await prisma.planningExercise.deleteMany();
   await prisma.planningDay.deleteMany();
   await prisma.planning.deleteMany();
@@ -263,9 +264,10 @@ async function main() {
       canManageGyms: true,
       canViewReports: true,
       maxGymsAllowed: 10,
+      isSuperOwner: true,
     }
   });
-  console.log(`✅ Owner: ${ownerUser.firstName} ${ownerUser.lastName}`);
+  console.log(`✅ Owner (super-owner): ${ownerUser.firstName} ${ownerUser.lastName}`);
 
   // Manager profiles
   await prisma.manager.create({

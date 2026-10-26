@@ -1,15 +1,16 @@
 const { PrismaClient } = require('@prisma/client');
 const { PrismaPg } = require('@prisma/adapter-pg');
+const { withAudit } = require('./audit');
 
 const globalForPrisma = global;
 
 function createPrismaClient() {
   const adapter = new PrismaPg({ connectionString: process.env.DATABASE_URL });
-  return new PrismaClient({
+  return withAudit(new PrismaClient({
     adapter,
     log: ['error', 'warn'],
     errorFormat: 'pretty',
-  });
+  }));
 }
 
 const prisma = globalForPrisma.prisma || createPrismaClient();

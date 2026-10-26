@@ -1,3 +1,4 @@
+const { flushAudit } = require('../../utils/audit');
 const { randomUUID } = require('crypto');
 const prisma = require('../../utils/prismaClient');
 const bcrypt = require('bcryptjs');
@@ -10,7 +11,10 @@ const uid = () => randomUUID().replace(/-/g, '').slice(0, 10);
  * Clean database - Remove all test data
  */
 async function cleanDatabase() {
+  // Les entrées d'audit s'écrivent après coup : les laisser finir d'abord
+  await flushAudit();
   // Delete in order to respect foreign key constraints
+  await prisma.auditLog.deleteMany({});
   await prisma.passwordResetToken.deleteMany({});
   await prisma.bannerStats.deleteMany({});
   await prisma.bannerVariant.deleteMany({});
@@ -90,7 +94,8 @@ async function createTestOwner(gymId, data = {}) {
           canManageAdmins: data.canManageAdmins !== undefined ? data.canManageAdmins : true,
           canManageGyms: data.canManageGyms !== undefined ? data.canManageGyms : true,
           canViewReports: data.canViewReports !== undefined ? data.canViewReports : true,
-          maxGymsAllowed: data.maxGymsAllowed || 10
+          maxGymsAllowed: data.maxGymsAllowed || 10,
+          isSuperOwner: data.isSuperOwner === true
         }
       }
     },
