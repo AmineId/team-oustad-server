@@ -402,6 +402,29 @@ describe('Authentication Routes', () => {
       expect(response.body.success).toBe(true);
       expect(response.body.member).toBeDefined();
       expect(response.body.member.id).toBe(testMember.id);
+      expect(response.body.quota).toMatchObject({ sessionQuota: 30, sessionsUsed: 0, sessionsRemaining: 30, canCheckIn: true });
+
+      // Kiosk : `qrData` = contenu JSON du QR de l'app (displayId)
+      const kiosk = await request(app)
+        .post('/auth/scan-qr')
+        .set('Authorization', authHeader(testAdmin))
+        .send({ qrData: JSON.stringify({ displayId: testMember.displayId, type: 'member' }) });
+      expect(kiosk.status).toBe(200);
+      expect(kiosk.body.member.id).toBe(testMember.id);
+
+      // Quota épuisé : accès reconnu mais canCheckIn=false
+      await prisma.subscription.update({ where: { id: subscription.id }, data: { sessionsUsed: 30 } });
+      const exhausted = await request(app)
+        .post('/auth/scan-qr')
+        .set('Authorization', authHeader(testAdmin))
+        .send({ qrData: { displayId: testMember.displayId } });
+      expect(exhausted.body.quota).toMatchObject({ sessionsRemaining: 0, canCheckIn: false });
+
+      const noDisplayId = await request(app)
+        .post('/auth/scan-qr')
+        .set('Authorization', authHeader(testAdmin))
+        .send({ qrData: JSON.stringify({ foo: 'bar' }) });
+      expect(noDisplayId.status).toBe(400);
     });
 
     it('should return 403 if non-admin tries to scan', async () => {

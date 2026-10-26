@@ -8,6 +8,7 @@ const { generateUserId } = require('../utils/idGenerator');
 const prisma = require('../utils/prismaClient');
 const { ownerHasPermission, requireOwnerPermission } = require('../utils/ownerPermissions');
 const { normalizeRole } = require('../utils/roles');
+const { toSafeUser } = require('../utils/safeUser');
 const coachService = require('../services/coachService');
 const { CoachError } = coachService;
 const { COACH_REF_SELECT, getCoachGyms, toCoachRef } = require('../utils/staffScope');
@@ -105,7 +106,7 @@ router.get('/me', auth, async (req, res) => {
       return res.status(404).json({ error: 'User not found' });
     }
 
-    res.json(user);
+    res.json(toSafeUser(user));
   } catch (error) {
     handleError(res, error, 500);
   }
@@ -501,7 +502,7 @@ router.post('/', auth, async (req, res) => {
     }
 
     // Retourner l'utilisateur sans le mot de passe
-    const { password: _, ...safeUser } = user;
+    const safeUser = toSafeUser(user);
     res.status(201).json({
       message: shouldSendSetupEmail 
         ? 'Utilisateur créé avec succès. Un email d\'activation a été envoyé.'
@@ -593,7 +594,7 @@ router.get('/', auth, async (req, res) => {
     });
 
     // Masquer les mots de passe
-    const safeUsers = users.map(({ password, ...rest }) => rest);
+    const safeUsers = users.map(toSafeUser);
 
     res.json(safeUsers);
 
@@ -862,7 +863,7 @@ router.get('/:id/qr', auth, async (req, res) => {
 router.put('/:id', auth, async (req, res) => {
   try {
     const id = Number(req.params.id);
-    const { email, firstName, lastName, password, permissions } = req.body;
+    const { email, firstName, lastName, password, permissions, phoneNumber, gymId } = req.body;
 
     const requester = await prisma.user.findUnique({ where: { id: req.user.sub } });
     if (!requester) return res.status(403).json({ error: 'Forbidden' });
@@ -905,6 +906,28 @@ router.put('/:id', auth, async (req, res) => {
     if (lastName) updateData.lastName = lastName;
     if (password) updateData.password = await bcrypt.hash(password, 10);
 
+    if (phoneNumber !== undefined) {
+      if (typeof phoneNumber !== 'string' || !phoneNumber.trim()) {
+        return res.status(400).json({ error: 'invalid_phone', message: 'phoneNumber doit être une chaîne non vide' });
+      }
+      const phone = phoneNumber.trim();
+      const taken = await prisma.user.findFirst({ where: { phoneNumber: phone, id: { not: id } }, select: { id: true } });
+      if (taken) return res.status(400).json({ error: 'phone_taken', message: 'Ce numéro de téléphone est déjà utilisé' });
+      updateData.phoneNumber = phone;
+    }
+
+    // Changement de salle d'un manager : owner avec canManageAdmins uniquement
+    // (la salle d'un coach passe par PATCH /users/:id/gyms)
+    if (gymId !== undefined && Number(gymId) !== targetUser.gymId) {
+      if (targetUser.role !== 'manager' || requester.role !== 'owner' ||
+          !(await ownerHasPermission(requester, 'canManageAdmins'))) {
+        return res.status(403).json({ error: 'gym_change_forbidden', message: 'Seul un owner (canManageAdmins) change la salle d\'un manager' });
+      }
+      const gym = Number.isInteger(Number(gymId)) && await prisma.gym.findUnique({ where: { id: Number(gymId) }, select: { id: true } });
+      if (!gym) return res.status(400).json({ error: 'gym_not_found', message: 'Salle introuvable' });
+      updateData.gymId = gym.id;
+    }
+
     const updatedUser = await prisma.user.update({
       where: { id },
       data: updateData,
@@ -929,8 +952,7 @@ router.put('/:id', auth, async (req, res) => {
       });
     }
 
-    const { password: _, ...safeUser } = updatedUser;
-    res.json(safeUser);
+    res.json(toSafeUser(updatedUser));
 
   } catch (e) {
     if (e.code === 'P2025') return notFound(res, 'User', req.params.id);
