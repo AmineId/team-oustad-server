@@ -1395,6 +1395,15 @@ components:
         isScheduled:
           type: boolean
           example: true
+        notifyMembers:
+          type: boolean
+          example: true
+          description: "Envoie un push FCM (titre, description, image si imageUrl est une URL publique) aux membres ciblés (salle de la bannière, ou toutes les salles si gymId est null ; filtrés par type d'abonnement actif si subscriptionTypeIds est renseigné) dès que la bannière est active et dans ses dates. Un seul envoi par bannière. Le push contient data.type = \"banner\", data.bannerId (displayId) et data.bannerType."
+        notifiedAt:
+          type: string
+          format: date-time
+          nullable: true
+          description: Date d'envoi du push aux membres (null tant qu'il n'est pas parti)
         subscriptionTypes:
           type: array
           items:
@@ -7013,6 +7022,10 @@ paths:
                   type: boolean
                   default: true
                   description: Activation/désactivation automatique selon dates
+                notifyMembers:
+                  type: boolean
+                  default: false
+                  description: "Envoie un push FCM (titre, description, image si imageUrl est une URL publique) aux membres ciblés (salle de la bannière, ou toutes les salles si gymId est null ; filtrés par type d'abonnement actif si subscriptionTypeIds est renseigné) dès que la bannière est active et dans ses dates. Un seul envoi par bannière. Le push contient data.type = \"banner\", data.bannerId (displayId) et data.bannerType."
                 subscriptionTypeIds:
                   type: array
                   items:
@@ -7136,6 +7149,9 @@ paths:
                   type: integer
                 isScheduled:
                   type: boolean
+                notifyMembers:
+                  type: boolean
+                  description: Passer à true sur une bannière déjà visible envoie le push immédiatement (s'il n'est pas déjà parti)
                 subscriptionTypeIds:
                   type: array
                   items:

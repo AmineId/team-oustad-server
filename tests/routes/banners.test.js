@@ -571,4 +571,83 @@ describe('Banners Routes', () => {
       expect(response.status).toBe(200);
     });
   });
+
+  describe('Banner push to members', () => {
+    const { sendMulticastPushNotification } = require('../../services/pushNotificationService');
+
+    // L'envoi part après la réponse : attendre qu'il soit terminé
+    const waitForPush = async () => {
+      for (let i = 0; i < 50 && sendMulticastPushNotification.mock.calls.length === 0; i++) {
+        await new Promise(resolve => setTimeout(resolve, 20));
+      }
+    };
+
+    beforeEach(async () => {
+      sendMulticastPushNotification.mockResolvedValue({ success: true, successCount: 1, failureCount: 0 });
+      await prisma.user.update({ where: { id: testMember.id }, data: { fcmToken: 'member-token' } });
+      await prisma.user.update({ where: { id: testAdmin.id }, data: { fcmToken: 'admin-token' } });
+    });
+
+    const bannerBody = {
+      title: 'Tournoi',
+      description: 'Inscrivez-vous',
+      type: 'event',
+      imageUrl: 'https://cdn.example.com/tournoi.jpg',
+      notifyMembers: true
+    };
+
+    it('should push the banner to the gym members only, once', async () => {
+      const created = await request(app)
+        .post('/banners')
+        .set('Authorization', authHeader(testOwner))
+        .send(bannerBody);
+      expect(created.status).toBe(201);
+      expect(created.body.notifyMembers).toBe(true);
+
+      await waitForPush();
+      expect(sendMulticastPushNotification).toHaveBeenCalledWith(['member-token'], expect.objectContaining({
+        title: 'Tournoi',
+        imageUrl: 'https://cdn.example.com/tournoi.jpg',
+        data: expect.objectContaining({ type: 'banner', bannerId: created.body.displayId })
+      }));
+      const stored = await prisma.banner.findUnique({ where: { id: created.body.id } });
+      expect(stored.notifiedAt).not.toBeNull();
+
+      sendMulticastPushNotification.mockClear();
+      const updated = await request(app)
+        .put(`/banners/${created.body.id}`)
+        .set('Authorization', authHeader(testOwner))
+        .send({ title: 'Tournoi (modifié)' });
+      expect(updated.status).toBe(200);
+      await new Promise(resolve => setTimeout(resolve, 200));
+      expect(sendMulticastPushNotification).not.toHaveBeenCalled();
+    });
+
+    it('should push when notifyMembers is turned on later', async () => {
+      const created = await request(app)
+        .post('/banners')
+        .set('Authorization', authHeader(testOwner))
+        .send({ ...bannerBody, notifyMembers: false });
+      await new Promise(resolve => setTimeout(resolve, 200));
+      expect(sendMulticastPushNotification).not.toHaveBeenCalled();
+
+      await request(app)
+        .put(`/banners/${created.body.id}`)
+        .set('Authorization', authHeader(testOwner))
+        .send({ notifyMembers: true });
+
+      await waitForPush();
+      expect(sendMulticastPushNotification).toHaveBeenCalledTimes(1);
+    });
+
+    it('should wait for the start date of a scheduled banner', async () => {
+      await request(app)
+        .post('/banners')
+        .set('Authorization', authHeader(testOwner))
+        .send({ ...bannerBody, startDate: new Date(Date.now() + 86400000).toISOString() });
+
+      await new Promise(resolve => setTimeout(resolve, 200));
+      expect(sendMulticastPushNotification).not.toHaveBeenCalled();
+    });
+  });
 });

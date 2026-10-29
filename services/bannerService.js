@@ -1,5 +1,6 @@
 const prisma = require('../utils/prismaClient');
 const { generateBannerId, generateBannerVariantId } = require('../utils/idGenerator');
+const { sendMulticastPushNotification } = require('./pushNotificationService');
 
 /**
  * Service pour la gestion des bannières et événements
@@ -156,6 +157,7 @@ class BannerService {
         textColor: data.textColor,
         maxViewsPerUser: data.maxViewsPerUser,
         isScheduled: data.isScheduled !== undefined ? data.isScheduled : true,
+        notifyMembers: data.notifyMembers === true,
         subscriptionTypes: data.subscriptionTypeIds || []
       }
     });
@@ -183,7 +185,8 @@ class BannerService {
       'imageUrl', 'imageBase64', 'videoUrl', 'mediaType',
       'type', 'actionType', 'actionData', 'actionParams',
       'priority', 'isActive', 'gymId',
-      'backgroundColor', 'textColor', 'maxViewsPerUser', 'isScheduled'
+      'backgroundColor', 'textColor', 'maxViewsPerUser', 'isScheduled',
+      'notifyMembers'
     ];
     
     fields.forEach(field => {
@@ -660,6 +663,78 @@ class BannerService {
     });
     
     console.log('Scheduled banners updated');
+
+    // Bannières devenues visibles (activées ci-dessus ou dont la date de début est arrivée)
+    const pending = await prisma.banner.findMany({
+      where: {
+        notifyMembers: true,
+        notifiedAt: null,
+        isActive: true,
+        startDate: { lte: now },
+        endDate: { gte: now }
+      }
+    });
+    for (const banner of pending) {
+      await this.sendBannerPush(banner);
+    }
+  }
+
+  /**
+   * Push FCM (titre, description, image) aux membres ciblés par la bannière :
+   * membres de sa salle (toutes les salles si gymId est null), filtrés par type
+   * d'abonnement actif si subscriptionTypes est renseigné.
+   * Envoyé une seule fois, et seulement si la bannière est visible maintenant.
+   * @returns {Promise<Object|null>} Résultat de l'envoi, ou null si rien à envoyer
+   */
+  async sendBannerPush(banner) {
+    const now = new Date();
+    if (!banner.notifyMembers || banner.notifiedAt || !banner.isActive ||
+        banner.startDate > now || banner.endDate < now) {
+      return null;
+    }
+
+    // Réserve l'envoi : la route et le cron ne peuvent pas l'envoyer deux fois
+    const { count } = await prisma.banner.updateMany({
+      where: { id: banner.id, notifiedAt: null },
+      data: { notifiedAt: now }
+    });
+    if (count === 0) {
+      return null;
+    }
+
+    const where = {
+      role: 'member',
+      fcmToken: { not: null },
+      notificationsEnabled: true
+    };
+    if (banner.gymId) {
+      where.gymId = banner.gymId;
+    }
+    if (banner.subscriptionTypes?.length) {
+      where.Member = {
+        Subscription: {
+          some: { status: 'active', subscriptionTypeId: { in: banner.subscriptionTypes } }
+        }
+      };
+    }
+    const users = await prisma.user.findMany({ where, select: { fcmToken: true } });
+    if (users.length === 0) {
+      return { success: true, successCount: 0, failureCount: 0 };
+    }
+
+    // FCM n'accepte qu'une URL publique (pas de base64 ni de vidéo)
+    const imageUrl = ['image', 'gif'].includes(banner.mediaType) && /^https?:\/\//.test(banner.imageUrl || '')
+      ? banner.imageUrl
+      : undefined;
+
+    return sendMulticastPushNotification(users.map(u => u.fcmToken), {
+      title: banner.title,
+      body: banner.description || 'Nouveauté dans votre salle',
+      imageUrl,
+      data: { type: 'banner', bannerId: banner.displayId, bannerType: banner.type },
+      android: { priority: 'high' },
+      apns: imageUrl ? { payload: { aps: { 'mutable-content': 1 } }, fcmOptions: { imageUrl } } : undefined
+    });
   }
 }
 
