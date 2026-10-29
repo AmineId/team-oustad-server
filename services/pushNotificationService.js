@@ -1,6 +1,8 @@
 // Service pour gérer l'envoi de notifications push via Firebase Cloud Messaging (FCM)
 
-const admin = require('firebase-admin');
+// firebase-admin >= 12 n'expose plus l'API « namespace » (credential, messaging()) : API modulaire
+const { initializeApp, cert } = require('firebase-admin/app');
+const { getMessaging } = require('firebase-admin/messaging');
 const path = require('path');
 const prisma = require('../utils/prismaClient');
 
@@ -12,6 +14,8 @@ const prisma = require('../utils/prismaClient');
 // 4. Ajouter le chemin dans .env: FIREBASE_SERVICE_ACCOUNT_PATH=./firebase-service-account.json
 
 let firebaseInitialized = false;
+
+const FCM_MULTICAST_LIMIT = 500;
 
 function initializeFirebase() {
   if (firebaseInitialized) {
@@ -30,8 +34,8 @@ function initializeFirebase() {
     const absolutePath = path.resolve(process.cwd(), serviceAccountPath);
     const serviceAccount = require(absolutePath);
 
-    admin.initializeApp({
-      credential: admin.credential.cert(serviceAccount)
+    initializeApp({
+      credential: cert(serviceAccount)
     });
 
     firebaseInitialized = true;
@@ -114,7 +118,7 @@ async function sendPushNotification(fcmToken, notification, userId = null) {
       message.apns = notification.apns;
     }
 
-    const response = await admin.messaging().send(message);
+    const response = await getMessaging().send(message);
     console.log(`✅ Notification envoyée avec succès - Message ID: ${response}`);
     
     return { success: true, messageId: response };
@@ -138,7 +142,7 @@ async function sendPushNotification(fcmToken, notification, userId = null) {
 /**
  * Envoyer une notification push à plusieurs utilisateurs
  * @param {string[]} fcmTokens - Liste des tokens FCM
- * @param {Object} notification - Contenu de la notification
+ * @param {Object} notification - Contenu de la notification (title, body, imageUrl?, data?, android?, apns?)
  * @returns {Promise<Object>} Résultat de l'envoi groupé
  */
 async function sendMulticastPushNotification(fcmTokens, notification) {
@@ -166,9 +170,12 @@ async function sendMulticastPushNotification(fcmTokens, notification) {
       notification: {
         title: notification.title,
         body: notification.body
-      },
-      tokens: validTokens
+      }
     };
+
+    if (notification.imageUrl) {
+      message.notification.imageUrl = notification.imageUrl;
+    }
 
     if (notification.data) {
       message.data = notification.data;
@@ -180,7 +187,17 @@ async function sendMulticastPushNotification(fcmTokens, notification) {
       message.apns = notification.apns;
     }
 
-    const response = await admin.messaging().sendEachForMulticast(message);
+    // FCM limite sendEachForMulticast à 500 tokens par appel
+    const response = { successCount: 0, failureCount: 0, responses: [] };
+    for (let i = 0; i < validTokens.length; i += FCM_MULTICAST_LIMIT) {
+      const batch = await getMessaging().sendEachForMulticast({
+        ...message,
+        tokens: validTokens.slice(i, i + FCM_MULTICAST_LIMIT)
+      });
+      response.successCount += batch.successCount;
+      response.failureCount += batch.failureCount;
+      response.responses.push(...batch.responses);
+    }
     console.log(`✅ ${response.successCount}/${validTokens.length} notifications envoyées avec succès`);
     
     if (response.failureCount > 0) {
@@ -621,7 +638,7 @@ async function validateFCMToken(fcmToken) {
     };
 
     // Utiliser validateOnly pour tester sans envoyer réellement
-    await admin.messaging().send(message, true); // dry-run = true
+    await getMessaging().send(message, true); // dry-run = true
     console.log(`✅ Token FCM valide: ${fcmToken.substring(0, 20)}...`);
     return { valid: true };
   } catch (error) {

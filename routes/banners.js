@@ -4,6 +4,13 @@ const authenticateToken = require('../middleware/auth');
 const { requireManagerOrOwner, requireBannerOwner } = require('../middleware/bannerAuth');
 const bannerService = require('../services/bannerService');
 
+/** Push aux membres si la bannière le demande, sans bloquer la réponse. */
+function notifyBannerMembers(banner) {
+  bannerService.sendBannerPush(banner).catch(error => {
+    console.error('Error sending banner push:', error);
+  });
+}
+
 // ==================== PUBLIC ENDPOINTS ====================
 
 /**
@@ -160,7 +167,8 @@ router.post('/', authenticateToken, requireBannerOwner, async (req, res) => {
     }
 
     const banner = await bannerService.createBanner(bannerData);
-    
+    notifyBannerMembers(banner);
+
     res.status(201).json(banner);
   } catch (error) {
     console.error('Error creating banner:', error);
@@ -181,10 +189,11 @@ router.put('/:id', authenticateToken, requireBannerOwner, async (req, res) => {
     const updateData = req.body;
 
     const banner = await bannerService.updateBanner(parseInt(id), updateData);
-    
+
     if (!banner) {
       return res.status(404).json({ error: 'Banner not found' });
     }
+    notifyBannerMembers(banner);
 
     res.json(banner);
   } catch (error) {

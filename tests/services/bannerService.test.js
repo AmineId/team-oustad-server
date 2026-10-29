@@ -19,11 +19,15 @@ jest.mock('../../utils/prismaClient', () => ({
     count: jest.fn(),
     groupBy: jest.fn(),
     findFirst: jest.fn()
+  },
+  user: {
+    findMany: jest.fn()
   }
 }));
 
 const prisma = require('../../utils/prismaClient');
 const bannerService = require('../../services/bannerService');
+const { sendMulticastPushNotification } = require('../../services/pushNotificationService');
 
 const mockBanner = {
   id: 1,
@@ -42,6 +46,23 @@ const mockBanner = {
   subscriptionTypes: [],
   BannerVariant: [],
   Gym: null
+};
+
+const pushBanner = {
+  id: 9,
+  displayId: 'BANNER-push',
+  title: 'Tournoi',
+  description: 'Inscrivez-vous',
+  type: 'event',
+  mediaType: 'image',
+  imageUrl: 'https://cdn.example.com/tournoi.jpg',
+  isActive: true,
+  notifyMembers: true,
+  notifiedAt: null,
+  startDate: new Date(Date.now() - 1000),
+  endDate: new Date(Date.now() + 100000),
+  gymId: 7,
+  subscriptionTypes: []
 };
 
 beforeEach(() => {
@@ -370,8 +391,103 @@ describe('BannerService', () => {
   describe('updateScheduledBanners', () => {
     it('should activate and deactivate banners', async () => {
       prisma.banner.updateMany.mockResolvedValue({ count: 2 });
+      prisma.banner.findMany.mockResolvedValue([]);
       await bannerService.updateScheduledBanners();
       expect(prisma.banner.updateMany).toHaveBeenCalledTimes(2);
+    });
+
+    it('should push banners that became visible and were not notified yet', async () => {
+      prisma.banner.updateMany.mockResolvedValue({ count: 1 });
+      prisma.banner.findMany.mockResolvedValue([{ ...pushBanner }]);
+      prisma.user.findMany.mockResolvedValue([{ fcmToken: 'tok-1' }]);
+
+      await bannerService.updateScheduledBanners();
+
+      expect(prisma.banner.findMany).toHaveBeenCalledWith({
+        where: expect.objectContaining({ notifyMembers: true, notifiedAt: null, isActive: true })
+      });
+      expect(sendMulticastPushNotification).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe('sendBannerPush', () => {
+    beforeEach(() => {
+      prisma.banner.updateMany.mockResolvedValue({ count: 1 });
+      prisma.user.findMany.mockResolvedValue([{ fcmToken: 'tok-1' }, { fcmToken: 'tok-2' }]);
+      sendMulticastPushNotification.mockResolvedValue({ success: true, successCount: 2, failureCount: 0 });
+    });
+
+    it('should send title, description and image to the gym members', async () => {
+      const result = await bannerService.sendBannerPush({ ...pushBanner });
+
+      expect(prisma.banner.updateMany).toHaveBeenCalledWith({
+        where: { id: pushBanner.id, notifiedAt: null },
+        data: { notifiedAt: expect.any(Date) }
+      });
+      expect(prisma.user.findMany).toHaveBeenCalledWith({
+        where: { role: 'member', fcmToken: { not: null }, notificationsEnabled: true, gymId: 7 },
+        select: { fcmToken: true }
+      });
+      expect(sendMulticastPushNotification).toHaveBeenCalledWith(['tok-1', 'tok-2'], expect.objectContaining({
+        title: 'Tournoi',
+        body: 'Inscrivez-vous',
+        imageUrl: 'https://cdn.example.com/tournoi.jpg',
+        data: { type: 'banner', bannerId: 'BANNER-push', bannerType: 'event' }
+      }));
+      expect(result.successCount).toBe(2);
+    });
+
+    it('should target every gym and filter by active subscription type', async () => {
+      await bannerService.sendBannerPush({ ...pushBanner, gymId: null, subscriptionTypes: [3, 4] });
+
+      const { where } = prisma.user.findMany.mock.calls[0][0];
+      expect(where.gymId).toBeUndefined();
+      expect(where.Member).toEqual({
+        Subscription: { some: { status: 'active', subscriptionTypeId: { in: [3, 4] } } }
+      });
+    });
+
+    it('should not attach a video or a non-URL image', async () => {
+      await bannerService.sendBannerPush({ ...pushBanner, mediaType: 'video' });
+      await bannerService.sendBannerPush({ ...pushBanner, imageUrl: null, imageBase64: 'abc' });
+
+      for (const [, notification] of sendMulticastPushNotification.mock.calls) {
+        expect(notification.imageUrl).toBeUndefined();
+        expect(notification.apns).toBeUndefined();
+      }
+    });
+
+    it.each([
+      ['notifyMembers is off', { notifyMembers: false }],
+      ['it was already sent', { notifiedAt: new Date() }],
+      ['the banner is inactive', { isActive: false }],
+      ['the banner has not started', { startDate: new Date(Date.now() + 3600000) }],
+      ['the banner has ended', { endDate: new Date(Date.now() - 1000) }]
+    ])('should not send when %s', async (_, override) => {
+      const result = await bannerService.sendBannerPush({ ...pushBanner, ...override });
+
+      expect(result).toBeNull();
+      expect(prisma.banner.updateMany).not.toHaveBeenCalled();
+      expect(sendMulticastPushNotification).not.toHaveBeenCalled();
+    });
+
+    it('should not send twice when another call already claimed the banner', async () => {
+      prisma.banner.updateMany.mockResolvedValue({ count: 0 });
+
+      const result = await bannerService.sendBannerPush({ ...pushBanner });
+
+      expect(result).toBeNull();
+      expect(prisma.user.findMany).not.toHaveBeenCalled();
+      expect(sendMulticastPushNotification).not.toHaveBeenCalled();
+    });
+
+    it('should not call FCM when nobody can receive it', async () => {
+      prisma.user.findMany.mockResolvedValue([]);
+
+      const result = await bannerService.sendBannerPush({ ...pushBanner });
+
+      expect(result).toEqual({ success: true, successCount: 0, failureCount: 0 });
+      expect(sendMulticastPushNotification).not.toHaveBeenCalled();
     });
   });
 

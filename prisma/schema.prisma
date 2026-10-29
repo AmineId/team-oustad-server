@@ -622,6 +622,8 @@ model Banner {
   textColor         String?
   maxViewsPerUser   Int? // Limite d'affichage par utilisateur
   isScheduled       Boolean         @default(true) // Auto-activation selon dates
+  notifyMembers     Boolean         @default(false) // Push aux membres ciblés quand la bannière devient visible
+  notifiedAt        DateTime? // Date de l'envoi du push (une seule fois par bannière)
   createdAt         DateTime        @default(now())
   updatedAt         DateTime        @updatedAt
   Gym               Gym?            @relation(fields: [gymId], references: [id], onDelete: Cascade)

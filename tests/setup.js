@@ -29,6 +29,7 @@ jest.mock('../services/notificationService', () => ({
 // Mock push notification service to prevent actual notifications during tests
 jest.mock('../services/pushNotificationService', () => ({
   sendPushNotification: jest.fn().mockResolvedValue(true),
+  sendMulticastPushNotification: jest.fn().mockResolvedValue({ success: true, successCount: 0, failureCount: 0 }),
   notifyNewTrainingPlan: jest.fn().mockResolvedValue(true),
   notifyPlanningModified: jest.fn().mockResolvedValue(true),
   notifyPlanningDeleted: jest.fn().mockResolvedValue(true),
