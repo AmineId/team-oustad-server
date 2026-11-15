@@ -185,8 +185,7 @@ class BannerService {
       'imageUrl', 'imageBase64', 'videoUrl', 'mediaType',
       'type', 'actionType', 'actionData', 'actionParams',
       'priority', 'isActive', 'gymId',
-      'backgroundColor', 'textColor', 'maxViewsPerUser', 'isScheduled',
-      'notifyMembers'
+      'backgroundColor', 'textColor', 'maxViewsPerUser', 'isScheduled'
     ];
     
     fields.forEach(field => {
@@ -195,6 +194,11 @@ class BannerService {
       }
     });
     
+    // Même règle qu'à la création : seul le booléen true active le push
+    if (data.notifyMembers !== undefined) {
+      updateData.notifyMembers = data.notifyMembers === true;
+    }
+
     // Dates
     if (data.startDate) {
       updateData.startDate = new Date(data.startDate);
@@ -675,7 +679,11 @@ class BannerService {
       }
     });
     for (const banner of pending) {
-      await this.sendBannerPush(banner);
+      try {
+        await this.sendBannerPush(banner);
+      } catch (error) {
+        console.error(`Error sending banner push ${banner.displayId}:`, error);
+      }
     }
   }
 
@@ -702,6 +710,22 @@ class BannerService {
       return null;
     }
 
+    let result;
+    try {
+      result = await this.pushToMembers(banner);
+    } catch (error) {
+      result = { success: false, error: error.message };
+    }
+
+    // Échec (Firebase non configuré, erreur FCM ou base) : libère la réservation pour que le cron réessaie.
+    // shortcut: si un paquet de 500 échoue après d'autres envoyés, ceux-là reçoivent le push en double au nouvel essai ; suivre par token si ça arrive.
+    if (!result.success) {
+      await prisma.banner.updateMany({ where: { id: banner.id }, data: { notifiedAt: null } });
+    }
+    return result;
+  }
+
+  async pushToMembers(banner) {
     const where = {
       role: 'member',
       fcmToken: { not: null },
