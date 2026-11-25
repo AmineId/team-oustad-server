@@ -281,6 +281,12 @@ describe('BannerService', () => {
       expect(updatedData.startDate).toBeInstanceOf(Date);
       expect(updatedData.endDate).toBeInstanceOf(Date);
     });
+
+    it('should only accept true as notifyMembers, like createBanner', async () => {
+      prisma.banner.update.mockResolvedValue(mockBanner);
+      await bannerService.updateBanner(1, { notifyMembers: 'true' });
+      expect(prisma.banner.update.mock.calls[0][0].data.notifyMembers).toBe(false);
+    });
   });
 
   describe('deleteBanner', () => {
@@ -488,6 +494,33 @@ describe('BannerService', () => {
 
       expect(result).toEqual({ success: true, successCount: 0, failureCount: 0 });
       expect(sendMulticastPushNotification).not.toHaveBeenCalled();
+    });
+
+    it.each([
+      ['FCM fails', () => sendMulticastPushNotification.mockResolvedValue({ success: false, error: 'Firebase non configuré' })],
+      ['the member query throws', () => prisma.user.findMany.mockRejectedValue(new Error('db down'))]
+    ])('should release the reservation when %s, so the cron retries', async (_, arrange) => {
+      arrange();
+
+      const result = await bannerService.sendBannerPush({ ...pushBanner });
+
+      expect(result.success).toBe(false);
+      expect(prisma.banner.updateMany).toHaveBeenLastCalledWith({
+        where: { id: pushBanner.id },
+        data: { notifiedAt: null }
+      });
+    });
+
+    it('should keep pushing the other banners when one fails in the cron', async () => {
+      prisma.banner.findMany.mockResolvedValue([{ ...pushBanner, id: 1 }, { ...pushBanner, id: 2 }]);
+      prisma.banner.updateMany
+        .mockResolvedValueOnce({ count: 1 }) // activation
+        .mockResolvedValueOnce({ count: 1 }) // désactivation
+        .mockRejectedValueOnce(new Error('db down')); // réservation de la 1re bannière
+
+      await bannerService.updateScheduledBanners();
+
+      expect(sendMulticastPushNotification).toHaveBeenCalledTimes(1);
     });
   });
 
